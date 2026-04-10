@@ -32,6 +32,12 @@ export function AuthProvider({ children }) {
     return adminData;
   };
 
+  const loginFromData = (token, adminData) => {
+    localStorage.setItem('token', token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setAdmin(adminData);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
@@ -39,7 +45,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ admin, loading, login, logout }}>
+    <AuthContext.Provider value={{ admin, loading, login, logout, loginFromData }}>
       {children}
     </AuthContext.Provider>
   );
