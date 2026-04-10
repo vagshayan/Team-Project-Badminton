@@ -1,4 +1,4 @@
-# 🏸 Badminton Tournament Management System
+# Tournament Management System
 > Elite Multi-Sport Management Platform for University Tournaments.
 
 ## 🌟 Key Features
