@@ -8,279 +8,167 @@ const CAT_LABELS = {
 };
 
 const FACULTIES = [
-  'Faculty of Arts',
-  'Faculty of Agriculture',
-  'Faculty of Allied Health Sciences',
-  'Faculty of Engineering',
-  'Faculty of Hindu Studies',
-  'Faculty of Management Studies & Commerce',
-  'Faculty of Medicine',
-  'Faculty of Science',
-  'Faculty of Performing & Visual Arts',
-  'Faculty of Technology',
+  'Faculty of Arts', 'Faculty of Agriculture', 'Faculty of Allied Health Sciences',
+  'Faculty of Engineering', 'Faculty of Hindu Studies', 'Faculty of Management Studies & Commerce',
+  'Faculty of Medicine', 'Faculty of Science', 'Faculty of Performing & Visual Arts', 'Faculty of Technology',
 ];
 
-// Reg No validation: 20XX/XXX/XXX or 20XX/XX/XXX
-// 20 + 2 digits / 2-3 uppercase letters / 3 digits
-const validateRegNo = (val) => {
-  return /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/.test(val);
-};
-
-const validatePhone = (val) => {
-  return /^\d{10}$/.test(val);
-};
+const validateRegNo = (val) => /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/.test(val);
+const validatePhone = (val) => /^\d{10}$/.test(val);
 
 export default function RegisterModal({ tournament, onClose }) {
   const isDoubles = DOUBLES.includes(tournament.category);
+  const sportColor = tournament.sport === 'badminton' ? '#C8A84B' : (tournament.sport === 'table-tennis' ? '#8B5CF6' : '#EC4899');
 
-  const [form, setForm] = useState({
-    playerName: '',
-    regNo: '',
-    nicNo: '',
-    address: '',
-    email: '',
-    phone: '',
-    faculty: '',
-    partnerName: '',
-    partnerRegNo: '',
-  });
-
+  const [form, setForm] = useState({ playerName: '', regNo: '', nicNo: '', address: '', email: '', phone: '', faculty: '', partnerName: '', partnerRegNo: '' });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const set = (k, v) => {
-    setForm((p) => ({ ...p, [k]: v }));
-    setErrors((p) => ({ ...p, [k]: '' }));
-  };
+  const set = (k, v) => { setForm((p) => ({ ...p, [k]: v })); setErrors((p) => ({ ...p, [k]: '' })); };
 
   const validate = () => {
     const newErrors = {};
-
     if (!form.playerName.trim()) newErrors.playerName = 'Full name is required';
-
-    if (!form.regNo.trim()) {
-      newErrors.regNo = 'Registration number is required';
-    } else if (!validateRegNo(form.regNo.trim())) {
-      newErrors.regNo = 'Format: 20XX/XXX/XXX or 20XX/XX/XXX (e.g. 2023/CSE/001)';
-    }
-
-    if (!form.nicNo.trim()) newErrors.nicNo = 'NIC number is required';
-
-    if (!form.address.trim()) newErrors.address = 'Address is required';
-
-    if (!form.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
-      newErrors.email = 'Invalid email format';
-    }
-
-    if (!form.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!validatePhone(form.phone.trim())) {
-      newErrors.phone = 'Phone must be exactly 10 digits';
-    }
-
-    if (!form.faculty) newErrors.faculty = 'Faculty is required';
-
+    if (!form.regNo.trim()) newErrors.regNo = 'Required'; else if (!validateRegNo(form.regNo.trim())) newErrors.regNo = 'Invalid format';
+    if (!form.nicNo.trim()) newErrors.nicNo = 'Required';
+    if (!form.address.trim()) newErrors.address = 'Required';
+    if (!form.email.trim()) newErrors.email = 'Required'; else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid';
+    if (!form.phone.trim()) newErrors.phone = 'Required'; else if (!validatePhone(form.phone.trim())) newErrors.phone = '10 digits';
+    if (!form.faculty) newErrors.faculty = 'Required';
     if (isDoubles) {
-      if (!form.partnerName.trim()) newErrors.partnerName = 'Partner name is required';
-      if (!form.partnerRegNo.trim()) {
-        newErrors.partnerRegNo = 'Partner reg no is required';
-      } else if (!validateRegNo(form.partnerRegNo.trim())) {
-        newErrors.partnerRegNo = 'Format: 20XX/XXX/XXX or 20XX/XX/XXX';
-      }
+      if (!form.partnerName.trim()) newErrors.partnerName = 'Required';
+      if (!form.partnerRegNo.trim()) newErrors.partnerRegNo = 'Required'; else if (!validateRegNo(form.partnerRegNo.trim())) newErrors.partnerRegNo = 'Invalid';
     }
-
     return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError('');
-
     const validationErrors = validate();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
+    if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return; }
     setLoading(true);
     try {
       await axios.post('/api/registrations', {
-        tournament: tournament._id,
-        playerName: form.playerName.trim(),
-        rollNumber: form.regNo.trim(),
-        nicNo: form.nicNo.trim(),
-        address: form.address.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        department: form.faculty,
-        year: 'N/A',
-        partnerName: form.partnerName.trim(),
-        partnerRollNumber: form.partnerRegNo.trim(),
+        tournament: tournament._id, playerName: form.playerName.trim(), rollNumber: form.regNo.trim(),
+        nicNo: form.nicNo.trim(), address: form.address.trim(), email: form.email.trim(), phone: form.phone.trim(),
+        department: form.faculty, partnerName: form.partnerName.trim(), partnerRollNumber: form.partnerRegNo.trim(),
       });
       setSuccess(true);
     } catch (err) {
-      setSubmitError(err.response?.data?.message || 'Registration failed. Try again.');
+      setSubmitError(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   if (success) return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 420, textAlign: 'center' }}>
-        <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-        <h3 style={{ fontFamily: 'var(--font-d)', fontSize: 26, color: 'var(--success)', letterSpacing: 2, marginBottom: 10 }}>REGISTERED!</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 }}>Successfully registered for:</p>
-        <p style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 4 }}>{CAT_LABELS[tournament.category]} — {tournament.year}</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 28 }}>📍 {tournament.venue} · 🕐 {tournament.time}</p>
-        <button className="btn btn-primary btn-full" onClick={onClose}>CLOSE</button>
+    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...sh.card, maxWidth: 450, padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>✅</div>
+          <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>VERIFIED!</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.6, marginBottom: 32 }}>
+             You have successfully registered for:<br/>
+             <strong style={{ color: 'var(--text)' }}>{CAT_LABELS[tournament.category]}</strong>
+          </p>
+          <button onClick={onClose} style={{ ...sh.submitBtn, background: '#10B981', color: '#FFF', width: '100%', borderRadius: 16 }}>DONE</button>
       </div>
+      <style>{`
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+      `}</style>
     </div>
   );
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 580 }}>
-        <div className="modal-title">REGISTER FOR TOURNAMENT</div>
-
-        {/* Tournament info */}
-        <div style={{ padding: '10px 14px', background: 'var(--dark3)', borderRadius: 6, marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
-          <span>📅 {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
-          <span>🕐 {tournament.time}</span>
-          <span>📍 {tournament.venue}</span>
+    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...sh.card, maxWidth: 650 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 950, color: sportColor, letterSpacing: -0.5 }}>REGISTER FOR TOURNAMENT</h2>
+          <button onClick={onClose} style={sh.closeBtn}>✕</button>
         </div>
 
-        {submitError && <div className="alert alert-error">⚠ {submitError}</div>}
+        <div style={sh.infoBar}>
+           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
+              <span style={{ fontSize: 13, color: 'var(--border)' }}>|</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>📍 {tournament.venue} · 🕐 {tournament.time}</span>
+           </div>
+        </div>
 
-        <form onSubmit={handleSubmit}>
+        {submitError && <div style={sh.errorBox}>⚠ {submitError}</div>}
 
-          {/* Full Name */}
-          <div className="form-group">
-            <label>Full Name</label>
-            <input
-              type="text"
-              value={form.playerName}
-              onChange={(e) => set('playerName', e.target.value)}
-              placeholder="Your full name"
-            />
-            {errors.playerName && <span style={errStyle}>{errors.playerName}</span>}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={sh.field}>
+            <label style={sh.label}>FULL NAME</label>
+            <input type="text" value={form.playerName} onChange={(e) => set('playerName', e.target.value)} placeholder="Full Name" style={sh.input} />
+            {errors.playerName && <span style={sh.errMsg}>{errors.playerName}</span>}
           </div>
 
-          {/* Reg No + NIC */}
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Registration Number</label>
-              <input
-                type="text"
-                value={form.regNo}
-                onChange={(e) => set('regNo', e.target.value.toUpperCase())}
-                placeholder="e.g. 2023/CSE/001"
-              />
-              {errors.regNo && <span style={errStyle}>{errors.regNo}</span>}
+          <div style={sh.grid}>
+            <div style={sh.field}>
+              <label style={sh.label}>REGISTRATION NUMBER</label>
+              <input type="text" value={form.regNo} onChange={(e) => set('regNo', e.target.value.toUpperCase())} placeholder="2023/CSE/001" style={sh.input} />
+              {errors.regNo && <span style={sh.errMsg}>{errors.regNo}</span>}
             </div>
-            <div className="form-group">
-              <label>NIC Number</label>
-              <input
-                type="text"
-                value={form.nicNo}
-                onChange={(e) => set('nicNo', e.target.value)}
-                placeholder="e.g. 200012345678"
-              />
-              {errors.nicNo && <span style={errStyle}>{errors.nicNo}</span>}
+            <div style={sh.field}>
+              <label style={sh.label}>NIC NUMBER</label>
+              <input type="text" value={form.nicNo} onChange={(e) => set('nicNo', e.target.value)} placeholder="Identity No" style={sh.input} />
+              {errors.nicNo && <span style={sh.errMsg}>{errors.nicNo}</span>}
             </div>
           </div>
 
-          {/* Address */}
-          <div className="form-group">
-            <label>Address</label>
-            <input
-              type="text"
-              value={form.address}
-              onChange={(e) => set('address', e.target.value)}
-              placeholder="Your home address"
-            />
-            {errors.address && <span style={errStyle}>{errors.address}</span>}
-          </div>
-
-          {/* Email + Phone */}
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                placeholder="your@email.com"
-              />
-              {errors.email && <span style={errStyle}>{errors.email}</span>}
+          <div style={sh.grid}>
+            <div style={sh.field}>
+              <label style={sh.label}>EMAIL ADDRESS</label>
+              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Email" style={sh.input} />
+              {errors.email && <span style={sh.errMsg}>{errors.email}</span>}
             </div>
-            <div className="form-group">
-              <label>Phone Number</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="10-digit number"
-                maxLength={10}
-              />
-              {errors.phone && <span style={errStyle}>{errors.phone}</span>}
+            <div style={sh.field}>
+              <label style={sh.label}>PHONE</label>
+              <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))} placeholder="07XXXXXXXX" style={sh.input} maxLength={10} />
+              {errors.phone && <span style={sh.errMsg}>{errors.phone}</span>}
             </div>
           </div>
 
-          {/* Faculty */}
-          <div className="form-group">
-            <label>Faculty</label>
-            <select value={form.faculty} onChange={(e) => set('faculty', e.target.value)}>
+          <div style={sh.field}>
+            <label style={sh.label}>FACULTY / DEPARTMENT</label>
+            <select value={form.faculty} onChange={(e) => set('faculty', e.target.value)} style={sh.input}>
               <option value="">Select your faculty</option>
-              {FACULTIES.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
+              {FACULTIES.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-            {errors.faculty && <span style={errStyle}>{errors.faculty}</span>}
+            {errors.faculty && <span style={sh.errMsg}>{errors.faculty}</span>}
           </div>
 
-          {/* Partner fields for doubles */}
+          <div style={sh.field}>
+            <label style={sh.label}>HOME ADDRESS</label>
+            <input type="text" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Residential Address" style={sh.input} />
+            {errors.address && <span style={sh.errMsg}>{errors.address}</span>}
+          </div>
+
           {isDoubles && (
-            <>
-              <div style={{ borderTop: '1px dashed var(--border)', margin: '6px 0 18px', paddingTop: 16 }}>
-                <p style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600, marginBottom: 14, letterSpacing: 1 }}>
-                  PARTNER DETAILS (DOUBLES)
-                </p>
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label>Partner Full Name</label>
-                  <input
-                    type="text"
-                    value={form.partnerName}
-                    onChange={(e) => set('partnerName', e.target.value)}
-                    placeholder="Partner's full name"
-                  />
-                  {errors.partnerName && <span style={errStyle}>{errors.partnerName}</span>}
+            <div style={sh.doublesSection}>
+              <div style={{ fontSize: 11, fontWeight: 900, color: sportColor, letterSpacing: 2, marginBottom: 16 }}>PARTNER DETAILS (DOUBLES)</div>
+              <div style={sh.grid}>
+                <div style={sh.field}>
+                  <label style={sh.label}>PARTNER NAME</label>
+                  <input type="text" value={form.partnerName} onChange={(e) => set('partnerName', e.target.value)} placeholder="Partner full name" style={sh.input} />
+                  {errors.partnerName && <span style={sh.errMsg}>{errors.partnerName}</span>}
                 </div>
-                <div className="form-group">
-                  <label>Partner Reg Number</label>
-                  <input
-                    type="text"
-                    value={form.partnerRegNo}
-                    onChange={(e) => set('partnerRegNo', e.target.value.toUpperCase())}
-                    placeholder="e.g. 2023/CSE/002"
-                  />
-                  {errors.partnerRegNo && <span style={errStyle}>{errors.partnerRegNo}</span>}
+                <div style={sh.field}>
+                  <label style={sh.label}>PARTNER REG NO</label>
+                  <input type="text" value={form.partnerRegNo} onChange={(e) => set('partnerRegNo', e.target.value.toUpperCase())} placeholder="2023/CSE/002" style={sh.input} />
+                  {errors.partnerRegNo && <span style={sh.errMsg}>{errors.partnerRegNo}</span>}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>CANCEL</button>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
-              {loading ? <><span className="spinner" style={{ width: 14, height: 14 }} /> REGISTERING...</> : 'REGISTER NOW'}
+          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+            <button type="button" onClick={onClose} style={sh.cancelBtn}>CANCEL</button>
+            <button type="submit" disabled={loading} style={{ ...sh.submitBtn, background: sportColor }}>
+              {loading ? 'SYNCING...' : 'REGISTER NOW'}
             </button>
           </div>
         </form>
@@ -289,9 +177,18 @@ export default function RegisterModal({ tournament, onClose }) {
   );
 }
 
-const errStyle = {
-  display: 'block',
-  color: '#FC8181',
-  fontSize: 11,
-  marginTop: 4,
+const sh = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(15px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
+  card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 32, padding: 50, width: '100%', position: 'relative', boxShadow: 'var(--shadow)', maxHeight: '95vh', overflowY: 'auto' },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer' },
+  infoBar: { background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '16px 20px', borderRadius: 16, marginBottom: 32 },
+  errorBox: { background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', color: '#FCA5A5', padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, textAlign: 'center' },
+  field: { display: 'flex', flexDirection: 'column', gap: 6 },
+  label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' },
+  input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
+  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
+  doublesSection: { borderTop: '1px solid var(--border)', paddingTop: 24, marginTop: 12 },
+  errMsg: { fontSize: 10, color: '#EF4444', fontWeight: 700, marginTop: 4 },
+  cancelBtn: { flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
+  submitBtn: { flex: 2, border: 'none', color: '#000', padding: '16px', borderRadius: 14, fontWeight: 950, fontSize: 14, cursor: 'pointer', letterSpacing: 0.5 }
 };

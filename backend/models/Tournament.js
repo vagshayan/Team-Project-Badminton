@@ -13,9 +13,14 @@ const tournamentSchema = new mongoose.Schema(
       enum: ['singles-men', 'singles-women', 'doubles-men', 'doubles-women', 'mixed-doubles'],
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+    isLocked: { type: Boolean, default: false }, // If true, new registrations are blocked
+    winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
+
+// Prevent duplicate tournaments for same sport, year and category
+tournamentSchema.index({ sport: 1, year: 1, category: 1 }, { unique: true });
 
 module.exports = mongoose.model('Tournament', tournamentSchema);

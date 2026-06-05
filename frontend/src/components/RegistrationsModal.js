@@ -16,65 +16,76 @@ export default function RegistrationsModal({ tournament, onClose }) {
   useEffect(() => {
     axios.get(`/api/registrations/tournament/${tournament._id}`)
       .then((res) => setRegistrations(res.data))
-      .catch(() => setError('Failed to load registrations'))
+      .catch(() => setError('Failed to load registered players'))
       .finally(() => setLoading(false));
   }, [tournament._id]);
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 900 }}>
-        <div className="modal-title">REGISTRATIONS</div>
-
-        {/* Tournament info */}
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '10px 14px', background: 'var(--dark3)', borderRadius: 6, marginBottom: 16 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, background: 'rgba(200,168,75,0.12)', border: '1px solid rgba(200,168,75,0.25)', color: 'var(--primary)', padding: '3px 10px', borderRadius: 3 }}>
-            {CAT_LABELS[tournament.category]}
-          </span>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>📅 {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>🕐 {tournament.time}</span>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>📍 {tournament.venue}</span>
-          <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-d)', fontSize: 22, fontWeight: 700, color: 'var(--primary)' }}>{tournament.year}</span>
+    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={sh.card}>
+        <div style={sh.header}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <div>
+                  <div style={sh.badge}>DOMAIN: {tournament.sport.toUpperCase()}</div>
+                  <h2 style={sh.title}>REGISTERED PLAYERS</h2>
+                  <p style={sh.subtitle}>Full list of participants for {CAT_LABELS[tournament.category]}.</p>
+               </div>
+               <button onClick={onClose} style={sh.closeBtn}>✕</button>
+            </div>
+            
+            <div style={sh.infoBar}>
+               <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                  <div style={{ fontWeight: 950, fontSize: 24, color: 'var(--primary)' }}>{tournament.year}</div>
+                  <div style={{ display: 'flex', gap: 15, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
+                     <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
+                     <span>📍 {tournament.venue}</span>
+                  </div>
+               </div>
+            </div>
         </div>
 
         {loading ? (
-          <div className="spinner-wrap"><div className="spinner" /> Loading...</div>
+          <div style={sh.status}>
+             <div className="spinner" style={{ width: 40, height: 40, borderTopColor: 'var(--primary)' }} />
+             <p style={{ marginTop: 20 }}>Syncing player data...</p>
+          </div>
         ) : error ? (
-          <div className="alert alert-error">{error}</div>
+          <div style={sh.errorBox}>⚠ {error}</div>
         ) : registrations.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--dark3)', borderRadius: 6 }}>
-            <div style={{ fontSize: 40 }}>📋</div>
-            <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>No registrations yet for this tournament.</p>
+          <div style={sh.status}>
+             <div style={{ fontSize: 50, marginBottom: 15 }}>📋</div>
+             <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
+          <div style={sh.tableBox}>
+            <table style={sh.table}>
+              <thead style={sh.thead}>
                 <tr>
-                  <th>#</th>
-                  <th>Full Name</th>
-                  <th>Reg No</th>
-                  <th>NIC No</th>
-                  <th>Address</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Faculty</th>
-                  {isDoubles && <th>Partner Name</th>}
-                  {isDoubles && <th>Partner Reg No</th>}
+                  <th style={sh.th}>#</th>
+                  <th style={sh.th}>PARTICIPANT NAME</th>
+                  <th style={sh.th}>REG NUMBER</th>
+                  <th style={sh.th}>FACULTY</th>
+                  <th style={sh.th}>CONTACT</th>
+                  {isDoubles && <th style={sh.th}>PARTNER INFO</th>}
                 </tr>
               </thead>
               <tbody>
                 {registrations.map((r, i) => (
-                  <tr key={r._id}>
-                    <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                    <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{r.playerName}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.rollNumber}</td>
-                    <td style={{ fontSize: 12 }}>{r.nicNo || '—'}</td>
-                    <td style={{ fontSize: 12, maxWidth: 150, wordBreak: 'break-word' }}>{r.address || '—'}</td>
-                    <td style={{ fontSize: 12 }}>{r.email}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.phone}</td>
-                    <td style={{ fontSize: 12 }}>{r.department}</td>
-                    {isDoubles && <td style={{ whiteSpace: 'nowrap' }}>{r.partnerName || '—'}</td>}
-                    {isDoubles && <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.partnerRollNumber || '—'}</td>}
+                  <tr key={r._id} style={sh.tr}>
+                    <td style={{ ...sh.td, color: 'var(--text-muted)', fontWeight: 800 }}>{String(i + 1).padStart(2, '0')}</td>
+                    <td style={{ ...sh.td, fontWeight: 900, fontSize: 15 }}>{r.playerName}</td>
+                    <td style={{ ...sh.td, fontWeight: 800, color: 'var(--primary)', letterSpacing: 0.5 }}>{r.rollNumber}</td>
+                    <td style={{ ...sh.td, fontSize: 13, fontWeight: 700 }}>{r.department}</td>
+                    <td style={sh.td}>
+                       <div style={{ fontSize: 13, fontWeight: 700 }}>📞 {r.phone}</div>
+                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{r.email}</div>
+                    </td>
+                    {isDoubles && (
+                       <td style={sh.td}>
+                          <div style={{ fontWeight: 800, fontSize: 13 }}>{r.partnerName || '—'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.partnerRollNumber || '—'}</div>
+                       </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -82,13 +93,38 @@ export default function RegistrationsModal({ tournament, onClose }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            Total: <strong style={{ color: 'var(--text)' }}>{registrations.length}</strong> registrations
-          </span>
-          <button className="btn btn-ghost" onClick={onClose}>CLOSE</button>
+        <div style={sh.footer}>
+           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)' }}>
+              TOTAL ENROLLED: <span style={{ color: 'var(--text)', fontWeight: 950 }}>{registrations.length} PLAYERS</span>
+           </div>
+           <button onClick={onClose} style={sh.closeBtnAction}>CLOSE VIEW</button>
         </div>
       </div>
+      <style>{`
+         .spinner { border: 4px solid var(--border); border-radius: 50%; animation: spin 0.8s linear infinite; }
+         @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
+
+const sh = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 40 },
+  card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 44, padding: 50, width: '100%', maxWidth: 1100, boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto' },
+  header: { marginBottom: 32 },
+  badge: { fontSize: 10, fontWeight: 950, color: 'var(--primary)', background: 'var(--bg-input)', padding: '6px 14px', borderRadius: 8, display: 'inline-block', marginBottom: 12, letterSpacing: 1.5 },
+  title: { fontSize: 36, fontWeight: 950, letterSpacing: -1.5, marginBottom: 8 },
+  subtitle: { color: 'var(--text-muted)', fontSize: 15, fontWeight: 500 },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 24, cursor: 'pointer', padding: 10 },
+  infoBar: { background: 'var(--bg-input)', padding: '20px 30px', borderRadius: 24, border: '1px solid var(--border)', marginTop: 24 },
+  status: { minHeight: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
+  errorBox: { background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '16px', borderRadius: 16, textAlign: 'center' },
+  tableBox: { borderRadius: 28, border: '1px solid var(--border)', overflow: 'hidden' },
+  table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
+  thead: { background: 'var(--bg-input)', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 1.5 },
+  th: { padding: '20px 30px' },
+  tr: { borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)' },
+  td: { padding: '24px 30px' },
+  footer: { marginTop: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 24, borderTop: '1px solid var(--border)' },
+  closeBtnAction: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 30px', borderRadius: 16, fontWeight: 900, cursor: 'pointer', fontSize: 13 }
+};
