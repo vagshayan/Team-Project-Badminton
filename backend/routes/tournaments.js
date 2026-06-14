@@ -30,44 +30,95 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
     seeded2 = null;
   }
 
-  const rest = players.filter(p => {
+  const rest = shuffle(players.filter(p => {
     if (seeded1 && p._id.toString() === seeded1._id.toString()) return false;
     if (seeded2 && p._id.toString() === seeded2._id.toString()) return false;
     return true;
-  });
+  }));
 
-  const shuffledRest = shuffle(rest);
-  const n = players.length;
-  const byeCount = bracketSize - n;
-  const fightingCount = n - byeCount;
+  const totalMatches    = bracketSize / 2;
+  const naturalByes     = bracketSize - players.length;
+  const fightingPlayers = players.length - naturalByes;
+  const r1Winners       = fightingPlayers / 2;
+
+  const canPlaceChamp    = !!seeded1 && naturalByes >= 1 && r1Winners >= 1;
+  const canPlaceRunnerup = !!seeded2 && naturalByes >= 2 && r1Winners >= 2;
+  const activeSeedByes   = (canPlaceChamp ? 1 : 0) + (canPlaceRunnerup ? 1 : 0);
+
+  // Seeds that can't be placed rejoin as fighters
+  const extraFighters = [];
+  if (seeded1 && !canPlaceChamp)    extraFighters.push(seeded1);
+  if (seeded2 && !canPlaceRunnerup) extraFighters.push(seeded2);
+
+  const allRest      = [...rest, ...extraFighters];
+  const restByes     = naturalByes - activeSeedByes; // e.g. 4-2=2
+  const fighters     = allRest.slice(0, fightingPlayers); // exactly 8
+  const byeRest      = allRest.slice(fightingPlayers);    // exactly 2
+
+  // Pre-calculate which matchIdx slots are reserved
+  // M0 = first fighting match (always)
+  // M1 = Champion bye (if canPlaceChamp)
+  // M(last-1) = last fighting match (if canPlaceRunnerup)
+  // M(last)   = Runner-up bye (if canPlaceRunnerup)
+  // Everything else = distribute remaining fighters first, then byeRest
+
+  const reservedSlots = new Set();
+  reservedSlots.add(0); // first fighting match
+  if (canPlaceChamp)    reservedSlots.add(1);
+  if (canPlaceRunnerup) reservedSlots.add(totalMatches - 1);
+  if (canPlaceRunnerup) reservedSlots.add(totalMatches - 2);
+
+  // Count how many middle slots exist
+  const middleSlots = [];
+  for (let i = 0; i < totalMatches; i++) {
+    if (!reservedSlots.has(i)) middleSlots.push(i);
+  }
+
+  // Fighters used: 2 for M0 + 2 for M(last-1) if runnerup = fightingPlayers
+  // Remaining fighters for middle = fightingPlayers - 2 - (canPlaceRunnerup ? 2 : 0)
+  const fightersUsedByReserved = 2 + (canPlaceRunnerup ? 2 : 0);
+  const middleFighterPairs     = (fightingPlayers - fightersUsedByReserved) / 2;
+  // Remaining middle slots go to byeRest players
 
   const result = new Array(bracketSize).fill(null);
+  let fighterIdx = 0;
+  let byeRestIdx = 0;
+  let middleFighterPairsPlaced = 0;
 
-  let restIdx = 0;
-  for (let i = 0; i < fightingCount; i++) {
-    result[i] = shuffledRest[restIdx++];
-  }
+  for (let matchIdx = 0; matchIdx < totalMatches; matchIdx++) {
+    const slot = matchIdx * 2;
 
-  const byePlayers = shuffledRest.slice(restIdx);
-  const totalPairs = bracketSize / 2;
-  const fightingPairs = fightingCount / 2;
-  const byePairs = totalPairs - fightingPairs;
-  const byeSlotPlayers = new Array(byePairs).fill(null);
+    if (matchIdx === 0) {
+      // First fighting match → winner faces Champion in R2
+      result[slot]     = fighters[fighterIdx++];
+      result[slot + 1] = fighters[fighterIdx++];
 
-  if (seeded1) byeSlotPlayers[0] = seeded1;
-  if (seeded2) byeSlotPlayers[byePairs - 1] = seeded2;
+    } else if (matchIdx === 1 && canPlaceChamp) {
+      // Champion bye
+      result[slot]     = seeded1;
+      result[slot + 1] = null;
 
-  let byeIdx = 0;
-  for (let i = 0; i < byeSlotPlayers.length; i++) {
-    if (byeSlotPlayers[i] === null && byeIdx < byePlayers.length) {
-      byeSlotPlayers[i] = byePlayers[byeIdx++];
+    } else if (matchIdx === totalMatches - 2 && canPlaceRunnerup) {
+      // Last fighting match → winner faces Runner-up in R2
+      result[slot]     = fighters[fighterIdx++];
+      result[slot + 1] = fighters[fighterIdx++];
+
+    } else if (matchIdx === totalMatches - 1 && canPlaceRunnerup) {
+      // Runner-up bye
+      result[slot]     = seeded2;
+      result[slot + 1] = null;
+
+    } else {
+      // Middle slots — fighters first, then byeRest
+      if (middleFighterPairsPlaced < middleFighterPairs) {
+        result[slot]     = fighters[fighterIdx++];
+        result[slot + 1] = fighters[fighterIdx++];
+        middleFighterPairsPlaced++;
+      } else {
+        result[slot]     = byeRest[byeRestIdx++] || null;
+        result[slot + 1] = null;
+      }
     }
-  }
-
-  for (let i = 0; i < byePairs; i++) {
-    const slotIndex = fightingCount + (i * 2);
-    result[slotIndex] = byeSlotPlayers[i];
-    result[slotIndex + 1] = null;
   }
 
   return result;
@@ -276,9 +327,18 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
     const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
     if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
-
+   /*
     const n = confirmedRegs.length;
     const bracketSize = nextPowerOf2(n);
+        // Expand bracket if seeds need bye slots but bracket is already full
+    if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
+      const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
+      if (bracketSize === n) bracketSize = bracketSize * 2;
+    }
+    const rounds = Math.log2(bracketSize);
+    */
+    const n = confirmedRegs.length;
+    let bracketSize = nextPowerOf2(n);
     const rounds = Math.log2(bracketSize);
 
     let orderedPlayers;
