@@ -10,6 +10,7 @@ const tournamentSchema = new mongoose.Schema({
   category: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
   isActive: { type: Boolean, default: true },
+  isPublished: { type: Boolean, default: false },
 }, { timestamps: true });
 
 const registrationSchema = new mongoose.Schema({
