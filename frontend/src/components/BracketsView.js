@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import axios from 'axios';
 import { exportTournamentResultPDF } from '../utils/exporters';
 
@@ -12,20 +12,28 @@ const CAT_LABELS = {
 
 const SINGLES = ['singles-men', 'singles-women'];
 
+const CARD_HEIGHT = 96;
+const GAP = 28;
+const COLUMN_WIDTH = 260;
+const COLUMN_GAP = 70;
+
+function isHiddenByeMatch(m) {
+  return m.isCompleted === true && (!m.player1 || !m.player2);
+}
+
 export default function BracketsView({ admin, color }) {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [scoreModal, setScoreModal] = useState(null);
-  const [scores, setScores] = useState({ s1: 0, s2: 0 });
+  const [resultModal, setResultModal] = useState(null);
   const [seedingModal, setSeedingModal] = useState(false);
   const [championRegNo, setChampionRegNo] = useState('');
   const [runnerUpRegNo, setRunnerUpRegNo] = useState('');
   const [toast, setToast] = useState('');
+  const [positions, setPositions] = useState({});
   const [lines, setLines] = useState([]);
-  const bracketRef = useRef(null);
-  const matchRefs = useRef({});
+  const [containerHeight, setContainerHeight] = useState(400);
 
   useEffect(() => { fetchTournaments(); }, []);
 
@@ -53,58 +61,124 @@ export default function BracketsView({ admin, color }) {
   const handleSelectTournament = (t) => {
     setSelectedTournament(t);
     setMatches([]);
+    setPositions({});
     setLines([]);
     if (t.isLocked) fetchMatches(t._id);
   };
 
-  // ── Calculate connector lines after render ─────────────
-  useEffect(() => {
-    if (matches.length === 0 || !bracketRef.current) return;
+  const roundsMap = {};
+  matches.forEach(m => {
+    if (!roundsMap[m.round]) roundsMap[m.round] = [];
+    roundsMap[m.round].push(m);
+  });
+  const roundNums = Object.keys(roundsMap).map(Number).sort((a, b) => a - b);
 
-    // Small delay to ensure DOM is rendered
-    const timer = setTimeout(() => {
-      calculateLines();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [matches]);
+  const visibleByRound = {};
+  roundNums.forEach(r => {
+    visibleByRound[r] = roundsMap[r]
+      .filter(m => !isHiddenByeMatch(m))
+      .sort((a, b) => a.matchNumber - b.matchNumber);
+  });
 
-  const calculateLines = () => {
-    if (!bracketRef.current) return;
-    const containerRect = bracketRef.current.getBoundingClientRect();
-    const newLines = [];
+  // ── VERIFIED TIGHT-STACKING POSITION ALGORITHM (unchanged) ──
+  useLayoutEffect(() => {
+    if (roundNums.length === 0) return;
 
-    matches.forEach(match => {
-      if (!match.nextMatchId) return;
+    const pos = {};
 
-      const sourceEl = matchRefs.current[match._id];
-      const targetEl = matchRefs.current[match.nextMatchId];
-
-      if (!sourceEl || !targetEl) return;
-
-      const sourceRect = sourceEl.getBoundingClientRect();
-      const targetRect = targetEl.getBoundingClientRect();
-
-      // Start point — right middle of source match card
-      const x1 = sourceRect.right - containerRect.left;
-      const y1 = sourceRect.top + sourceRect.height / 2 - containerRect.top;
-
-      // End point — left middle of target match card
-      // But we need to connect to player1 or player2 slot
-      const x2 = targetRect.left - containerRect.left;
-
-      // positionInNextMatch: 1 = top player, 2 = bottom player
-      // Target y = top quarter or bottom quarter of target card
-      const y2 = match.positionInNextMatch === 1
-        ? targetRect.top + targetRect.height * 0.25 - containerRect.top
-        : targetRect.top + targetRect.height * 0.75 - containerRect.top;
-
-      newLines.push({ x1, y1, x2, y2, id: match._id });
+    const firstRound = roundNums[0];
+    const round1All = (roundsMap[firstRound] || []).slice().sort((a, b) => a.matchNumber - b.matchNumber);
+    round1All.forEach((m, i) => {
+      pos[m._id] = { top: i * (CARD_HEIGHT + GAP), roundIdx: 0 };
     });
 
-    setLines(newLines);
-  };
+    for (let ri = 1; ri < roundNums.length; ri++) {
+      const r = roundNums[ri];
+      const prevR = roundNums[ri - 1];
+      const prevAll = roundsMap[prevR] || [];
 
-  // ── Generate Draw ──────────────────────────────────────
+      const feedMap = {};
+      prevAll.forEach(pm => {
+        if (!pm.nextMatchId) return;
+        if (!feedMap[pm.nextMatchId]) feedMap[pm.nextMatchId] = [];
+        feedMap[pm.nextMatchId].push(pm);
+      });
+
+      const thisRoundAll = (roundsMap[r] || []).slice().sort((a, b) => a.matchNumber - b.matchNumber);
+      thisRoundAll.forEach(m => {
+        const feeders = feedMap[m._id] || [];
+        const centers = feeders.map(f => pos[f._id].top + CARD_HEIGHT / 2);
+        const avg = centers.length > 0 ? centers.reduce((a, b) => a + b, 0) / centers.length : 0;
+        pos[m._id] = { top: avg - CARD_HEIGHT / 2, roundIdx: ri };
+      });
+    }
+
+    setPositions(pos);
+    const allTops = Object.values(pos).map(p => p.top + CARD_HEIGHT);
+    setContainerHeight(Math.max(400, ...allTops) + 60);
+  }, [matches]);
+
+  // ── Lines derived directly from position data (unchanged) ──
+  useEffect(() => {
+    if (Object.keys(positions).length === 0) return;
+
+    const newLines = [];
+
+    for (let ri = 0; ri < roundNums.length - 1; ri++) {
+      const r = roundNums[ri];
+      const prevVisible = visibleByRound[r] || [];
+
+      const groups = {};
+      prevVisible.forEach(m => {
+        if (!m.nextMatchId || !positions[m.nextMatchId]) return;
+        if (!groups[m.nextMatchId]) groups[m.nextMatchId] = [];
+        groups[m.nextMatchId].push(m);
+      });
+
+      Object.entries(groups).forEach(([targetId, sources]) => {
+        const targetPos = positions[targetId];
+        if (!targetPos) return;
+
+        const targetX = targetPos.roundIdx * (COLUMN_WIDTH + COLUMN_GAP);
+        const targetCenterY = targetPos.top + CARD_HEIGHT / 2;
+
+        const validSources = sources.filter(src => positions[src._id]);
+        if (validSources.length === 0) return;
+
+        const sourceX = positions[validSources[0]._id].roundIdx * (COLUMN_WIDTH + COLUMN_GAP) + COLUMN_WIDTH;
+        const stubs = validSources.map(src => ({
+          x1: sourceX,
+          y1: positions[src._id].top + CARD_HEIGHT / 2,
+        }));
+
+        const midX = (sourceX + targetX) / 2;
+
+        if (stubs.length === 1) {
+          const s = stubs[0];
+          newLines.push({
+            path: `M ${s.x1} ${s.y1} L ${midX} ${s.y1} L ${midX} ${targetCenterY} L ${targetX} ${targetCenterY}`,
+            id: `${targetId}-single-${ri}`,
+          });
+        } else {
+          stubs.forEach((s, i) => {
+            newLines.push({ path: `M ${s.x1} ${s.y1} L ${midX} ${s.y1}`, id: `${targetId}-stub-${ri}-${i}` });
+          });
+          const ys = stubs.map(s => s.y1);
+          newLines.push({
+            path: `M ${midX} ${Math.min(...ys)} L ${midX} ${Math.max(...ys)}`,
+            id: `${targetId}-vert-${ri}`,
+          });
+          newLines.push({
+            path: `M ${midX} ${targetCenterY} L ${targetX} ${targetCenterY}`,
+            id: `${targetId}-final-${ri}`,
+          });
+        }
+      });
+    }
+
+    setLines(newLines);
+  }, [positions]);
+
   const generateDraws = () => {
     const isSingles = SINGLES.includes(selectedTournament.category);
     if (isSingles) {
@@ -136,7 +210,7 @@ export default function BracketsView({ admin, color }) {
     setSeedingModal(false);
     try {
       const res = await axios.get(`/api/registrations/tournament/${selectedTournament._id}`);
-      const regs = res.data;
+      const regs = res.data.filter(r => r.status === 'confirmed');
       const champion = regs.find(r => r.rollNumber === championRegNo.trim());
       const runnerUp = regs.find(r => r.rollNumber === runnerUpRegNo.trim());
 
@@ -161,7 +235,6 @@ export default function BracketsView({ admin, color }) {
     }
   };
 
-  // ── Reset Draw ─────────────────────────────────────────
   const handleResetDraw = async () => {
     if (!window.confirm('Reset draw? This will delete all matches!')) return;
     setLoading(true);
@@ -171,6 +244,7 @@ export default function BracketsView({ admin, color }) {
       setSelectedTournament(updatedT);
       setTournaments(prev => prev.map(t => t._id === updatedT._id ? updatedT : t));
       setMatches([]);
+      setPositions({});
       setLines([]);
       showToast('🔄 Draw reset. You can regenerate now.');
     } catch (err) {
@@ -178,7 +252,23 @@ export default function BracketsView({ admin, color }) {
     } finally { setLoading(false); }
   };
 
-  // ── Publish Draw ───────────────────────────────────────
+  const handleForceUnlock = async () => {
+    if (!window.confirm('⚠️ TESTING ONLY: This bypasses the publish-lock safety rule and deletes all matches. Use only for testing, never for real published tournaments. Continue?')) return;
+    setLoading(true);
+    try {
+      await axios.delete(`/api/tournaments/${selectedTournament._id}/force-unlock`);
+      const updatedT = { ...selectedTournament, isLocked: false, isPublished: false };
+      setSelectedTournament(updatedT);
+      setTournaments(prev => prev.map(t => t._id === updatedT._id ? updatedT : t));
+      setMatches([]);
+      setPositions({});
+      setLines([]);
+      showToast('⚠️ Force-unlocked for testing.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Force unlock failed.');
+    } finally { setLoading(false); }
+  };
+
   const handlePublishDraw = async () => {
     if (!window.confirm('Publish draw? Students will see the bracket. Cannot be undone!')) return;
     setLoading(true);
@@ -193,54 +283,32 @@ export default function BracketsView({ admin, color }) {
     } finally { setLoading(false); }
   };
 
-  // ── Update Score ───────────────────────────────────────
-  const handleUpdateScore = async () => {
-    if (scores.s1 === scores.s2) {
-      alert('Scores cannot be equal!');
-      return;
-    }
+  // ── Mark Result (W/L only — no scores) ──────────────────
+  const handleMarkWinner = async (winnerId) => {
     try {
-      await axios.put(`/api/tournaments/matches/${scoreModal._id}/score`, {
-        score1: scores.s1,
-        score2: scores.s2,
-      });
-      setScoreModal(null);
+      await axios.put(`/api/tournaments/matches/${resultModal._id}/score`, { winnerId });
+      setResultModal(null);
       fetchMatches(selectedTournament._id);
-      showToast('✅ Score updated!');
+      showToast('✅ Result confirmed!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update score');
+      alert(err.response?.data?.message || 'Failed to update result');
     }
   };
 
-  // ── Filter — hide bye matches ──────────────────────────
-  const getDisplayMatches = (roundMatches) => {
-    return roundMatches.filter(m => {
-      const isByeMatch = m.isCompleted && (!m.player1 || !m.player2);
-      return !isByeMatch;
-    });
-  };
-
-  // Group matches by round
-  const rounds = [];
-  matches.forEach(m => {
-    if (!rounds[m.round - 1]) rounds[m.round - 1] = [];
-    rounds[m.round - 1].push(m);
-  });
-
-  const getRoundLabel = (roundIndex, totalRounds) => {
-    const remaining = totalRounds - roundIndex;
+  const getRoundLabel = (roundIdx, totalRounds) => {
+    const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
     if (remaining === 2) return 'SEMI FINALS';
     if (remaining === 3) return 'QUARTER FINALS';
-    return `ROUND ${roundIndex + 1}`;
+    return `ROUND ${roundIdx + 1}`;
   };
+
+  const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
 
   return (
     <div style={s.container}>
-      {/* Toast */}
       {toast && <div style={s.toast}>{toast}</div>}
 
-      {/* Header */}
       <header style={s.header}>
         <h2 style={s.title}>BRACKET MANAGEMENT</h2>
         <select
@@ -265,7 +333,6 @@ export default function BracketsView({ admin, color }) {
         <div style={s.emptyState}>Select a tournament to view or generate brackets.</div>
       ) : (
         <div>
-          {/* Status Bar */}
           <div style={s.statusBar}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700 }}>
@@ -283,7 +350,6 @@ export default function BracketsView({ admin, color }) {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 12 }}>
               {!selectedTournament.isLocked && (
                 <button onClick={generateDraws} style={{ ...s.btn, background: color }}>
@@ -301,17 +367,25 @@ export default function BracketsView({ admin, color }) {
                 </>
               )}
               {selectedTournament.isPublished && (
-                <button
-                  onClick={() => exportTournamentResultPDF(selectedTournament, matches)}
-                  style={{ ...s.btn, background: '#3B82F6' }}
-                >
-                  📄 DOWNLOAD PDF
-                </button>
+                <>
+                  <button
+                    onClick={() => exportTournamentResultPDF(selectedTournament, matches)}
+                    style={{ ...s.btn, background: '#3B82F6' }}
+                  >
+                    📄 DOWNLOAD PDF
+                  </button>
+                  <button
+                    onClick={handleForceUnlock}
+                    style={{ ...s.btn, background: '#6B7280', fontSize: 11 }}
+                    title="Testing only — bypasses the publish safety rule"
+                  >
+                    ⚠️ FORCE UNLOCK (TEST)
+                  </button>
+                </>
               )}
             </div>
           </div>
 
-          {/* Bracket */}
           {loading ? (
             <div style={s.loading}>Loading bracket...</div>
           ) : matches.length === 0 ? (
@@ -322,147 +396,122 @@ export default function BracketsView({ admin, color }) {
               </p>
             </div>
           ) : (
-            <div style={{ position: 'relative' }}>
-              {/* SVG connector lines */}
-              <svg
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none',
-                  zIndex: 1,
-                  overflow: 'visible',
-                }}
-              >
-                {lines.map((line, idx) => {
-                  // Mid x point for the bend
-                  const midX = (line.x1 + line.x2) / 2;
-                  return (
-                    <path
-                      key={idx}
-                      d={`M ${line.x1} ${line.y1} C ${midX} ${line.y1}, ${midX} ${line.y2}, ${line.x2} ${line.y2}`}
-                      fill="none"
-                      stroke={`${color}60`}
-                      strokeWidth="1.5"
-                      strokeDasharray="4 3"
-                    />
-                  );
-                })}
-              </svg>
+            <div style={{ overflowX: 'auto', paddingBottom: 40 }}>
+              <div style={{ position: 'relative', width: totalWidth, height: containerHeight }}>
 
-              {/* Bracket columns */}
-              <div
-                ref={bracketRef}
-                style={s.bracketScroll}
-                onScroll={() => calculateLines()}
-              >
-                <div style={s.bracketContainer}>
-                  {rounds.map((roundMatches, rIdx) => {
-                    const displayMatches = getDisplayMatches(roundMatches);
-                    if (displayMatches.length === 0) return null;
+                {roundNums.map((r, rIdx) => (
+                  <div
+                    key={`label-${r}`}
+                    style={{
+                      position: 'absolute',
+                      left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                      top: 0,
+                      width: COLUMN_WIDTH,
+                      textAlign: 'center',
+                      fontSize: 11,
+                      letterSpacing: 2,
+                      fontWeight: 950,
+                      color,
+                    }}
+                  >
+                    {getRoundLabel(rIdx, roundNums.length)}
+                  </div>
+                ))}
 
-                    // Calculate spacing between matches based on round
-                    // Each round doubles the space between matches
-                    const spacingMultiplier = Math.pow(2, rIdx);
-                    const baseGap = 20;
-                    const matchGap = baseGap * spacingMultiplier;
+                <svg
+                  style={{
+                    position: 'absolute',
+                    top: 36,
+                    left: 0,
+                    width: '100%',
+                    height: containerHeight,
+                    pointerEvents: 'none',
+                    overflow: 'visible',
+                  }}
+                >
+                  {lines.map((line) => (
+                    <path key={line.id} d={line.path} fill="none" stroke={`${color}70`} strokeWidth="1.5" />
+                  ))}
+                </svg>
 
+                {roundNums.map((r, rIdx) =>
+                  (visibleByRound[r] || []).map(m => {
+                    const pos = positions[m._id];
+                    if (!pos) return null;
                     return (
-                      <div key={rIdx} style={{ ...s.roundColumn, gap: matchGap }}>
-                        <h3 style={{ ...s.roundTitle, color }}>
-                          {getRoundLabel(rIdx, rounds.length)}
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: matchGap }}>
-                          {displayMatches.map(m => (
-                            <div
-                              key={m._id}
-                              ref={el => matchRefs.current[m._id] = el}
-                              style={{
-                                ...s.matchCard,
-                                borderColor: m.isCompleted ? '#10B981' : 'var(--border)',
-                                borderWidth: m.isCompleted ? 2 : 1,
-                                position: 'relative',
-                                zIndex: 2,
-                              }}
-                            >
-                              {/* Player 1 row */}
-                              <div style={s.playerRow}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  {m.winner?._id === m.player1?._id && (
-                                    <span style={{ ...s.winnerBadge, background: color }}>W</span>
-                                  )}
-                                  <span style={{
-                                    fontSize: 13,
-                                    fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
-                                    color: m.winner?._id === m.player1?._id ? 'var(--text)' : 'var(--text-muted)',
-                                  }}>
-                                    {m.player1?.playerName || <i style={{ color: '#555' }}>TBD</i>}
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontWeight: 900,
-                                  fontSize: 15,
-                                  color: m.winner?._id === m.player1?._id ? color : 'var(--text-muted)',
-                                }}>
-                                  {m.isCompleted ? m.score1 : ''}
-                                </span>
-                              </div>
-
-                              <div style={s.divider} />
-
-                              {/* Player 2 row */}
-                              <div style={s.playerRow}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  {m.winner?._id === m.player2?._id && (
-                                    <span style={{ ...s.winnerBadge, background: color }}>W</span>
-                                  )}
-                                  <span style={{
-                                    fontSize: 13,
-                                    fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
-                                    color: m.winner?._id === m.player2?._id ? 'var(--text)' : 'var(--text-muted)',
-                                  }}>
-                                    {m.player2?.playerName || <i style={{ color: '#555' }}>TBD</i>}
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontWeight: 900,
-                                  fontSize: 15,
-                                  color: m.winner?._id === m.player2?._id ? color : 'var(--text-muted)',
-                                }}>
-                                  {m.isCompleted ? m.score2 : ''}
-                                </span>
-                              </div>
-
-                              {/* Enter Score Button */}
-                              {!m.isCompleted && m.player1 && m.player2 && (
-                                <button
-                                  onClick={() => { setScoreModal(m); setScores({ s1: 0, s2: 0 }); }}
-                                  style={{ ...s.scoreBtn, borderColor: color, color }}
-                                >
-                                  Enter Score
-                                </button>
-                              )}
-
-                              {/* Completed badge */}
-                              {m.isCompleted && (
-                                <div style={s.completedBadge}>✓ COMPLETED</div>
-                              )}
-                            </div>
-                          ))}
+                      <div
+                        key={m._id}
+                        style={{
+                          position: 'absolute',
+                          left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                          top: pos.top + 36,
+                          width: COLUMN_WIDTH,
+                          height: CARD_HEIGHT,
+                          ...s.matchCard,
+                          borderColor: m.isCompleted ? '#10B981' : 'var(--border)',
+                          borderWidth: m.isCompleted ? 2 : 1,
+                          boxSizing: 'border-box',
+                          zIndex: 2,
+                        }}
+                      >
+                        <div style={s.playerRow}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            {m.winner?._id === m.player1?._id && (
+                              <span style={{ ...s.winnerBadge, background: color }}>W</span>
+                            )}
+                            {m.isCompleted && m.winner?._id !== m.player1?._id && m.player1 && (
+                              <span style={s.loserBadge}>L</span>
+                            )}
+                            <span style={{
+                              fontSize: 13,
+                              fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
+                              color: m.winner?._id === m.player1?._id ? 'var(--text)' : 'var(--text-muted)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {m.player1?.playerName || <i style={{ color: '#555' }}>TBD</i>}
+                            </span>
+                          </div>
                         </div>
+
+                        <div style={s.divider} />
+
+                        <div style={s.playerRow}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            {m.winner?._id === m.player2?._id && (
+                              <span style={{ ...s.winnerBadge, background: color }}>W</span>
+                            )}
+                            {m.isCompleted && m.winner?._id !== m.player2?._id && m.player2 && (
+                              <span style={s.loserBadge}>L</span>
+                            )}
+                            <span style={{
+                              fontSize: 13,
+                              fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
+                              color: m.winner?._id === m.player2?._id ? 'var(--text)' : 'var(--text-muted)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {m.player2?.playerName || <i style={{ color: '#555' }}>TBD</i>}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!m.isCompleted && m.player1 && m.player2 && (
+                          <button
+                            onClick={() => setResultModal(m)}
+                            style={{ ...s.scoreBtn, borderColor: color, color }}
+                          >
+                            Mark Result
+                          </button>
+                        )}
                       </div>
                     );
-                  })}
-                </div>
+                  })
+                )}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Seeding Modal */}
       {seedingModal && (
         <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setSeedingModal(false)}>
           <div style={modalS.content}>
@@ -506,46 +555,38 @@ export default function BracketsView({ admin, color }) {
         </div>
       )}
 
-      {/* Score Modal */}
-      {scoreModal && (
-        <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setScoreModal(null)}>
+      {/* W/L Result Modal — replaces numeric score modal */}
+      {resultModal && (
+        <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setResultModal(null)}>
           <div style={modalS.content}>
-            <h3 style={{ marginBottom: 20, fontSize: 18, fontWeight: 900 }}>Enter Match Score</h3>
-            <div style={modalS.row}>
-              <div style={modalS.playerCol}>
-                <div style={{ fontWeight: 800, marginBottom: 8, fontSize: 14 }}>
-                  {scoreModal.player1?.playerName}
-                </div>
-                <input
-                  type="number"
-                  value={scores.s1}
-                  onChange={e => setScores({ ...scores, s1: parseInt(e.target.value) || 0 })}
-                  style={modalS.input}
-                  min={0}
-                />
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-muted)' }}>VS</div>
-              <div style={modalS.playerCol}>
-                <div style={{ fontWeight: 800, marginBottom: 8, fontSize: 14 }}>
-                  {scoreModal.player2?.playerName}
-                </div>
-                <input
-                  type="number"
-                  value={scores.s2}
-                  onChange={e => setScores({ ...scores, s2: parseInt(e.target.value) || 0 })}
-                  style={modalS.input}
-                  min={0}
-                />
-              </div>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 20 }}>
-              ⚠️ Scores cannot be equal!
+            <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 900 }}>Mark Match Result</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+              Select the player who won this match.
             </p>
-            <div style={modalS.actions}>
-              <button onClick={() => setScoreModal(null)} style={modalS.cancel}>CANCEL</button>
-              <button onClick={handleUpdateScore} style={{ ...modalS.confirm, background: color }}>
-                CONFIRM RESULT
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Confirm ${resultModal.player1?.playerName} as winner? This cannot be undone.`)) {
+                    handleMarkWinner(resultModal.player1._id);
+                  }
+                }}
+                style={modalS.winnerOption}
+              >
+                🏆 {resultModal.player1?.playerName} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
               </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Confirm ${resultModal.player2?.playerName} as winner? This cannot be undone.`)) {
+                    handleMarkWinner(resultModal.player2._id);
+                  }
+                }}
+                style={modalS.winnerOption}
+              >
+                🏆 {resultModal.player2?.playerName} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+              </button>
+            </div>
+            <div style={modalS.actions}>
+              <button onClick={() => setResultModal(null)} style={modalS.cancel}>CANCEL</button>
             </div>
           </div>
         </div>
@@ -564,17 +605,12 @@ const s = {
   statusBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, padding: '16px 20px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)' },
   badge: { display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: 1 },
   btn: { border: 'none', color: '#FFF', padding: '12px 24px', borderRadius: 10, fontWeight: 900, cursor: 'pointer', fontSize: 13 },
-  bracketScroll: { overflowX: 'auto', paddingBottom: 40, position: 'relative' },
-  bracketContainer: { display: 'flex', gap: 80, minWidth: 'max-content', padding: '20px 0', alignItems: 'flex-start' },
-  roundColumn: { width: 220, display: 'flex', flexDirection: 'column' },
-  roundTitle: { textAlign: 'center', fontSize: 11, letterSpacing: 2, fontWeight: 950, marginBottom: 16 },
-  matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' },
-  playerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' },
-  divider: { height: 1, background: 'var(--border)', margin: '6px 0' },
-  score: { fontWeight: 950, width: 30, textAlign: 'right', fontSize: 16 },
-  scoreBtn: { width: '100%', marginTop: 10, padding: '8px', borderRadius: 8, background: 'transparent', border: '1px solid', cursor: 'pointer', fontSize: 11, fontWeight: 800 },
-  winnerBadge: { color: '#000', fontSize: 9, fontWeight: 900, padding: '2px 5px', borderRadius: 3 },
-  completedBadge: { marginTop: 6, fontSize: 10, color: '#10B981', fontWeight: 800, textAlign: 'right' },
+  matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  playerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' },
+  divider: { height: 1, background: 'var(--border)', margin: '4px 0' },
+  scoreBtn: { width: '100%', marginTop: 8, padding: '6px', borderRadius: 6, background: 'transparent', border: '1px solid', cursor: 'pointer', fontSize: 10, fontWeight: 800 },
+  winnerBadge: { color: '#000', fontSize: 9, fontWeight: 900, padding: '2px 5px', borderRadius: 3, flexShrink: 0 },
+  loserBadge: { background: '#EF444430', color: '#EF4444', fontSize: 9, fontWeight: 900, padding: '2px 5px', borderRadius: 3, flexShrink: 0 },
   loading: { textAlign: 'center', padding: 50, color: 'var(--text-muted)' },
   toast: { position: 'fixed', top: 24, right: 24, background: '#10B981', color: '#fff', padding: '14px 24px', borderRadius: 12, fontWeight: 700, fontSize: 14, zIndex: 9999, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' },
 };
@@ -584,9 +620,8 @@ const modalS = {
   content: { background: 'var(--bg-card)', padding: 40, borderRadius: 24, width: 520, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid var(--border)' },
   label: { display: 'block', fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 8 },
   input: { width: '100%', padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 16, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, margin: '20px 0' },
-  playerCol: { flex: 1, textAlign: 'center' },
-  actions: { display: 'flex', gap: 10, marginTop: 10 },
+  winnerOption: { width: '100%', padding: '16px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 15, fontWeight: 800, textAlign: 'left', cursor: 'pointer' },
+  actions: { display: 'flex', gap: 10, marginTop: 20 },
   cancel: { flex: 1, padding: 14, borderRadius: 10, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontWeight: 800, fontSize: 12 },
   secondary: { flex: 1, padding: 14, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer', fontWeight: 800, fontSize: 12 },
   confirm: { flex: 2, padding: 14, borderRadius: 10, border: 'none', color: '#FFF', cursor: 'pointer', fontWeight: 900, fontSize: 12 },

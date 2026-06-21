@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -10,12 +10,21 @@ const CAT_LABELS = {
 };
 
 const SPORT_META = {
-  badminton:      { label: 'BADMINTON',    icon: '🏸', color: '#3B82F6' },
+  badminton: { label: 'BADMINTON', icon: '🏸', color: '#3B82F6' },
   'table-tennis': { label: 'TABLE TENNIS', icon: '🏓', color: '#8B5CF6' },
-  carrom:         { label: 'CARROM',       icon: '🎯', color: '#EC4899' },
+  carrom: { label: 'CARROM', icon: '🎯', color: '#EC4899' },
 };
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+const CARD_HEIGHT = 96;
+const GAP = 28;
+const COLUMN_WIDTH = 260;
+const COLUMN_GAP = 70;
+
+function isHiddenByeMatch(m) {
+  return m.isCompleted === true && (!m.player1 || !m.player2);
+}
 
 export default function StudentTournamentPage({ sport }) {
   const [tournaments, setTournaments] = useState([]);
@@ -24,9 +33,12 @@ export default function StudentTournamentPage({ sport }) {
   const [viewBracketsFor, setViewBracketsFor] = useState(null);
   const [matches, setMatches] = useState([]);
   const [bracketLoading, setBracketLoading] = useState(false);
+  const [positions, setPositions] = useState({});
+  const [lines, setLines] = useState([]);
+  const [containerHeight, setContainerHeight] = useState(400);
   const navigate = useNavigate();
   const { isDarkMode, toggleTheme } = useTheme();
-  
+
   const meta = SPORT_META[sport] || SPORT_META['badminton'];
 
   useEffect(() => {
@@ -41,22 +53,147 @@ export default function StudentTournamentPage({ sport }) {
     setViewBracketsFor(t);
     setBracketLoading(true);
     try {
-      const res = await axios.get(`/api/tournaments/${t._id}/matches`);
+      const res = await axios.get(`/api/tournaments/public/${t._id}/matches?sport=${sport}`);
       setMatches(res.data);
-    } catch (err) { console.error(err); }
-    finally { setBracketLoading(false); }
+    } catch (err) {
+      if (err.response?.status === 404) {
+        alert('The bracket has not been published yet. Check back later!');
+        setViewBracketsFor(null);
+      } else {
+        console.error(err);
+      }
+    } finally { setBracketLoading(false); }
   };
 
-  const rounds = [];
+  // Group raw matches by round
+  const roundsMap = {};
   matches.forEach(m => {
-    if (!rounds[m.round - 1]) rounds[m.round - 1] = [];
-    rounds[m.round - 1].push(m);
+    if (!roundsMap[m.round]) roundsMap[m.round] = [];
+    roundsMap[m.round].push(m);
   });
+  const roundNums = Object.keys(roundsMap).map(Number).sort((a, b) => a - b);
+
+  const visibleByRound = {};
+  roundNums.forEach(r => {
+    visibleByRound[r] = (roundsMap[r] || [])
+      .filter(m => !isHiddenByeMatch(m))
+      .sort((a, b) => a.matchNumber - b.matchNumber);
+  });
+
+  // ── VERIFIED TIGHT-STACKING POSITION ALGORITHM ─────────
+  // Same fix proven on the admin BracketsView — every round (hidden +
+  // visible matches) gets an evenly-spaced position, so later rounds
+  // always average from valid, non-compressed feeder positions.
+  useLayoutEffect(() => {
+    if (roundNums.length === 0) return;
+
+    const pos = {};
+    const firstRound = roundNums[0];
+    const round1All = (roundsMap[firstRound] || []).slice().sort((a, b) => a.matchNumber - b.matchNumber);
+    round1All.forEach((m, i) => {
+      pos[m._id] = { top: i * (CARD_HEIGHT + GAP), roundIdx: 0 };
+    });
+
+    for (let ri = 1; ri < roundNums.length; ri++) {
+      const r = roundNums[ri];
+      const prevR = roundNums[ri - 1];
+      const prevAll = roundsMap[prevR] || [];
+
+      const feedMap = {};
+      prevAll.forEach(pm => {
+        if (!pm.nextMatchId) return;
+        if (!feedMap[pm.nextMatchId]) feedMap[pm.nextMatchId] = [];
+        feedMap[pm.nextMatchId].push(pm);
+      });
+
+      const thisRoundAll = (roundsMap[r] || []).slice().sort((a, b) => a.matchNumber - b.matchNumber);
+      thisRoundAll.forEach(m => {
+        const feeders = feedMap[m._id] || [];
+        const centers = feeders.map(f => pos[f._id].top + CARD_HEIGHT / 2);
+        const avg = centers.length > 0 ? centers.reduce((a, b) => a + b, 0) / centers.length : 0;
+        pos[m._id] = { top: avg - CARD_HEIGHT / 2, roundIdx: ri };
+      });
+    }
+
+    setPositions(pos);
+    const allTops = Object.values(pos).map(p => p.top + CARD_HEIGHT);
+    setContainerHeight(Math.max(400, ...allTops) + 60);
+  }, [matches]);
+
+  // ── Lines derived directly from position data ──────────
+  useEffect(() => {
+    if (Object.keys(positions).length === 0) return;
+
+    const newLines = [];
+
+    for (let ri = 0; ri < roundNums.length - 1; ri++) {
+      const r = roundNums[ri];
+      const prevVisible = visibleByRound[r] || [];
+
+      const groups = {};
+      prevVisible.forEach(m => {
+        if (!m.nextMatchId || !positions[m.nextMatchId]) return;
+        if (!groups[m.nextMatchId]) groups[m.nextMatchId] = [];
+        groups[m.nextMatchId].push(m);
+      });
+
+      Object.entries(groups).forEach(([targetId, sources]) => {
+        const targetPos = positions[targetId];
+        if (!targetPos) return;
+
+        const targetX = targetPos.roundIdx * (COLUMN_WIDTH + COLUMN_GAP);
+        const targetCenterY = targetPos.top + CARD_HEIGHT / 2;
+
+        const validSources = sources.filter(src => positions[src._id]);
+        if (validSources.length === 0) return;
+
+        const sourceX = positions[validSources[0]._id].roundIdx * (COLUMN_WIDTH + COLUMN_GAP) + COLUMN_WIDTH;
+        const stubs = validSources.map(src => ({
+          x1: sourceX,
+          y1: positions[src._id].top + CARD_HEIGHT / 2,
+        }));
+
+        const midX = (sourceX + targetX) / 2;
+
+        if (stubs.length === 1) {
+          const s = stubs[0];
+          newLines.push({
+            path: `M ${s.x1} ${s.y1} L ${midX} ${s.y1} L ${midX} ${targetCenterY} L ${targetX} ${targetCenterY}`,
+            id: `${targetId}-single-${ri}`,
+          });
+        } else {
+          stubs.forEach((s, i) => {
+            newLines.push({ path: `M ${s.x1} ${s.y1} L ${midX} ${s.y1}`, id: `${targetId}-stub-${ri}-${i}` });
+          });
+          const ys = stubs.map(s => s.y1);
+          newLines.push({
+            path: `M ${midX} ${Math.min(...ys)} L ${midX} ${Math.max(...ys)}`,
+            id: `${targetId}-vert-${ri}`,
+          });
+          newLines.push({
+            path: `M ${midX} ${targetCenterY} L ${targetX} ${targetCenterY}`,
+            id: `${targetId}-final-${ri}`,
+          });
+        }
+      });
+    }
+
+    setLines(newLines);
+  }, [positions]);
+
+  const getRoundLabel = (roundIdx, totalRounds) => {
+    const remaining = totalRounds - roundIdx;
+    if (remaining === 1) return 'FINAL';
+    if (remaining === 2) return 'SEMI FINALS';
+    if (remaining === 3) return 'QUARTER FINALS';
+    return `ROUND ${roundIdx + 1}`;
+  };
+
+  const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
-      
-      {/* Top Prominent Navigation (Traditional Style) */}
+
       <nav style={sh.nav}>
         <div style={sh.brand} onClick={() => navigate('/')}>
           <div style={sh.logoCircle}>🏆</div>
@@ -65,8 +202,8 @@ export default function StudentTournamentPage({ sport }) {
 
         <div style={sh.sportSwitcher}>
           {Object.keys(SPORT_META).map((s) => (
-            <button 
-              key={s} 
+            <button
+              key={s}
               onClick={() => navigate(`/${s}`)}
               style={{ ...sh.sportBtn, color: sport === s ? SPORT_META[s].color : 'var(--text-muted)', borderBottom: sport === s ? `3px solid ${SPORT_META[s].color}` : 'none' }}
             >
@@ -82,29 +219,28 @@ export default function StudentTournamentPage({ sport }) {
         </div>
       </nav>
 
-      {/* Main Experience */}
       <div style={sh.hero}>
-          <div style={{ ...sh.heroBlob, background: meta.color }} />
-          <h1 style={sh.heroTitle}>{meta.label} RESULTS</h1>
-          <div style={sh.liveIndicator}>
-              <span className="live-dot" style={{ background: '#10B981' }} />
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
-          </div>
+        <div style={{ ...sh.heroBlob, background: meta.color }} />
+        <h1 style={sh.heroTitle}>{meta.label} RESULTS</h1>
+        <div style={sh.liveIndicator}>
+          <span className="live-dot" style={{ background: '#10B981' }} />
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+        </div>
       </div>
 
       <main style={sh.mainContent}>
         <div style={sh.containerCard}>
           {loading ? (
-             <div style={sh.statusFill}>
-                <div className="spinner" style={{ width: 44, height: 44, borderTopColor: meta.color }} />
-                <p style={{ marginTop: 24, fontSize: 18, fontWeight: 700, opacity: 0.6 }}>Synchronizing tournament data...</p>
-             </div>
+            <div style={sh.statusFill}>
+              <div className="spinner" style={{ width: 44, height: 44, borderTopColor: meta.color }} />
+              <p style={{ marginTop: 24, fontSize: 18, fontWeight: 700, opacity: 0.6 }}>Synchronizing tournament data...</p>
+            </div>
           ) : tournaments.length === 0 ? (
-             <div style={sh.statusFill}>
-                <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>🏟️</div>
-                <h3 style={{ fontSize: 24, fontWeight: 950 }}>Arena Empty</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: 16 }}>No tournaments are currently active for registration.</p>
-             </div>
+            <div style={sh.statusFill}>
+              <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>🏟️</div>
+              <h3 style={{ fontSize: 24, fontWeight: 950 }}>Arena Empty</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 16 }}>No tournaments are currently active for registration.</p>
+            </div>
           ) : (
             <div style={sh.grid}>
               {tournaments.map(t => (
@@ -118,10 +254,15 @@ export default function StudentTournamentPage({ sport }) {
                     <div style={sh.infoLine}>🕐 {t.time}</div>
                     <div style={sh.infoLine}>📍 {t.venue}</div>
                   </div>
-                  {t.isLocked ? (
+                  {t.isPublished ? (
                     <div style={{ display: 'flex', gap: 10 }}>
-                        <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
-                        <button onClick={() => loadBrackets(t)} style={{ ...sh.regBtn, background: meta.color, flex: 2 }}>VIEW BRACKETS</button>
+                      <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
+                      <button onClick={() => loadBrackets(t)} style={{ ...sh.regBtn, background: meta.color, flex: 2 }}>VIEW BRACKETS</button>
+                    </div>
+                  ) : t.isLocked ? (
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
+                      <button style={{ ...sh.regBtn, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)', cursor: 'default', flex: 2 }}>BRACKET PENDING...</button>
                     </div>
                   ) : (
                     <button onClick={() => setRegisterFor(t)} style={{ ...sh.regBtn, background: meta.color }}>REGISTER TO COMPETE</button>
@@ -144,38 +285,102 @@ export default function StudentTournamentPage({ sport }) {
 
       {viewBracketsFor && (
         <div style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
-           <div style={bh.card}>
-              <div style={bh.header}>
-                 <h2 style={{ margin: 0 }}>{viewBracketsFor.year} {CAT_LABELS[viewBracketsFor.category]} BRACKET</h2>
-                 <button onClick={() => setViewBracketsFor(null)} style={bh.close}>✕</button>
-              </div>
-              {bracketLoading ? <div style={{ padding: 100, textAlign: 'center' }}>Loading bracket...</div> : (
-                <div style={bh.bracketScroll}>
-                   <div style={bh.bracketContainer}>
-                      {rounds.map((roundMatches, rIdx) => (
-                        <div key={rIdx} style={bh.roundColumn}>
-                           <div style={bh.roundTitle}>ROUND {rIdx + 1}</div>
-                           <div style={bh.matchList}>
-                              {roundMatches.map(m => (
-                                <div key={m._id} style={{ ...bh.matchCard, borderLeft: `4px solid ${m.isCompleted ? '#10B981' : 'var(--border)'}` }}>
-                                   <div style={bh.pRow}>
-                                      <span style={{ fontWeight: m.winner?._id === m.player1?._id ? 900 : 400 }}>{m.player1?.playerName || 'TBD'}</span>
-                                      <span style={bh.score}>{m.score1}</span>
-                                   </div>
-                                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                                   <div style={bh.pRow}>
-                                      <span style={{ fontWeight: m.winner?._id === m.player2?._id ? 900 : 400 }}>{m.player2?.playerName || 'TBD'}</span>
-                                      <span style={bh.score}>{m.score2}</span>
-                                   </div>
-                                </div>
-                              ))}
-                           </div>
+          <div style={bh.card}>
+            <div style={bh.header}>
+              <h2 style={{ margin: 0 }}>{viewBracketsFor.year} {CAT_LABELS[viewBracketsFor.category]} BRACKET</h2>
+              <button onClick={() => setViewBracketsFor(null)} style={bh.close}>✕</button>
+            </div>
+            {bracketLoading ? <div style={{ padding: 100, textAlign: 'center' }}>Loading bracket...</div> : (
+              <div style={bh.bracketScroll}>
+                <div style={{ position: 'relative', width: totalWidth, height: containerHeight }}>
+
+                  {roundNums.map((r, rIdx) => (
+                    <div
+                      key={`label-${r}`}
+                      style={{
+                        position: 'absolute',
+                        left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                        top: 0,
+                        width: COLUMN_WIDTH,
+                        textAlign: 'center',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        letterSpacing: 2,
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      {getRoundLabel(rIdx, roundNums.length)}
+                    </div>
+                  ))}
+
+                  <svg
+                    style={{
+                      position: 'absolute',
+                      top: 36,
+                      left: 0,
+                      width: '100%',
+                      height: containerHeight,
+                      pointerEvents: 'none',
+                      overflow: 'visible',
+                    }}
+                  >
+                    {lines.map((line) => (
+                      <path key={line.id} d={line.path} fill="none" stroke={`${meta.color}70`} strokeWidth="1.5" />
+                    ))}
+                  </svg>
+
+                  {roundNums.map((r, rIdx) =>
+                    (visibleByRound[r] || []).map(m => {
+                      const pos = positions[m._id];
+                      if (!pos) return null;
+                      return (
+                        <div
+                          key={m._id}
+                          style={{
+                            position: 'absolute',
+                            left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                            top: pos.top + 36,
+                            width: COLUMN_WIDTH,
+                            height: CARD_HEIGHT,
+                            ...bh.matchCard,
+                            borderLeft: `4px solid ${m.isCompleted ? '#10B981' : 'var(--border)'}`,
+                            boxSizing: 'border-box',
+                            zIndex: 2,
+                          }}
+                        >
+                          <div style={bh.pRow}>
+                            <span style={{
+                              fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
+                              color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {m.player1?.playerName || 'TBD'}
+                            </span>
+                            <span style={{ ...bh.score, color: m.winner?._id === m.player1?._id ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
+                              {m.isCompleted && m.winner?._id === m.player1?._id ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
+                            </span>
+                          </div>
+                          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                          <div style={bh.pRow}>
+                            <span style={{
+                              fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
+                              color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {m.player2?.playerName || 'TBD'}
+                            </span>
+                            <span style={{ ...bh.score, color: m.winner?._id === m.player2?._id ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
+                              {m.isCompleted && m.winner?._id === m.player2?._id ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
+                            </span>
+                          </div>
                         </div>
-                      ))}
-                   </div>
+                      );
+                    })
+                  )}
                 </div>
-              )}
-           </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -183,18 +388,14 @@ export default function StudentTournamentPage({ sport }) {
 }
 
 const bh = {
-    overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
-    card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-    header: { padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    close: { background: 'none', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer' },
-    bracketScroll: { flex: 1, overflowX: 'auto', overflowY: 'auto', padding: 50 },
-    bracketContainer: { display: 'flex', gap: 60, minWidth: 'max-content' },
-    roundColumn: { width: 260, display: 'flex', flexDirection: 'column', gap: 30 },
-    roundTitle: { textAlign: 'center', fontSize: 12, fontWeight: 900, letterSpacing: 2, color: 'var(--text-muted)', marginBottom: 20 },
-    matchList: { display: 'flex', flexDirection: 'column', gap: 40, justifyContent: 'space-around', flex: 1 },
-    matchCard: { background: 'var(--bg-input)', padding: 16, borderRadius: 12, border: '1px solid var(--border)' },
-    pRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 },
-    score: { fontWeight: 900, color: 'var(--primary)' }
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
+  card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  header: { padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  close: { background: 'none', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer' },
+  bracketScroll: { flex: 1, overflowX: 'auto', overflowY: 'auto', padding: 50 },
+  matchCard: { background: 'var(--bg-input)', padding: 16, borderRadius: 12, border: '1px solid var(--border)' },
+  pRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 },
+  score: { fontWeight: 900, color: 'var(--primary)' }
 };
 
 const sh = {

@@ -43,7 +43,7 @@ export default function Dashboard() {
   const [viewTarget, setViewTarget] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
+
   const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
 
   const fetchData = useCallback(async () => {
@@ -68,7 +68,7 @@ export default function Dashboard() {
   useEffect(() => { if (admin) fetchData(); }, [admin, fetchData]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-  
+
   const handleUpdateStatus = async (id, status) => {
     try {
       const res = await axios.patch(`/api/registrations/${id}/status`, { status });
@@ -81,15 +81,15 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreate = async (data) => { 
+  const handleCreate = async (data) => {
     try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast('✅ Tournament created!'); }
     catch (err) { alert(err.response?.data?.message || 'Error creating tournament'); }
   };
-  const handleUpdate = async (data) => { 
+  const handleUpdate = async (data) => {
     try { await axios.put(`/api/tournaments/${editTarget._id}`, { ...data, password: data.password }); setEditTarget(null); fetchData(); showToast('✅ Tournament updated!'); }
     catch (err) { alert(err.response?.data?.message || 'Error updating tournament.'); }
   };
-  const handleDelete = async (password) => { 
+  const handleDelete = async (password) => {
     try { await axios.delete(`/api/tournaments/${deleteTarget._id}`, { data: { password } }); setDeleteTarget(null); fetchData(); showToast('🗑 Deleted.'); }
     catch (err) { alert(err.response?.data?.message || 'Invalid password.'); }
   };
@@ -107,14 +107,14 @@ export default function Dashboard() {
 
         {/* Manager Profile Card */}
         <div style={ds.profileCard}>
-           <div style={ds.avatarBox}>
-              <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={ds.avatar} />
-              <div style={ds.statusDot} />
-           </div>
-           <div style={{ textAlign: 'center' }}>
-              <div style={ds.pName}>{admin.name.toUpperCase()}</div>
-              <div style={ds.pRole}>{meta.label.toUpperCase()} MANAGER</div>
-           </div>
+          <div style={ds.avatarBox}>
+            <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={ds.avatar} />
+            <div style={ds.statusDot} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={ds.pName}>{admin.name.toUpperCase()}</div>
+            <div style={ds.pRole}>{meta.label.toUpperCase()} MANAGER</div>
+          </div>
         </div>
 
         <nav style={ds.nav}>
@@ -131,23 +131,23 @@ export default function Dashboard() {
         </nav>
 
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-           <button onClick={toggleTheme} style={ds.themeBtn}>{isDarkMode ? '⛅ DAY MODE' : '🌙 NIGHT MODE'}</button>
-           <button onClick={logout} style={ds.logoutBtn}>SIGN OUT</button>
+          <button onClick={toggleTheme} style={ds.themeBtn}>{isDarkMode ? '⛅ DAY MODE' : '🌙 NIGHT MODE'}</button>
+          <button onClick={logout} style={ds.logoutBtn}>SIGN OUT</button>
         </div>
       </aside>
 
       {/* Main content wrapper */}
       <div style={ds.mainWrapper}>
         <header style={ds.header}>
-            <div style={ds.greetBox}>
-               <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
-                 {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
-               </h2>
-               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
-            </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-               <div style={{ ...ds.domainBadge, borderColor: meta.color, color: meta.color }}>{meta.label.toUpperCase()} CONTROL</div>
-            </div>
+          <div style={ds.greetBox}>
+            <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
+              {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
+            </h2>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
+          </div>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+            <div style={{ ...ds.domainBadge, borderColor: meta.color, color: meta.color }}>{meta.label.toUpperCase()} CONTROL</div>
+          </div>
         </header>
 
         <main style={{ padding: '60px' }}>
@@ -157,7 +157,7 @@ export default function Dashboard() {
             <div>
               <h1 style={ds.title}>DASHBOARD OVERVIEW</h1>
               <p style={ds.subtitle}>Real-time metrics for your managed tournaments.</p>
-              
+
               <div style={ds.statsGrid}>
                 {[
                   { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: '👥' },
@@ -179,35 +179,35 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
                 <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
                 <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
-                   <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...ds.filterSelect, width: 350, height: 50, borderRadius: 20 }}>
-                      <option value="all">ALL REGISTRATIONS</option>
-                      <option value="confirmed">APPROVED ONLY</option>
-                      <option value="pending">PENDING ONLY</option>
-                      <option value="rejected">REJECTED ONLY</option>
-                   </select>
-                   <button 
-                      onClick={() => {
-                        const filtered = registrations.filter(r => {
-                          const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                          const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-                          const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
-                          return (matName || matReg) && matStatus;
-                        });
-                        const unique = Array.from(new Map(filtered.map(item => [item.rollNumber, item])).values());
-                        exportFilteredPlayersCSV(unique, `${admin.sport.toUpperCase()} PARTICIPANTS - ${statusFilter.toUpperCase()}`);
-                      }} 
-                      style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
-                   >💾 DOWNLOAD CSV</button>
-                   <div style={{ position: 'relative', width: 350 }}>
-                      <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>🔍</span>
-                      <input 
-                        type="text" 
-                        placeholder="Search Name or Reg No..." 
-                        value={searchTerm} 
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ ...ds.input, paddingLeft: 50, borderRadius: 20, width: '100%', height: 50 }}
-                      />
-                   </div>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...ds.filterSelect, width: 350, height: 50, borderRadius: 20 }}>
+                    <option value="all">ALL REGISTRATIONS</option>
+                    <option value="confirmed">APPROVED ONLY</option>
+                    <option value="pending">PENDING ONLY</option>
+                    <option value="rejected">REJECTED ONLY</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      const filtered = registrations.filter(r => {
+                        const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+                        const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+                        const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
+                        return (matName || matReg) && matStatus;
+                      });
+                      const unique = Array.from(new Map(filtered.map(item => [item.rollNumber, item])).values());
+                      exportFilteredPlayersCSV(unique, `${admin.sport.toUpperCase()} PARTICIPANTS - ${statusFilter.toUpperCase()}`);
+                    }}
+                    style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
+                  >💾 DOWNLOAD CSV</button>
+                  <div style={{ position: 'relative', width: 350 }}>
+                    <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Search Name or Reg No..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{ ...ds.input, paddingLeft: 50, borderRadius: 20, width: '100%', height: 50 }}
+                    />
+                  </div>
                 </div>
               </div>
               <div style={ds.tableBox}>
@@ -228,7 +228,7 @@ export default function Dashboard() {
                       const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
                       return (matName || matReg) && matStatus;
                     }).length === 0 ? (
-                        <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
+                      <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
                       registrations
                         .filter(r => {
@@ -238,37 +238,37 @@ export default function Dashboard() {
                           return (matName || matReg) && matStatus;
                         })
                         .map(r => (
-                        <tr key={r._id} style={ds.tr}>
-                          <td style={ds.td}>
-                            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
-                            <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
-                            <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
-                          </td>
-                          <td style={ds.td}>
-                            <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
-                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
-                          </td>
-                          <td style={ds.td}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
-                            <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>📧 <a href={`mailto:${r.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a></div>
-                          </td>
-                          <td style={ds.td}>
-                            <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
-                          </td>
-                          <td style={ds.td}>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                              {r.status === 'pending' ? (
-                                 <>
+                          <tr key={r._id} style={ds.tr}>
+                            <td style={ds.td}>
+                              <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
+                              <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
+                              <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
+                            </td>
+                            <td style={ds.td}>
+                              <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
+                              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
+                            </td>
+                            <td style={ds.td}>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                              <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>📧 <a href={`mailto:${r.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a></div>
+                            </td>
+                            <td style={ds.td}>
+                              <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
+                            </td>
+                            <td style={ds.td}>
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                {r.status === 'pending' ? (
+                                  <>
                                     <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
                                     <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
-                                 </>
-                              ) : (
-                                 <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                                  </>
+                                ) : (
+                                  <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
                     )}
                   </tbody>
                 </table>
@@ -278,7 +278,7 @@ export default function Dashboard() {
 
           {activeTab === 'tournament-setup' && (
             <div style={ds.section}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
                 <h2 style={ds.sectionTitle}>TOURNAMENT SETUP BOARD</h2>
                 <button onClick={() => setShowCreate(true)} style={ds.createBtn}>+ ADD NEW TOURNAMENT</button>
               </div>
@@ -290,21 +290,21 @@ export default function Dashboard() {
                       <div style={{ ...ds.catBadge, color: 'var(--primary)' }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={ds.tournInfo}>
-                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>{fmtDate(t.date)}</span></div>
-                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>📍 <span>{t.venue}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>{fmtDate(t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>📍 <span>{t.venue}</span></div>
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
-                        <button onClick={() => setViewTarget(t)} style={ds.viewBtn}>VIEW REGISTERED PLAYERS</button>
-                        <button onClick={async () => {
-                          const res = await axios.get(`/api/registrations/tournament/${t._id}`);
-                          exportPlayerListCSV(t, res.data);
-                        }} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>📊 CSV</button>
-                        <button onClick={async () => {
-                          const res = await axios.get(`/api/registrations/tournament/${t._id}`);
-                          exportFullPlayerReportPDF(t, res.data);
-                        }} style={{ ...ds.viewBtn, width: 'auto', px: 20, color: '#EF4444' }}>📄 FULL PDF</button>
-                        <button onClick={() => setEditTarget(t)} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>✏️</button>
-                        <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>🗑️</button>
+                      <button onClick={() => setViewTarget(t)} style={ds.viewBtn}>VIEW REGISTERED PLAYERS</button>
+                      <button onClick={async () => {
+                        const res = await axios.get(`/api/registrations/tournament/${t._id}`);
+                        exportPlayerListCSV(t, res.data);
+                      }} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>📊 CSV</button>
+                      <button onClick={async () => {
+                        const res = await axios.get(`/api/registrations/tournament/${t._id}`);
+                        exportFullPlayerReportPDF(t, res.data);
+                      }} style={{ ...ds.viewBtn, width: 'auto', px: 20, color: '#EF4444' }}>📄 FULL PDF</button>
+                      <button onClick={() => setEditTarget(t)} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>✏️</button>
+                      <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>🗑️</button>
                     </div>
                   </div>
                 ))}

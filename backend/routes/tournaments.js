@@ -36,24 +36,24 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
     return true;
   }));
 
-  const totalMatches    = bracketSize / 2;
-  const naturalByes     = bracketSize - players.length;
+  const totalMatches = bracketSize / 2;
+  const naturalByes = bracketSize - players.length;
   const fightingPlayers = players.length - naturalByes;
-  const r1Winners       = fightingPlayers / 2;
+  const r1Winners = fightingPlayers / 2;
 
-  const canPlaceChamp    = !!seeded1 && naturalByes >= 1 && r1Winners >= 1;
+  const canPlaceChamp = !!seeded1 && naturalByes >= 1 && r1Winners >= 1;
   const canPlaceRunnerup = !!seeded2 && naturalByes >= 2 && r1Winners >= 2;
-  const activeSeedByes   = (canPlaceChamp ? 1 : 0) + (canPlaceRunnerup ? 1 : 0);
+  const activeSeedByes = (canPlaceChamp ? 1 : 0) + (canPlaceRunnerup ? 1 : 0);
 
   // Seeds that can't be placed rejoin as fighters
   const extraFighters = [];
-  if (seeded1 && !canPlaceChamp)    extraFighters.push(seeded1);
+  if (seeded1 && !canPlaceChamp) extraFighters.push(seeded1);
   if (seeded2 && !canPlaceRunnerup) extraFighters.push(seeded2);
 
-  const allRest      = [...rest, ...extraFighters];
-  const restByes     = naturalByes - activeSeedByes; // e.g. 4-2=2
-  const fighters     = allRest.slice(0, fightingPlayers); // exactly 8
-  const byeRest      = allRest.slice(fightingPlayers);    // exactly 2
+  const allRest = [...rest, ...extraFighters];
+  const restByes = naturalByes - activeSeedByes; // e.g. 4-2=2
+  const fighters = allRest.slice(0, fightingPlayers); // exactly 8
+  const byeRest = allRest.slice(fightingPlayers);    // exactly 2
 
   // Pre-calculate which matchIdx slots are reserved
   // M0 = first fighting match (always)
@@ -64,7 +64,7 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
 
   const reservedSlots = new Set();
   reservedSlots.add(0); // first fighting match
-  if (canPlaceChamp)    reservedSlots.add(1);
+  if (canPlaceChamp) reservedSlots.add(1);
   if (canPlaceRunnerup) reservedSlots.add(totalMatches - 1);
   if (canPlaceRunnerup) reservedSlots.add(totalMatches - 2);
 
@@ -77,7 +77,7 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
   // Fighters used: 2 for M0 + 2 for M(last-1) if runnerup = fightingPlayers
   // Remaining fighters for middle = fightingPlayers - 2 - (canPlaceRunnerup ? 2 : 0)
   const fightersUsedByReserved = 2 + (canPlaceRunnerup ? 2 : 0);
-  const middleFighterPairs     = (fightingPlayers - fightersUsedByReserved) / 2;
+  const middleFighterPairs = (fightingPlayers - fightersUsedByReserved) / 2;
   // Remaining middle slots go to byeRest players
 
   const result = new Array(bracketSize).fill(null);
@@ -90,32 +90,32 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
 
     if (matchIdx === 0) {
       // First fighting match → winner faces Champion in R2
-      result[slot]     = fighters[fighterIdx++];
+      result[slot] = fighters[fighterIdx++];
       result[slot + 1] = fighters[fighterIdx++];
 
     } else if (matchIdx === 1 && canPlaceChamp) {
       // Champion bye
-      result[slot]     = seeded1;
+      result[slot] = seeded1;
       result[slot + 1] = null;
 
     } else if (matchIdx === totalMatches - 2 && canPlaceRunnerup) {
       // Last fighting match → winner faces Runner-up in R2
-      result[slot]     = fighters[fighterIdx++];
+      result[slot] = fighters[fighterIdx++];
       result[slot + 1] = fighters[fighterIdx++];
 
     } else if (matchIdx === totalMatches - 1 && canPlaceRunnerup) {
       // Runner-up bye
-      result[slot]     = seeded2;
+      result[slot] = seeded2;
       result[slot + 1] = null;
 
     } else {
       // Middle slots — fighters first, then byeRest
       if (middleFighterPairsPlaced < middleFighterPairs) {
-        result[slot]     = fighters[fighterIdx++];
+        result[slot] = fighters[fighterIdx++];
         result[slot + 1] = fighters[fighterIdx++];
         middleFighterPairsPlaced++;
       } else {
-        result[slot]     = byeRest[byeRestIdx++] || null;
+        result[slot] = byeRest[byeRestIdx++] || null;
         result[slot + 1] = null;
       }
     }
@@ -277,7 +277,25 @@ router.delete('/:id/reset-draw', protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
+// ─── FORCE UNLOCK (testing only — bypasses publish safety) ─
+router.delete('/:id/force-unlock', protect, async (req, res) => {
+  try {
+    const { Tournament } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.id,
+      sport: req.admin.sport
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    tournament.isLocked = false;
+    tournament.isPublished = false;
+    tournament.winner = null;
+    await tournament.save();
+    await Match.deleteMany({ tournament: req.params.id });
+    res.json({ message: 'Tournament force-unlocked for testing. Draw, lock, and publish status all reset.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 // ─── DELETE TOURNAMENT — password required ────────────────
 router.delete('/:id', protect, async (req, res) => {
   const { password } = req.body;
@@ -327,16 +345,16 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
     const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
     if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
-   /*
-    const n = confirmedRegs.length;
-    const bracketSize = nextPowerOf2(n);
-        // Expand bracket if seeds need bye slots but bracket is already full
-    if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
-      const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
-      if (bracketSize === n) bracketSize = bracketSize * 2;
-    }
-    const rounds = Math.log2(bracketSize);
-    */
+    /*
+     const n = confirmedRegs.length;
+     const bracketSize = nextPowerOf2(n);
+         // Expand bracket if seeds need bye slots but bracket is already full
+     if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
+       const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
+       if (bracketSize === n) bracketSize = bracketSize * 2;
+     }
+     const rounds = Math.log2(bracketSize);
+     */
     const n = confirmedRegs.length;
     let bracketSize = nextPowerOf2(n);
     const rounds = Math.log2(bracketSize);
@@ -432,7 +450,7 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
+/*
 // ─── UPDATE MATCH SCORE ───────────────────────────────────
 router.put('/matches/:matchId/score', protect, async (req, res) => {
   try {
@@ -456,6 +474,41 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});*/
+// ─── UPDATE MATCH RESULT (W/L only — no score numbers) ────
+router.put('/matches/:matchId/score', protect, async (req, res) => {
+  try {
+    const { winnerId } = req.body;
+    if (!winnerId) return res.status(400).json({ message: 'winnerId is required' });
+
+    const match = await Match.findById(req.params.matchId);
+    if (!match) return res.status(404).json({ message: 'Match not found' });
+    if (match.isCompleted) return res.status(400).json({ message: 'Match already completed' });
+
+    const winnerStr = String(winnerId);
+    const p1Str = match.player1 ? String(match.player1) : null;
+    const p2Str = match.player2 ? String(match.player2) : null;
+
+    if (winnerStr !== p1Str && winnerStr !== p2Str) {
+      return res.status(400).json({ message: 'winnerId must be one of the two players in this match' });
+    }
+
+    match.winner = winnerId;
+    match.isCompleted = true;
+    await match.save();
+
+    if (match.nextMatchId) {
+      await advanceWinner(match);
+    } else {
+      const { Tournament } = getModelsForSport(req.admin.sport);
+      await Tournament.findByIdAndUpdate(match.tournament, { winner: match.winner });
+    }
+
+    res.json({ message: 'Result updated', match });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
+
 
 module.exports = router;
