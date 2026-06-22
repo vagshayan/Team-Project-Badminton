@@ -22,18 +22,19 @@ export const exportPlayerListCSV = (tournament, registrations) => {
     r.status
   ]);
 
-  let csvContent = "data:text/csv;charset=utf-8," 
-    + `${tournament.year} ${CAT_LABELS[tournament.category]} - PLAYER LIST\n`
+  const csvContent = `${tournament.year} ${CAT_LABELS[tournament.category]} - PLAYER LIST\n`
     + headers.join(",") + "\n" 
     + rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
 
-  const encodedUri = encodeURI(csvContent);
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
+  link.setAttribute("href", url);
   link.setAttribute("download", `${tournament.year}_${tournament.category}_players.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 // 2. Export Full Player Master Report (PDF)
@@ -288,16 +289,17 @@ export const exportFilteredPlayersCSV = (registrations, title) => {
       r.status
     ]);
   
-    let csvContent = "data:text/csv;charset=utf-8," 
-      + `${title}\n`
+    const csvContent = `${title}\n`
       + headers.join(",") + "\n" 
       + rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
   
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `filtered_players.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 };

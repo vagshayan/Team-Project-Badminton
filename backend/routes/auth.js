@@ -104,6 +104,29 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
+// Reset password via security question (no token required — public endpoint)
+router.post('/reset-forgot-password', async (req, res) => {
+  const { username, securityAnswer, newPassword } = req.body;
+  if (!username || !securityAnswer || !newPassword)
+    return res.status(400).json({ message: 'All fields are required' });
+  if (newPassword.length < 6)
+    return res.status(400).json({ message: 'New password must be at least 6 characters' });
+  try {
+    const admin = await Admin.findOne({ username: username.trim() });
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+    if (!admin.securityAnswer)
+      return res.status(400).json({ message: 'No security question set for this account' });
+    const isMatch = await admin.compareSecurityAnswer(securityAnswer.trim());
+    if (!isMatch)
+      return res.status(401).json({ message: 'Incorrect answer to security question' });
+    admin.password = newPassword;
+    await admin.save(); // pre-save hook will bcrypt the new password
+    res.json({ message: 'Password reset successful. You can now log in.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Update security question
 router.post('/update-security-question', protect, async (req, res) => {
   const { currentPassword, securityQuestion, securityAnswer } = req.body;
