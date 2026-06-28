@@ -9,7 +9,10 @@ const tournamentSchema = new mongoose.Schema({
   venue: { type: String, required: true },
   category: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+  isLocked: { type: Boolean, default: false },
+  winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },
   isActive: { type: Boolean, default: true },
+  isPublished: { type: Boolean, default: false },
 }, { timestamps: true });
 
 const registrationSchema = new mongoose.Schema({
@@ -45,7 +48,14 @@ function getModelsForSport(sport) {
   const pModelName = `${prefix}Player`;
 
   // 1. Tournament Model
-  const Tournament = mongoose.models[tModelName] || mongoose.model(tModelName, tournamentSchema, `${prefix}tournaments`);
+  let Tournament;
+  if (mongoose.models[tModelName]) {
+    Tournament = mongoose.models[tModelName];
+  } else {
+    const sTournSchema = tournamentSchema.clone();
+    sTournSchema.path('winner').options.ref = rModelName;
+    Tournament = mongoose.model(tModelName, sTournSchema, `${prefix}tournaments`);
+  }
 
   // 2. Registration Model with Sport-Specific Ref
   let Registration;

@@ -5,36 +5,161 @@ const { getModelsForSport } = require('../models/SportModels');
 const Match = require('../models/Match');
 const { protect } = require('../middleware/auth');
 
-// Stats for Admin Dashboard
+const SINGLES = ['singles-men', 'singles-women'];
+
+function nextPowerOf2(n) {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
+  const seeded1 = players.find(p => p._id.toString() === String(championId));
+  let seeded2 = players.find(p => p._id.toString() === String(runnerUpId));
+
+  if (seeded1 && seeded2 && seeded1._id.toString() === seeded2._id.toString()) {
+    seeded2 = null;
+  }
+
+  const rest = shuffle(players.filter(p => {
+    if (seeded1 && p._id.toString() === seeded1._id.toString()) return false;
+    if (seeded2 && p._id.toString() === seeded2._id.toString()) return false;
+    return true;
+  }));
+
+  const totalMatches = bracketSize / 2;
+  const naturalByes = bracketSize - players.length;
+  const fightingPlayers = players.length - naturalByes;
+  const r1Winners = fightingPlayers / 2;
+
+  const canPlaceChamp = !!seeded1 && naturalByes >= 1 && r1Winners >= 1;
+  const canPlaceRunnerup = !!seeded2 && naturalByes >= 2 && r1Winners >= 2;
+  const activeSeedByes = (canPlaceChamp ? 1 : 0) + (canPlaceRunnerup ? 1 : 0);
+
+  // Seeds that can't be placed rejoin as fighters
+  const extraFighters = [];
+  if (seeded1 && !canPlaceChamp) extraFighters.push(seeded1);
+  if (seeded2 && !canPlaceRunnerup) extraFighters.push(seeded2);
+
+  const allRest = [...rest, ...extraFighters];
+  const restByes = naturalByes - activeSeedByes; // e.g. 4-2=2
+  const fighters = allRest.slice(0, fightingPlayers); // exactly 8
+  const byeRest = allRest.slice(fightingPlayers);    // exactly 2
+
+  // Pre-calculate which matchIdx slots are reserved
+  // M0 = first fighting match (always)
+  // M1 = Champion bye (if canPlaceChamp)
+  // M(last-1) = last fighting match (if canPlaceRunnerup)
+  // M(last)   = Runner-up bye (if canPlaceRunnerup)
+  // Everything else = distribute remaining fighters first, then byeRest
+
+  const reservedSlots = new Set();
+  reservedSlots.add(0); // first fighting match
+  if (canPlaceChamp) reservedSlots.add(1);
+  if (canPlaceRunnerup) reservedSlots.add(totalMatches - 1);
+  if (canPlaceRunnerup) reservedSlots.add(totalMatches - 2);
+
+  // Count how many middle slots exist
+  const middleSlots = [];
+  for (let i = 0; i < totalMatches; i++) {
+    if (!reservedSlots.has(i)) middleSlots.push(i);
+  }
+
+  // Fighters used: 2 for M0 + 2 for M(last-1) if runnerup = fightingPlayers
+  // Remaining fighters for middle = fightingPlayers - 2 - (canPlaceRunnerup ? 2 : 0)
+  const fightersUsedByReserved = 2 + (canPlaceRunnerup ? 2 : 0);
+  const middleFighterPairs = (fightingPlayers - fightersUsedByReserved) / 2;
+  // Remaining middle slots go to byeRest players
+
+  const result = new Array(bracketSize).fill(null);
+  let fighterIdx = 0;
+  let byeRestIdx = 0;
+  let middleFighterPairsPlaced = 0;
+
+  for (let matchIdx = 0; matchIdx < totalMatches; matchIdx++) {
+    const slot = matchIdx * 2;
+
+    if (matchIdx === 0) {
+      // First fighting match → winner faces Champion in R2
+      result[slot] = fighters[fighterIdx++];
+      result[slot + 1] = fighters[fighterIdx++];
+
+    } else if (matchIdx === 1 && canPlaceChamp) {
+      // Champion bye
+      result[slot] = seeded1;
+      result[slot + 1] = null;
+
+    } else if (matchIdx === totalMatches - 2 && canPlaceRunnerup) {
+      // Last fighting match → winner faces Runner-up in R2
+      result[slot] = fighters[fighterIdx++];
+      result[slot + 1] = fighters[fighterIdx++];
+
+    } else if (matchIdx === totalMatches - 1 && canPlaceRunnerup) {
+      // Runner-up bye
+      result[slot] = seeded2;
+      result[slot + 1] = null;
+
+    } else {
+      // Middle slots — fighters first, then byeRest
+      if (middleFighterPairsPlaced < middleFighterPairs) {
+        result[slot] = fighters[fighterIdx++];
+        result[slot + 1] = fighters[fighterIdx++];
+        middleFighterPairsPlaced++;
+      } else {
+        result[slot] = byeRest[byeRestIdx++] || null;
+        result[slot + 1] = null;
+      }
+    }
+  }
+
+  return result;
+}
+
+async function advanceWinner(match) {
+  if (!match.nextMatchId) return;
+  const nextMatch = await Match.findById(match.nextMatchId);
+  if (!nextMatch) return;
+  if (match.positionInNextMatch === 1) {
+    nextMatch.player1 = match.winner;
+  } else {
+    nextMatch.player2 = match.winner;
+  }
+  await nextMatch.save();
+}
+
+// ─── STATS ───────────────────────────────────────────────
 router.get('/stats', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
     const sportTournaments = await Tournament.find({ sport: req.admin.sport });
     const tournamentIds = sportTournaments.map(t => t._id);
-
-    const totalPlayers = await Registration.countDocuments({
-      tournament: { $in: tournamentIds },
-      status: 'confirmed'
-    });
-
-    const pendingApprovals = await Registration.countDocuments({
-      tournament: { $in: tournamentIds },
-      status: 'pending'
-    });
-
+    const totalPlayers = await Registration.countDocuments({ tournament: { $in: tournamentIds }, status: 'confirmed' });
+    const pendingApprovals = await Registration.countDocuments({ tournament: { $in: tournamentIds }, status: 'pending' });
     const activeCategories = [...new Set(sportTournaments.map(t => t.category))].length;
-
     res.json({ totalPlayers, pendingApprovals, activeCategories });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Public — students view
+// ─── PUBLIC — students view tournaments for REGISTRATION ──
 router.get('/public/:sport', async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.params.sport);
-    const tournaments = await Tournament.find({ sport: req.params.sport, isActive: true })
+    const tournaments = await Tournament.find({
+      sport: req.params.sport,
+      isActive: true,
+      // No isPublished filter — ALL active tournaments visible for registration
+    })
       .populate('createdBy', 'name')
       .sort({ date: 1 });
     res.json(tournaments);
@@ -43,7 +168,37 @@ router.get('/public/:sport', async (req, res) => {
   }
 });
 
-// Admin — own sport only
+// ─── PUBLIC — students view matches (no login needed) ────
+router.get('/public/:tournamentId/matches', async (req, res) => {
+  try {
+    const { sport } = req.query;
+    if (!sport) return res.status(400).json({ message: 'sport query parameter required' });
+    const { Tournament, Registration } = getModelsForSport(sport);
+
+    const tournament = await Tournament.findOne({
+      _id: req.params.tournamentId,
+      isPublished: true
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found or not published yet' });
+
+    const matches = await Match.find({ tournament: req.params.tournamentId })
+      .sort({ round: 1, matchNumber: 1 });
+
+    const populated = await Promise.all(matches.map(async (m) => {
+      const obj = m.toObject();
+      if (m.player1) obj.player1 = await Registration.findById(m.player1);
+      if (m.player2) obj.player2 = await Registration.findById(m.player2);
+      if (m.winner) obj.winner = await Registration.findById(m.winner);
+      return obj;
+    }));
+
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ─── ADMIN — own sport tournaments ───────────────────────
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
@@ -56,7 +211,7 @@ router.get('/admin', protect, async (req, res) => {
   }
 });
 
-// Create
+// ─── CREATE ───────────────────────────────────────────────
 router.post('/', protect, async (req, res) => {
   const { year, date, time, venue, category } = req.body;
   const currentYear = new Date().getFullYear();
@@ -76,7 +231,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// Update — password required
+// ─── UPDATE — password required ──────────────────────────
 router.put('/:id', protect, async (req, res) => {
   const { password, year, date, time, venue, category } = req.body;
   if (!password) return res.status(400).json({ message: 'Password is required to update' });
@@ -103,7 +258,45 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// Delete — password required
+// ─── RESET DRAW (blocked if published) ───────────────────
+router.delete('/:id/reset-draw', protect, async (req, res) => {
+  try {
+    const { Tournament } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.id,
+      sport: req.admin.sport
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    if (tournament.isPublished) return res.status(400).json({ message: 'Cannot reset a published draw. Draw is already public!' });
+    tournament.isLocked = false;
+    tournament.winner = null;
+    await tournament.save();
+    await Match.deleteMany({ tournament: req.params.id });
+    res.json({ message: 'Draw reset successfully. You can now regenerate.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+// ─── FORCE UNLOCK (testing only — bypasses publish safety) ─
+router.delete('/:id/force-unlock', protect, async (req, res) => {
+  try {
+    const { Tournament } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.id,
+      sport: req.admin.sport
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    tournament.isLocked = false;
+    tournament.isPublished = false;
+    tournament.winner = null;
+    await tournament.save();
+    await Match.deleteMany({ tournament: req.params.id });
+    res.json({ message: 'Tournament force-unlocked for testing. Draw, lock, and publish status all reset.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+// ─── DELETE TOURNAMENT — password required ────────────────
 router.delete('/:id', protect, async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: 'Password is required to delete' });
@@ -111,44 +304,38 @@ router.delete('/:id', protect, async (req, res) => {
     const admin = await Admin.findById(req.admin._id);
     const isMatch = await admin.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
-
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
-
-    // Check if tournament exists and get it before deletion
     const tournament = await Tournament.findOne({ _id: req.params.id, sport: req.admin.sport });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
-
-    // Update all registrations for this tournament to 'cancelled' status
-    await Registration.updateMany(
-      { tournament: req.params.id },
-      { status: 'cancelled' }
-    );
-
-    // Delete the tournament
+    await Registration.updateMany({ tournament: req.params.id }, { status: 'cancelled' });
+    await Match.deleteMany({ tournament: req.params.id });
     await Tournament.findOneAndDelete({ _id: req.params.id, sport: req.admin.sport });
-
-    res.json({
-      message: 'Tournament deleted successfully. All registrations have been cancelled.',
-      cancelledRegistrations: true
-    });
+    res.json({ message: 'Tournament deleted successfully. All registrations have been cancelled.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Get Matches for a Tournament
+// ─── GET MATCHES — admin ──────────────────────────────────
 router.get('/:id/matches', protect, async (req, res) => {
   try {
+    const { Registration } = getModelsForSport(req.admin.sport);
     const matches = await Match.find({ tournament: req.params.id })
-      .populate('player1 player2 winner')
       .sort({ round: 1, matchNumber: 1 });
-    res.json(matches);
+    const populated = await Promise.all(matches.map(async (m) => {
+      const obj = m.toObject();
+      if (m.player1) obj.player1 = await Registration.findById(m.player1);
+      if (m.player2) obj.player2 = await Registration.findById(m.player2);
+      if (m.winner) obj.winner = await Registration.findById(m.winner);
+      return obj;
+    }));
+    res.json(populated);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Generate Draws (Brackets)
+// ─── GENERATE DRAWS ───────────────────────────────────────
 router.post('/:id/generate-draws', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -158,129 +345,170 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
     const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
     if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
+    /*
+     const n = confirmedRegs.length;
+     const bracketSize = nextPowerOf2(n);
+         // Expand bracket if seeds need bye slots but bracket is already full
+     if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
+       const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
+       if (bracketSize === n) bracketSize = bracketSize * 2;
+     }
+     const rounds = Math.log2(bracketSize);
+     */
+    const n = confirmedRegs.length;
+    let bracketSize = nextPowerOf2(n);
+    const rounds = Math.log2(bracketSize);
 
-    // Shuffle players
-    const players = confirmedRegs.sort(() => Math.random() - 0.5);
-    const n = players.length;
-
-    // Determine bracket size (next power of 2)
-    let bracketSize = 1;
-    let rounds = 0;
-    while (bracketSize < n) {
-      bracketSize *= 2;
-      rounds++;
+    let orderedPlayers;
+    if (SINGLES.includes(tournament.category)) {
+      const { championId, runnerUpId } = req.body;
+      orderedPlayers = buildSeededOrder(confirmedRegs, championId, runnerUpId, bracketSize);
+    } else {
+      orderedPlayers = shuffle(confirmedRegs);
     }
 
-    // Lock the tournament
+    await Match.deleteMany({ tournament: req.params.id });
     tournament.isLocked = true;
     await tournament.save();
 
-    // 1. Create all matches for all rounds first to have IDs for nextMatchId
-    // Total matches in single elimination = n-1 (if we don't count byes as matches)
-    // But for a fixed bracket size, it's bracketSize - 1.
     const matchesByRound = [];
-    let currentRoundMatches = bracketSize / 2;
-    let lastRoundMatches = [];
-
-    for (let r = rounds; r >= 1; r--) {
+    for (let round = 1; round <= rounds; round++) {
+      const matchCount = bracketSize / Math.pow(2, round);
       const roundMatches = [];
-      for (let m = 0; m < currentRoundMatches; m++) {
+      for (let m = 0; m < matchCount; m++) {
         const match = new Match({
           tournament: tournament._id,
-          round: rounds - r + 1,
+          round,
           matchNumber: m + 1,
         });
-
-        // Set nextMatchId if not the final round (round 1 in our loop is actually the final round)
-        if (lastRoundMatches.length > 0) {
-          const nextMatchIdx = Math.floor(m / 2);
-          match.nextMatchId = lastRoundMatches[nextMatchIdx]._id;
-          match.positionInNextMatch = (m % 2) === 0 ? 1 : 2;
-        }
-
-        await match.save();
         roundMatches.push(match);
       }
-      matchesByRound.unshift(roundMatches);
-      lastRoundMatches = roundMatches;
-      currentRoundMatches /= 2;
+      matchesByRound.push(roundMatches);
     }
 
-    // 2. Assign players to Round 1
+    for (let round = 0; round < matchesByRound.length - 1; round++) {
+      const currentRoundMatches = matchesByRound[round];
+      const nextRoundMatches = matchesByRound[round + 1];
+      currentRoundMatches.forEach((match, idx) => {
+        const nextMatch = nextRoundMatches[Math.floor(idx / 2)];
+        match.nextMatchId = nextMatch._id;
+        match.positionInNextMatch = (idx % 2) === 0 ? 1 : 2;
+      });
+    }
+
+    await Promise.all(matchesByRound.flat().map(match => match.save()));
+
     const round1Matches = matchesByRound[0];
     for (let i = 0; i < bracketSize / 2; i++) {
-        const p1 = players[i * 2];
-        const p2 = players[i * 2 + 1];
-        
-        const match = round1Matches[i];
-        match.player1 = p1 ? p1._id : null;
-        match.player2 = p2 ? p2._id : null;
+      const p1 = orderedPlayers[i * 2];
+      const p2 = orderedPlayers[i * 2 + 1];
+      const match = round1Matches[i];
+      match.player1 = p1 ? p1._id : null;
+      match.player2 = p2 ? p2._id : null;
 
-        // Auto-advance if it's a bye
-        if (p1 && !p2) {
-            match.winner = p1._id;
-            match.isCompleted = true;
-            match.score1 = 1; match.score2 = 0;
-            await match.save();
-            await advanceWinner(match);
-        } else if (!p1 && p2) {
-            match.winner = p2._id;
-            match.isCompleted = true;
-            match.score1 = 0; match.score2 = 1;
-            await match.save();
-            await advanceWinner(match);
-        } else {
-            await match.save();
-        }
+      if (p1 && !p2) {
+        match.winner = p1._id;
+        match.isCompleted = true;
+        match.score1 = 1;
+        match.score2 = 0;
+        await match.save();
+        await advanceWinner(match);
+      } else if (!p1 && p2) {
+        match.winner = p2._id;
+        match.isCompleted = true;
+        match.score1 = 0;
+        match.score2 = 1;
+        await match.save();
+        await advanceWinner(match);
+      } else {
+        await match.save();
+      }
     }
 
     res.json({ message: 'Draws generated successfully', rounds: matchesByRound.length });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 });
 
-// Update Match Score
+// ─── PUBLISH DRAW ─────────────────────────────────────────
+router.post('/:id/publish-draw', protect, async (req, res) => {
+  try {
+    const { Tournament } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.id,
+      sport: req.admin.sport
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    if (!tournament.isLocked) return res.status(400).json({ message: 'Generate draw first before publishing' });
+    if (tournament.isPublished) return res.status(400).json({ message: 'Draw already published' });
+    tournament.isPublished = true;
+    await tournament.save();
+    res.json({ message: 'Draw published! Students can now see the bracket.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+/*
+// ─── UPDATE MATCH SCORE ───────────────────────────────────
 router.put('/matches/:matchId/score', protect, async (req, res) => {
   try {
     const { score1, score2 } = req.body;
+    if (score1 === score2) return res.status(400).json({ message: 'Scores cannot be equal — there must be a winner' });
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ message: 'Match not found' });
     if (match.isCompleted) return res.status(400).json({ message: 'Match already completed' });
-
     match.score1 = score1;
     match.score2 = score2;
     match.isCompleted = true;
     match.winner = score1 > score2 ? match.player1 : match.player2;
     await match.save();
-
-    // Advance winner to next match if exists
     if (match.nextMatchId) {
       await advanceWinner(match);
     } else {
-      // This was the final!
+      const { Tournament } = getModelsForSport(req.admin.sport);
+      await Tournament.findByIdAndUpdate(match.tournament, { winner: match.winner });
+    }
+    res.json({ message: 'Score updated', match });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});*/
+// ─── UPDATE MATCH RESULT (W/L only — no score numbers) ────
+router.put('/matches/:matchId/score', protect, async (req, res) => {
+  try {
+    const { winnerId } = req.body;
+    if (!winnerId) return res.status(400).json({ message: 'winnerId is required' });
+
+    const match = await Match.findById(req.params.matchId);
+    if (!match) return res.status(404).json({ message: 'Match not found' });
+    if (match.isCompleted) return res.status(400).json({ message: 'Match already completed' });
+
+    const winnerStr = String(winnerId);
+    const p1Str = match.player1 ? String(match.player1) : null;
+    const p2Str = match.player2 ? String(match.player2) : null;
+
+    if (winnerStr !== p1Str && winnerStr !== p2Str) {
+      return res.status(400).json({ message: 'winnerId must be one of the two players in this match' });
+    }
+
+    match.winner = winnerId;
+    match.isCompleted = true;
+    await match.save();
+
+    if (match.nextMatchId) {
+      await advanceWinner(match);
+    } else {
       const { Tournament } = getModelsForSport(req.admin.sport);
       await Tournament.findByIdAndUpdate(match.tournament, { winner: match.winner });
     }
 
-    res.json({ message: 'Score updated', match });
+    res.json({ message: 'Result updated', match });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-async function advanceWinner(match) {
-    if (!match.nextMatchId) return;
-    const nextMatch = await Match.findById(match.nextMatchId);
-    if (match.positionInNextMatch === 1) {
-        nextMatch.player1 = match.winner;
-    } else {
-        nextMatch.player2 = match.winner;
-    }
-    await nextMatch.save();
-
-    // If both players present in next match and one is a bye (unlikely here but good for safety)
-    // or if we want to handle cascading byes...
-}
 
 module.exports = router;

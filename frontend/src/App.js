@@ -36,7 +36,7 @@ function App() {
             <Route path="/badminton" element={<BadmintonPage />} />
             <Route path="/table-tennis" element={<TableTennisPage />} />
             <Route path="/carrom" element={<CarromPage />} />
-            <Route path="/" element={<LoginPage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
