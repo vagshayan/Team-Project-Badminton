@@ -280,7 +280,7 @@ export const exportFilteredPlayersCSV = (registrations, title) => {
     const rows = registrations.map(r => [
       r.playerName,
       r.rollNumber,
-      r.nicNo,
+      r.nicNo ? `\t${r.nicNo}` : '',
       r.department,
       r.phone,
       r.email,

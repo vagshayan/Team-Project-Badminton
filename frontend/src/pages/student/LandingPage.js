@@ -23,8 +23,8 @@ export default function LandingPage() {
     }}>
       <div style={{ textAlign: 'center', marginBottom: 60 }}>
         <div style={{ fontSize: 60, marginBottom: 10 }}>🏆</div>
-        <h1 style={{ fontSize: 56, fontWeight: 900, letterSpacing: 18, color: '#FFFFFF', margin: 0 }}>SPORTS</h1>
-        <p style={{ fontSize: 14, color: '#777', letterSpacing: 8, marginTop: 10, fontWeight: 500 }}>TOURNAMENT MANAGER</p>
+        <h1 className="title-text">SPORTS</h1>
+        <p className="subtitle-text">TOURNAMENT MANAGER</p>
       </div>
 
       <div style={{ 
@@ -79,6 +79,30 @@ export default function LandingPage() {
       </div>
 
       <style>{`
+        .title-text {
+          font-size: 56px;
+          font-weight: 900;
+          letter-spacing: 18px;
+          color: #FFFFFF;
+          margin: 0;
+        }
+        .subtitle-text {
+          font-size: 14px;
+          color: #777;
+          letter-spacing: 8px;
+          margin-top: 10px;
+          font-weight: 500;
+        }
+        @media (max-width: 480px) {
+          .title-text {
+            font-size: 40px;
+            letter-spacing: 12px;
+          }
+          .subtitle-text {
+            font-size: 11px;
+            letter-spacing: 5px;
+          }
+        }
         .sport-card:hover {
           background: rgba(255, 255, 255, 0.05) !important;
           transform: translateX(8px);

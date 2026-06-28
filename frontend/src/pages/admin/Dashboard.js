@@ -32,6 +32,9 @@ export default function Dashboard() {
   const { admin, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [stats, setStats] = useState({ totalPlayers: 0, pendingApprovals: 0, activeCategories: 0 });
@@ -45,6 +48,22 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Lock body scroll when mobile sidebar drawer is open
+  useEffect(() => {
+    if (mobileSidebarOpen) {
+      document.body.classList.add('sidebar-open');
+    } else {
+      document.body.classList.remove('sidebar-open');
+    }
+    return () => document.body.classList.remove('sidebar-open');
+  }, [mobileSidebarOpen]);
 
   const fetchData = useCallback(async () => {
     if (!admin) return;
@@ -96,26 +115,67 @@ export default function Dashboard() {
 
   if (!admin) return null;
 
+  /* ── computed sidebar width for desktop ── */
+  const desktopSidebarW = sidebarCollapsed ? 72 : 340;
+
   return (
     <div style={ds.container}>
+
+      {/* ── Mobile overlay backdrop ── */}
+      {isMobile && mobileSidebarOpen && (
+        <div
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 199 }}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside style={ds.sidebar}>
-        <div style={ds.sidebarBrand}>
-          <div style={{ ...ds.logoBox, background: meta.color }}>{meta.icon}</div>
-          <div style={{ fontWeight: 950, fontSize: 18, letterSpacing: -0.5 }}>ADMIN CONTROL PANEL</div>
+      <aside style={{
+        ...ds.sidebar,
+        width: isMobile ? 280 : desktopSidebarW,
+        transform: isMobile ? (mobileSidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
+        transition: isMobile
+          ? 'transform 0.3s cubic-bezier(0.4,0,0.2,1)'
+          : 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
+        overflow: 'hidden',
+        zIndex: isMobile ? 200 : 20,
+      }}>
+        {/* Brand / Toggle Row */}
+        <div style={{ ...ds.sidebarBrand, justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'flex-start', padding: (!isMobile && sidebarCollapsed) ? '0 14px' : '0 32px', gap: 12, overflow: 'hidden' }}>
+          <div style={{ ...ds.logoBox, background: meta.color, flexShrink: 0 }}>{meta.icon}</div>
+          {!((!isMobile) && sidebarCollapsed) && <div style={{ fontWeight: 950, fontSize: 16, letterSpacing: -0.5, whiteSpace: 'nowrap' }}>ADMIN PANEL</div>}
+          <button
+            onClick={() => isMobile ? setMobileSidebarOpen(false) : setSidebarCollapsed(c => !c)}
+            title={(!isMobile && sidebarCollapsed) ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 6, borderRadius: 8, flexShrink: 0, transition: 'color 0.2s' }}
+          >
+            {(!isMobile && sidebarCollapsed) ? '☰' : '✕'}
+          </button>
         </div>
 
         {/* Manager Profile Card */}
-        <div style={ds.profileCard}>
-          <div style={ds.avatarBox}>
-            <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={ds.avatar} />
-            <div style={ds.statusDot} />
+        {(isMobile || !sidebarCollapsed) && (
+          <div style={ds.profileCard}>
+            <div style={ds.avatarBox}>
+              <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={ds.avatar} />
+              <div style={ds.statusDot} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={ds.pName}>{admin.name.toUpperCase()}</div>
+              <div style={ds.pRole}>{meta.label.toUpperCase()} MANAGER</div>
+            </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={ds.pName}>{admin.name.toUpperCase()}</div>
-            <div style={ds.pRole}>{meta.label.toUpperCase()} MANAGER</div>
+        )}
+
+        {/* Collapsed avatar (icon only, desktop only) */}
+        {!isMobile && sidebarCollapsed && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ position: 'relative', width: 42, height: 42 }}>
+              <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
+              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, background: '#10B981', border: '2px solid var(--bg-card)', borderRadius: '50%' }} />
+            </div>
           </div>
-        </div>
+        )}
 
         <nav style={ds.nav}>
           {[
@@ -124,50 +184,99 @@ export default function Dashboard() {
             { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: '🏆' },
             { id: 'brackets', label: 'BRACKETS & DRAWS', icon: '🌳' },
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ ...ds.navBtn, background: activeTab === tab.id ? `${meta.color}20` : 'transparent', color: activeTab === tab.id ? meta.color : 'var(--text-muted)', borderLeft: activeTab === tab.id ? `4px solid ${meta.color}` : '4px solid transparent', borderRadius: '0 20px 20px 0' }}>
-              <span style={{ fontSize: 24 }}>{tab.icon}</span> <span style={{ fontSize: 13, letterSpacing: 0.5 }}>{tab.label}</span>
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); if (isMobile) setMobileSidebarOpen(false); }}
+              title={(!isMobile && sidebarCollapsed) ? tab.label : ''}
+              style={{
+                ...ds.navBtn,
+                justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'flex-start',
+                padding: (!isMobile && sidebarCollapsed) ? '18px 0' : '18px 32px',
+                background: activeTab === tab.id ? `${meta.color}20` : 'transparent',
+                color: activeTab === tab.id ? meta.color : 'var(--text-muted)',
+                borderLeft: activeTab === tab.id ? `4px solid ${meta.color}` : '4px solid transparent',
+                borderRadius: '0 20px 20px 0',
+              }}
+            >
+              <span style={{ fontSize: 24, flexShrink: 0 }}>{tab.icon}</span>
+              {(isMobile || !sidebarCollapsed) && <span style={{ fontSize: 13, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{tab.label}</span>}
             </button>
           ))}
         </nav>
 
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <button onClick={toggleTheme} style={ds.themeBtn}>{isDarkMode ? '⛅ DAY MODE' : '🌙 NIGHT MODE'}</button>
-          <button onClick={logout} style={ds.logoutBtn}>SIGN OUT</button>
+        <div style={{ padding: (!isMobile && sidebarCollapsed) ? '24px 8px' : '24px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: (!isMobile && sidebarCollapsed) ? 'center' : 'stretch' }}>
+          {(!isMobile && sidebarCollapsed) ? (
+            <>
+              <button onClick={toggleTheme} title={isDarkMode ? 'Day Mode' : 'Night Mode'} style={{ ...ds.themeBtn, width: 44, height: 44, padding: 0, fontSize: 20, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{isDarkMode ? '⛅' : '🌙'}</button>
+              <button onClick={logout} title="Sign Out" style={{ ...ds.logoutBtn, fontSize: 18 }}>🚪</button>
+            </>
+          ) : (
+            <>
+              <button onClick={toggleTheme} style={ds.themeBtn}>{isDarkMode ? '⛅ DAY MODE' : '🌙 NIGHT MODE'}</button>
+              <button onClick={logout} style={ds.logoutBtn}>SIGN OUT</button>
+            </>
+          )}
         </div>
       </aside>
 
       {/* Main content wrapper */}
-      <div style={ds.mainWrapper}>
-        <header style={ds.header}>
-          <div style={ds.greetBox}>
-            <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
+      <div style={{ ...ds.mainWrapper, marginLeft: isMobile ? 0 : desktopSidebarW, transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)', minWidth: 0 }}>
+        {/* ── Mobile top bar ── */}
+        {isMobile && (
+          <div style={{ height: 64, background: 'var(--nav-bg)', backdropFilter: 'blur(30px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', position: 'sticky', top: 0, zIndex: 10 }}>
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer', padding: 4, lineHeight: 1 }}
+              aria-label="Open menu"
+            >☰</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...ds.logoBox, background: meta.color, width: 32, height: 32, fontSize: 18 }}>{meta.icon}</div>
+              <span style={{ fontWeight: 950, fontSize: 14, letterSpacing: 0.5 }}>ADMIN PANEL</span>
+            </div>
+            <div style={{ width: 32 }} />
+          </div>
+        )}
+
+        {/* ── Desktop header ── */}
+        {!isMobile && (
+          <header style={ds.header}>
+            <div style={ds.greetBox}>
+              <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
+                {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
+              </h2>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
+            </div>
+          </header>
+        )}
+
+        {/* ── Mobile greeting banner ── */}
+        {isMobile && (
+          <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 950, margin: 0, letterSpacing: -0.5 }}>
               {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
             </h2>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
           </div>
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-            <div style={{ ...ds.domainBadge, borderColor: meta.color, color: meta.color }}>{meta.label.toUpperCase()} CONTROL</div>
-          </div>
-        </header>
+        )}
 
-        <main style={{ padding: '60px' }}>
+        <main style={{ padding: isMobile ? '20px' : '60px' }} className="mobile-padding">
           {toast && <div className="alert alert-success" style={{ padding: '16px 24px', fontSize: 16, marginBottom: 32 }}>{toast}</div>}
 
           {activeTab === 'dashboard' && (
             <div>
-              <h1 style={ds.title}>DASHBOARD OVERVIEW</h1>
-              <p style={ds.subtitle}>Real-time metrics for your managed tournaments.</p>
+              <h1 style={{ ...ds.title, fontSize: isMobile ? 28 : 56 }}>DASHBOARD OVERVIEW</h1>
+              <p style={{ ...ds.subtitle, fontSize: isMobile ? 14 : 18, marginBottom: isMobile ? 24 : 60 }}>Real-time metrics for your managed tournaments.</p>
 
-              <div style={ds.statsGrid}>
+              <div className="responsive-grid-3" style={{ marginBottom: isMobile ? 32 : 70 }}>
                 {[
                   { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: '👥' },
                   { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: '⏳' },
                   { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: '🎖️' },
                 ].map((s) => (
-                  <div key={s.label} style={ds.statCard}>
+                  <div key={s.label} style={{ ...ds.statCard, padding: isMobile ? '24px 20px' : '48px 32px', borderRadius: isMobile ? 24 : 40 }} className="mobile-card">
                     <div style={{ ...ds.cardSymbol, color: s.color, background: `${s.color}15` }}>{s.icon}</div>
-                    <div style={{ fontSize: 64, fontWeight: 950 }}>{s.val}</div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 2 }}>{s.label.toUpperCase()}</div>
+                    <div style={{ fontSize: isMobile ? 42 : 64, fontWeight: 950 }}>{s.val}</div>
+                    <div style={{ fontSize: isMobile ? 11 : 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 2 }}>{s.label.toUpperCase()}</div>
                   </div>
                 ))}
               </div>
@@ -176,10 +285,10 @@ export default function Dashboard() {
 
           {activeTab === 'player-approvals' && (
             <div style={ds.section}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
-                <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
-                <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...ds.filterSelect, width: 350, height: 50, borderRadius: 20 }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 32 }}>
+                <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 20 : 36, marginBottom: isMobile ? 0 : 32 }}>PLAYER VERIFICATION BOARD</h2>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 15, alignItems: 'stretch', flex: isMobile ? 'unset' : 1, justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...ds.filterSelect, width: isMobile ? '100%' : 350, height: 50, borderRadius: 20 }}>
                     <option value="all">ALL REGISTRATIONS</option>
                     <option value="confirmed">APPROVED ONLY</option>
                     <option value="pending">PENDING ONLY</option>
@@ -198,7 +307,7 @@ export default function Dashboard() {
                     }}
                     style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
                   >💾 DOWNLOAD CSV</button>
-                  <div style={{ position: 'relative', width: 350 }}>
+                  <div style={{ position: 'relative', width: isMobile ? '100%' : 350 }}>
                     <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>🔍</span>
                     <input
                       type="text"
@@ -210,7 +319,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div style={ds.tableBox}>
+              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
                     <tr>
@@ -278,13 +387,13 @@ export default function Dashboard() {
 
           {activeTab === 'tournament-setup' && (
             <div style={ds.section}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
-                <h2 style={ds.sectionTitle}>TOURNAMENT SETUP BOARD</h2>
-                <button onClick={() => setShowCreate(true)} style={ds.createBtn}>+ ADD NEW TOURNAMENT</button>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 40 }}>
+                <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 20 : 36 }}>TOURNAMENT SETUP BOARD</h2>
+                <button onClick={() => setShowCreate(true)} style={{ ...ds.createBtn, width: isMobile ? '100%' : 'auto' }}>+ ADD NEW TOURNAMENT</button>
               </div>
-              <div style={ds.grid}>
+              <div className="responsive-grid-auto">
                 {tournaments.map(t => (
-                  <div key={t._id} style={ds.tournCard}>
+                  <div key={t._id} style={ds.tournCard} className="mobile-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
                       <div style={{ fontSize: 40, fontWeight: 950, color: 'var(--primary)' }}>{t.year}</div>
                       <div style={{ ...ds.catBadge, color: 'var(--primary)' }}>{CAT_LABELS[t.category]}</div>
@@ -293,18 +402,10 @@ export default function Dashboard() {
                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>{fmtDate(t.date)}</span></div>
                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>📍 <span>{t.venue}</span></div>
                     </div>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <button onClick={() => setViewTarget(t)} style={ds.viewBtn}>VIEW REGISTERED PLAYERS</button>
-                      <button onClick={async () => {
-                        const res = await axios.get(`/api/registrations/tournament/${t._id}`);
-                        exportPlayerListCSV(t, res.data);
-                      }} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>📊 CSV</button>
-                      <button onClick={async () => {
-                        const res = await axios.get(`/api/registrations/tournament/${t._id}`);
-                        exportFullPlayerReportPDF(t, res.data);
-                      }} style={{ ...ds.viewBtn, width: 'auto', px: 20, color: '#EF4444' }}>📄 FULL PDF</button>
-                      <button onClick={() => setEditTarget(t)} style={{ ...ds.viewBtn, width: 'auto', px: 20 }}>✏️</button>
-                      <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>🗑️</button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      <button onClick={() => setViewTarget(t)} style={{ ...ds.viewBtn, minWidth: 0, flex: '1 1 100%' }}>VIEW REGISTERED PLAYERS</button>
+                      <button onClick={() => setEditTarget(t)} style={{ ...ds.viewBtn, flex: '1 1 auto', width: 'auto' }}>✏️ EDIT</button>
+                      <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, flex: '1 1 auto', width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>🗑️</button>
                     </div>
                   </div>
                 ))}
@@ -347,20 +448,18 @@ const ds = {
   logoutBtn: { color: '#EF4444', fontWeight: 950, border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, letterSpacing: 1 },
   title: { fontSize: 56, fontWeight: 950, marginBottom: 8, letterSpacing: -2, textTransform: 'uppercase' },
   subtitle: { color: 'var(--text-muted)', marginBottom: 60, fontSize: 18, fontWeight: 500 },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, marginBottom: 70 },
   statCard: { background: 'var(--bg-card)', padding: '48px 32px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', position: 'relative' },
   cardSymbol: { width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, marginBottom: 24 },
   section: { animation: 'fadeIn 0.5s ease' },
   sectionTitle: { fontSize: 36, fontWeight: 950, marginBottom: 32, letterSpacing: -1, textTransform: 'uppercase' },
-  tableBox: { borderRadius: 40, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow)', background: 'var(--bg-card)' },
+  tableBox: { borderRadius: 24, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', background: 'var(--bg-card)' },
   thead: { background: 'var(--bg-input)', borderBottom: '2px solid var(--border)' },
   th_header: { padding: '24px 32px', fontSize: 13, textTransform: 'uppercase', color: 'var(--text)', letterSpacing: 1.5, fontWeight: 950 },
   tr: { borderTop: '1px solid var(--border)', transition: 'background 0.2s' },
   input: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 18px', borderRadius: 12, fontSize: 16, outline: 'none', transition: 'all 0.2s' },
-  td: { padding: '28px 32px' },
+  td: { padding: '20px 16px', whiteSpace: 'nowrap' },
   actionBtn: { border: 'none', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer', letterSpacing: 0.5 },
   revertBtn: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 32 },
   tournCard: { background: 'var(--bg-card)', padding: '40px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: 28 },
   catBadge: { background: 'var(--bg-input)', padding: '10px 18px', borderRadius: 14, fontSize: 13, fontWeight: 950, letterSpacing: 0.5, border: '1px solid var(--border)' },
   tournInfo: { color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 10 },

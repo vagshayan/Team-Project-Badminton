@@ -45,7 +45,47 @@ export default function RegisterPage() {
       <div style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
       <div style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
 
-      <nav style={sh.nav}>
+      <style>{`
+        @media (max-width: 900px) {
+          .content-container {
+            flex-direction: column !important;
+            padding: 40px 20px !important;
+            align-items: stretch !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .hero-side {
+            padding-right: 0 !important;
+            margin-bottom: 40px !important;
+            text-align: center !important;
+          }
+          .hero-title {
+            font-size: 40px !important;
+          }
+          .benefit-list {
+            align-items: center !important;
+          }
+          .form-side {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .form-card {
+            padding: 30px !important;
+            border-radius: 24px !important;
+          }
+          .field-group {
+            grid-template-columns: 1fr !important;
+          }
+          .nav-container {
+            padding: 0 20px !important;
+          }
+          .sport-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+
+      <nav className="nav-container" style={sh.nav}>
         <div style={sh.brand} onClick={() => navigate('/')}>
           <div style={sh.logoCircle}>🏆</div>
           <span style={sh.brandName}>UoJ SPORTS</span>
@@ -53,13 +93,13 @@ export default function RegisterPage() {
         <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? '🌞' : '🌙'}</button>
       </nav>
 
-      <div style={sh.content}>
-        <div style={sh.heroSide}>
+      <div className="content-container" style={sh.content}>
+        <div className="hero-side" style={sh.heroSide}>
            <div style={sh.badge}>OFFICIAL ACCESS</div>
-           <h1 style={sh.title}>CREATE YOUR <br/><span style={sh.highlight}>ARENA HUB</span></h1>
+           <h1 className="hero-title" style={sh.title}>CREATE YOUR <br/><span style={sh.highlight}>ARENA HUB</span></h1>
            <p style={sh.subtitle}>Initialize your dedicated management dashboard for Badminton, Table Tennis, or Carrom tournaments.</p>
            
-           <div style={sh.benefitList}>
+           <div className="benefit-list" style={sh.benefitList}>
               {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map(b => (
                  <div key={b} style={sh.benefit}>
                     <span style={sh.check}>✔</span> {b}
@@ -68,14 +108,14 @@ export default function RegisterPage() {
            </div>
         </div>
 
-        <div style={sh.formSide}>
-          <div style={sh.card}>
+        <div className="form-side" style={sh.formSide}>
+          <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
               <div style={sh.section}>
                 <label style={sh.label}>CHOOSE DOMAIN</label>
-                <div style={sh.sportGrid}>
+                <div className="sport-grid" style={sh.sportGrid}>
                    {SPORT_OPTIONS.map(s => (
                       <div 
                          key={s.id} 
@@ -93,7 +133,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div style={sh.fieldGroup}>
+              <div className="field-group" style={sh.fieldGroup}>
                 <div style={sh.field}>
                    <label style={sh.label}>MANAGER NAME</label>
                    <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" style={sh.input} required />
@@ -104,7 +144,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div style={sh.fieldGroup}>
+              <div className="field-group" style={sh.fieldGroup}>
                 <div style={sh.field}>
                    <label style={sh.label}>PASSWORD</label>
                    <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" style={sh.input} required />
@@ -141,7 +181,7 @@ export default function RegisterPage() {
 }
 
 const sh = {
-  container: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
+  container: { position: 'relative', width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden'  },
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },

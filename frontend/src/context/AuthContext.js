@@ -8,19 +8,42 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401 && error.config.url !== '/api/auth/login') {
+          localStorage.removeItem('token');
+          delete axios.defaults.headers.common['Authorization'];
+          setAdmin(null);
+        }
+        return Promise.reject(error);
+      }
+    );
+
     const token = localStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       axios.get('/api/auth/me')
-        .then((res) => setAdmin(res.data))
+        .then((res) => {
+          if (res.data) {
+            setAdmin(res.data);
+          } else {
+            localStorage.removeItem('token');
+            delete axios.defaults.headers.common['Authorization'];
+            setAdmin(null);
+          }
+        })
         .catch(() => {
           localStorage.removeItem('token');
           delete axios.defaults.headers.common['Authorization'];
+          setAdmin(null);
         })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
+
+    return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
   const login = async (username, password) => {

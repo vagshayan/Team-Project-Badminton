@@ -49,32 +49,32 @@ export default function LoginPage() {
       <div style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
 
       {/* Top Navbar */}
-      <nav style={sh.nav}>
-        <div style={sh.brand}>
-          <div style={sh.logoCircle}>🏆</div>
+      <nav style={sh.nav} className="mobile-nav">
+        <div style={sh.brand} className="mobile-brand">
+          <div style={sh.logoCircle} className="mobile-logo">🏆</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--text)' }}>UoJ SPORTS</span>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 3, fontWeight: 800 }}>TOURNAMENT MANAGER</span>
+            <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--text)' }} className="mobile-title-main">UoJ SPORTS</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 3, fontWeight: 800 }} className="mobile-title-sub">TOURNAMENT MANAGER</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
-          <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? '🌞' : '🌙'}</button>
-          <button onClick={() => setShowLogin(!showLogin)} style={sh.adminToggleBtn}>{showLogin ? '← PUBLIC HUB' : 'ADMIN ACCESS'}</button>
+        <div style={{ display: 'flex', gap: 15, alignItems: 'center' }} className="mobile-controls">
+          <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
+          <button onClick={() => setShowLogin(!showLogin)} style={sh.adminToggleBtn} className="mobile-btn">{showLogin ? '← PUBLIC HUB' : 'ADMIN ACCESS'}</button>
         </div>
       </nav>
 
       {/* Main Experience */}
       <main style={sh.mainContent}>
         {!showLogin ? (
-          <div style={sh.heroWrapper}>
+          <div style={sh.heroWrapper} className="mobile-padding-x">
             <div style={{ textAlign: 'center', marginBottom: 80 }}>
-              <h1 style={sh.heroTitle}>SELECT YOUR <span style={sh.gradientText}>ZONE</span></h1>
+              <h1 style={sh.heroTitle} className="mobile-title">SELECT YOUR <span style={sh.gradientText}>ZONE</span></h1>
               <p style={sh.heroSub}>Choose your sport and explore the latest tournaments and live result updates.</p>
             </div>
 
-            <div style={sh.sportGrid}>
+            <div className="responsive-grid-3" style={{ marginTop: 60 }}>
               {SPORTS.map((s) => (
-                <div key={s.id} onClick={() => navigate(s.path)} className="sport-card" style={{ ...sh.card, '--accent': s.color }}>
+                <div key={s.id} onClick={() => navigate(s.path)} className="sport-card mobile-card" style={{ ...sh.card, '--accent': s.color }}>
                   <div style={sh.cardInner}>
                     <div style={sh.cardIcon}>{s.icon}</div>
                     <h3 style={sh.cardTitle}>{s.label}</h3>
@@ -86,8 +86,8 @@ export default function LoginPage() {
             </div>
           </div>
         ) : (
-          <div style={sh.loginContainer}>
-             <div style={sh.loginPane}>
+          <div style={sh.loginContainer} className="mobile-padding-x">
+             <div style={sh.loginPane} className="mobile-card">
                 <div style={{ textAlign: 'center', marginBottom: 40 }}>
                   <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 12, color: 'var(--text)' }}>Log in</h2>
                   <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>Enter your tournament manager credentials</p>
@@ -156,7 +156,6 @@ const sh = {
   heroTitle: { fontSize: 80, fontWeight: 900, letterSpacing: -3, margin: 0, color: 'var(--text)' },
   gradientText: { background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
   heroSub: { fontSize: 20, color: 'var(--text-muted)', marginTop: 20, maxWidth: 600, marginInline: 'auto' },
-  sportGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, marginTop: 60 },
   cardInner: { position: 'relative', zIndex: 1 },
   cardIcon: { fontSize: 60, marginBottom: 24 },
   cardTitle: { fontSize: 28, fontWeight: 900, marginBottom: 8 },

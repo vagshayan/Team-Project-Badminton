@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const CATEGORIES = [
   { value: 'singles-men',   label: 'Singles — Men' },
@@ -21,6 +21,13 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const yearOptions = [];
   for (let y = currentYear; y <= currentYear + 5; y++) yearOptions.push(y);
@@ -43,17 +50,32 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
 
   return (
     <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={sh.card}>
-        <div style={sh.header}>
+      <div style={{
+        ...sh.card,
+        padding: isMobile ? '30px 20px' : 48,
+        borderRadius: isMobile ? 24 : 40,
+        margin: isMobile ? '10px' : 0,
+      }}>
+        <div style={{
+          ...sh.header,
+          marginBottom: isMobile ? 24 : 40,
+        }}>
             <div style={sh.badge}>{tournament ? 'ID: ' + tournament._id.slice(-6) : 'NEW TOURNAMENT'}</div>
-            <h2 style={sh.title}>{tournament ? 'EDIT TOURNAMENT' : 'CREATE NEW TOURNAMENT'}</h2>
+            <h2 style={{
+              ...sh.title,
+              fontSize: isMobile ? 22 : 32,
+            }}>{tournament ? 'EDIT TOURNAMENT' : 'CREATE NEW TOURNAMENT'}</h2>
             <p style={sh.subtitle}>Configure the parameters for the upcoming tournament domain.</p>
         </div>
 
         {error && <div style={sh.errorBox}>⚠ {error}</div>}
 
         <form onSubmit={handleSubmit} style={sh.form}>
-           <div style={sh.grid}>
+           <div style={{
+             ...sh.grid,
+             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+             gap: isMobile ? 16 : 24,
+           }}>
               <div style={sh.field}>
                  <label style={sh.label}>CHOOSE CATEGORY 🏅</label>
                  <select value={form.category} onChange={(e) => set('category', e.target.value)} style={sh.input}>
@@ -68,7 +90,11 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
               </div>
            </div>
 
-           <div style={sh.grid}>
+           <div style={{
+             ...sh.grid,
+             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+             gap: isMobile ? 16 : 24,
+           }}>
               <div style={sh.field}>
                  <label style={sh.label}>EVENT DATE 🗓️</label>
                  <input type="date" value={form.date} min={todayDate} onChange={(e) => set('date', e.target.value)} style={sh.input} required />
@@ -91,9 +117,14 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
               </div>
            )}
 
-           <div style={sh.footer}>
-              <button type="button" onClick={onClose} style={sh.cancelBtn}>CANCEL</button>
-              <button type="submit" disabled={loading} style={sh.submitBtn}>
+           <div style={{
+             ...sh.footer,
+             flexDirection: isMobile ? 'column-reverse' : 'row',
+             gap: isMobile ? 12 : 20,
+             marginTop: isMobile ? 8 : 12,
+           }}>
+              <button type="button" onClick={onClose} style={{ ...sh.cancelBtn, padding: isMobile ? '14px' : '18px' }}>CANCEL</button>
+              <button type="submit" disabled={loading} style={{ ...sh.submitBtn, padding: isMobile ? '14px' : '18px' }}>
                 {loading ? 'SAVING...' : (tournament ? 'SAVE CHANGES' : 'CREATE TOURNAMENT')}
               </button>
            </div>
