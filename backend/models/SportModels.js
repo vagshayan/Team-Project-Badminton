@@ -29,6 +29,7 @@ const registrationSchema = new mongoose.Schema({
   partnerRollNumber: { type: String, default: '' },
   status: { type: String, default: 'pending' },
 }, { timestamps: true });
+registrationSchema.index({ tournament: 1, nicNo: 1 }, { unique: true });
 
 const playerSchema = new mongoose.Schema({
   name: { type: String, required: true },

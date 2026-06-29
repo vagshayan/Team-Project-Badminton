@@ -174,6 +174,12 @@ router.post('/', async (req, res) => {
     });
     if (playerExists) return res.status(400).json({ message: `Registration Failed: ${rollNumber} is already participating.` });
 
+    const nicExists = await Registration.findOne({
+      tournament,
+      nicNo: nicNo.trim()
+    });
+    if (nicExists) return res.status(400).json({ message: `Registration Failed: NIC ${nicNo.trim()} is already registered for this tournament.` });
+
     if (partnerRollNumber && partnerRollNumber.trim() !== "") {
       const pRoll = partnerRollNumber.trim();
       if (pRoll === rollNumber || pRoll === rollNumber.trim()) return res.status(400).json({ message: "Cannot partner with yourself." });

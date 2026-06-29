@@ -21,7 +21,8 @@ router.post('/register', async (req, res) => {
       admin: { id: admin._id, username: admin.username, name: admin.name, sport: admin.sport },
     });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    const errorMsg = err.message || 'Registration failed';
+    res.status(400).json({ message: errorMsg });
   }
 });
 
@@ -87,7 +88,8 @@ router.post('/reset-password', protect, async (req, res) => {
     await targetAdmin.save();
     res.json({ message: `Password reset successful for ${targetAdmin.username}` });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const errorMsg = err.message || 'Password reset failed';
+    res.status(400).json({ message: errorMsg });
   }
 });
 
@@ -109,8 +111,6 @@ router.post('/reset-forgot-password', async (req, res) => {
   const { username, securityAnswer, newPassword } = req.body;
   if (!username || !securityAnswer || !newPassword)
     return res.status(400).json({ message: 'All fields are required' });
-  if (newPassword.length < 6)
-    return res.status(400).json({ message: 'New password must be at least 6 characters' });
   try {
     const admin = await Admin.findOne({ username: username.trim() });
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
@@ -123,7 +123,8 @@ router.post('/reset-forgot-password', async (req, res) => {
     await admin.save(); // pre-save hook will bcrypt the new password
     res.json({ message: 'Password reset successful. You can now log in.' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const errorMsg = err.message || 'Password reset failed';
+    res.status(400).json({ message: errorMsg });
   }
 });
 
