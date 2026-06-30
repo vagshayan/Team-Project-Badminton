@@ -97,7 +97,6 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState(null);
   const [hoverCategory, setHoverCategory] = useState(null);
   const filterRef = useRef(null);
 
