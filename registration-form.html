@@ -533,12 +533,12 @@
             document.getElementById('charCount').textContent = password.length;
 
             // Update password strength bar
-            const allMet = metCount === 4;
+            const allMet = metCount === 5;
             if (allMet) {
                 strengthBar.className = 'password-strength-bar strong';
                 statusBar.textContent = '✅ All requirements met';
                 statusBar.classList.add('valid');
-            } else if (metCount >= 2) {
+            } else if (metCount >= 3) {
                 strengthBar.className = 'password-strength-bar medium';
                 statusBar.textContent = '⚠ Password incomplete';
                 statusBar.classList.remove('valid');
