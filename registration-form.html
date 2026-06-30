@@ -492,6 +492,11 @@
                 icon: document.querySelector('#req-uppercase .requirement-icon'),
                 validate: (pwd) => /[A-Z]/.test(pwd)
             },
+            lowercase: {
+                element: document.getElementById('req-lowercase'),
+                icon: document.querySelector('#req-lowercase .requirement-icon'),
+                validate: (pwd) => /[a-z]/.test(pwd)
+            },
             number: {
                 element: document.getElementById('req-number'),
                 icon: document.querySelector('#req-number .requirement-icon'),
