@@ -130,20 +130,11 @@ body.light-mode select option, body.light-mode select optgroup { background: #FF
   to { opacity: 1; transform: translateY(0); }
 }
 
-.nested-filter-option:hover {
+.context-menu-item:hover {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--primary) !important;
 }
 
-body.light-mode .nested-filter-option:hover {
+body.light-mode .context-menu-item:hover {
   background: rgba(0, 0, 0, 0.03) !important;
-}
-
-.nested-filter-category:hover {
-  background: rgba(255, 255, 255, 0.03) !important;
-  color: var(--primary) !important;
-}
-
-body.light-mode .nested-filter-category:hover {
-  background: rgba(0, 0, 0, 0.02) !important;
 }
