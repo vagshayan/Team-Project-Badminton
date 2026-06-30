@@ -190,7 +190,7 @@ export default function RegisterPage() {
                        <SparklesIcon style={sh.suggestPasswordIcon} />
                      </button>
                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? <EyeIcon style={sh.passwordIcon} /> : <EyeOffIcon style={sh.passwordIcon} />}
+                       {showPassword ? <EyeOffIcon style={sh.passwordIcon} /> : <EyeIcon style={sh.passwordIcon} />}
                      </button>
                    </div>
                    {showPasswordRequirements && (
