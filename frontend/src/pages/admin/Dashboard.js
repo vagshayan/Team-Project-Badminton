@@ -440,15 +440,14 @@ export default function Dashboard() {
                             <td style={ds.td}>
                               <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
                               <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                📧 <span
-                                  onClick={() => {
-                                    const email = encodeURIComponent(r.email || '');
-                                    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${email}`, '_blank', 'noopener,noreferrer');
-                                  }}
-                                  style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
+                                📧 <a
+                                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: 'inherit', textDecoration: 'none' }}
                                 >
                                   {r.email}
-                                </span>
+                                </a>
                               </div>
                               {r.nicNo ? (
                                 <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
