@@ -223,7 +223,7 @@ export default function RegisterPage() {
                    <div style={sh.passwordInputWrapper}>
                      <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} required />
                      <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? <EyeIcon style={sh.passwordIcon} /> : <EyeOffIcon style={sh.passwordIcon} />}
+                       {showConfirmPassword ? <EyeOffIcon style={sh.passwordIcon} /> : <EyeIcon style={sh.passwordIcon} />}
                      </button>
                    </div>
                    {showPasswordMatchMessage && (
