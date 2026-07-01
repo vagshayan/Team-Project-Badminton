@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +28,59 @@ const STATUS_STYLE = {
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
+const FILTER_CATEGORIES = [
+  {
+    id: 'singles-men',
+    label: 'Singles-Men',
+    options: [
+      { value: 'singles-men:all', label: 'All-Registrations' },
+      { value: 'singles-men:confirmed', label: 'Approved-only' },
+      { value: 'singles-men:rejected', label: 'Rejected-only' },
+      { value: 'singles-men:pending', label: 'Pending-only' },
+    ]
+  },
+  {
+    id: 'singles-women',
+    label: 'Singles-Women',
+    options: [
+      { value: 'singles-women:all', label: 'All-Registrations' },
+      { value: 'singles-women:confirmed', label: 'Approved-only' },
+      { value: 'singles-women:rejected', label: 'Rejected-only' },
+      { value: 'singles-women:pending', label: 'Pending-only' },
+    ]
+  },
+  {
+    id: 'doubles-men',
+    label: 'Doubles-Men',
+    options: [
+      { value: 'doubles-men:all', label: 'All-Registrations' },
+      { value: 'doubles-men:confirmed', label: 'Approved-only' },
+      { value: 'doubles-men:rejected', label: 'Rejected-only' },
+      { value: 'doubles-men:pending', label: 'Pending-only' },
+    ]
+  },
+  {
+    id: 'doubles-women',
+    label: 'Doubles-Women',
+    options: [
+      { value: 'doubles-women:all', label: 'All-Registrations' },
+      { value: 'doubles-women:confirmed', label: 'Approved-only' },
+      { value: 'doubles-women:rejected', label: 'Rejected-only' },
+      { value: 'doubles-women:pending', label: 'Pending-only' },
+    ]
+  },
+  {
+    id: 'mixed-doubles',
+    label: 'Mixed-Doubles',
+    options: [
+      { value: 'mixed-doubles:all', label: 'All-Registrations' },
+      { value: 'mixed-doubles:confirmed', label: 'Approved-only' },
+      { value: 'mixed-doubles:rejected', label: 'Rejected-only' },
+      { value: 'mixed-doubles:pending', label: 'Pending-only' },
+    ]
+  }
+];
+
 export default function Dashboard() {
   const { admin, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -46,6 +99,19 @@ export default function Dashboard() {
   const [viewTarget, setViewTarget] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [hoverCategory, setHoverCategory] = useState(null);
+  const filterRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setFilterOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
 
@@ -64,6 +130,30 @@ export default function Dashboard() {
     }
     return () => document.body.classList.remove('sidebar-open');
   }, [mobileSidebarOpen]);
+
+  const filteredRegistrations = registrations.filter(r => {
+    const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+    if (statusFilter === 'all') return matName || matReg;
+    const [cat, stat] = statusFilter.includes(':') ? statusFilter.split(':') : ['all', statusFilter];
+    const matCategory = cat === 'all' ? true : r.tournament?.category === cat;
+    const matStatus = stat === 'all' ? true : r.status === stat;
+    return (matName || matReg) && matCategory && matStatus;
+  });
+
+  const activeCatId = statusFilter.includes(':') ? statusFilter.split(':')[0] : null;
+
+  let selectedLabel = 'All Registrations';
+  let selectedCategoryLabel = 'Showing all';
+  for (const cat of FILTER_CATEGORIES) {
+    const opt = cat.options.find(o => o.value === statusFilter);
+    if (opt) {
+      selectedLabel = opt.label;
+      selectedCategoryLabel = cat.label;
+      break;
+    }
+  }
+
 
   const fetchData = useCallback(async () => {
     if (!admin) return;
@@ -285,24 +375,135 @@ export default function Dashboard() {
 
           {activeTab === 'player-approvals' && (
             <div style={ds.section}>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 32 }}>
-                <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 20 : 36, marginBottom: isMobile ? 0 : 32 }}>PLAYER VERIFICATION BOARD</h2>
-                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 15, alignItems: 'stretch', flex: isMobile ? 'unset' : 1, justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...ds.filterSelect, width: isMobile ? '100%' : 350, height: 50, borderRadius: 20 }}>
-                    <option value="all">ALL REGISTRATIONS</option>
-                    <option value="confirmed">APPROVED ONLY</option>
-                    <option value="pending">PENDING ONLY</option>
-                    <option value="rejected">REJECTED ONLY</option>
-                  </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
+                <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
+                <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+                  {/* Custom Nested Filter Dropdown (Windows Context Menu Style) */}
+                  <div ref={filterRef} style={{ position: 'relative', width: 350, zIndex: 50 }}>
+                    <div
+                      onClick={() => {
+                        setFilterOpen(!filterOpen);
+                        if (!filterOpen) setHoverCategory(activeCatId);
+                      }}
+                      style={{
+                        ...ds.filterSelect,
+                        width: '100%',
+                        height: 50,
+                        borderRadius: 20,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0 20px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{selectedCategoryLabel}</span>
+                        <span style={{ fontSize: 14, fontWeight: 900 }}>{selectedLabel}</span>
+                      </div>
+                      <span style={{ fontSize: 12, opacity: 0.6 }}>{filterOpen ? '▲' : '▼'}</span>
+                    </div>
+
+                    {filterOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '110%',
+                          left: 0,
+                          background: 'var(--bg-card)',
+                          backdropFilter: 'blur(25px)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 16,
+                          boxShadow: 'var(--shadow)',
+                          zIndex: 1000,
+                          padding: '6px 0',
+                          width: 240
+                        }}
+                      >
+                        {FILTER_CATEGORIES.map((cat) => {
+                          const isCategorySelected = activeCatId === cat.id;
+                          const isHovered = hoverCategory === cat.id;
+                          return (
+                            <div
+                              key={cat.id}
+                              style={{ position: 'relative' }}
+                              onMouseEnter={() => setHoverCategory(cat.id)}
+                            >
+                              <div
+                                className={`context-menu-item ${isHovered ? 'active-hover' : ''}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 16px',
+                                  height: 40
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <span style={{ width: 16, textAlign: 'center', fontWeight: 900, color: 'var(--primary)' }}>
+                                    {isCategorySelected ? '•' : ''}
+                                  </span>
+                                  <span>{cat.label}</span>
+                                </div>
+                                <span className="arrow-indicator" style={{ fontSize: 14, color: 'var(--text-muted)' }}>›</span>
+                              </div>
+
+                              {isHovered && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: '98%',
+                                    top: 0,
+                                    background: 'var(--bg-card)',
+                                    backdropFilter: 'blur(25px)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 16,
+                                    boxShadow: 'var(--shadow)',
+                                    zIndex: 1001,
+                                    padding: '6px 0',
+                                    width: 200
+                                  }}
+                                >
+                                  {cat.options.map((opt) => {
+                                    const isOptionSelected = statusFilter === opt.value;
+                                    return (
+                                      <div
+                                        key={opt.value}
+                                        onClick={() => {
+                                          setStatusFilter(opt.value);
+                                          setFilterOpen(false);
+                                        }}
+                                        className="context-menu-item"
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 10,
+                                          padding: '10px 16px',
+                                          height: 40
+                                        }}
+                                      >
+                                        <span style={{ width: 16, textAlign: 'center', fontWeight: 900, color: 'var(--primary)' }}>
+                                          {isOptionSelected ? '•' : ''}
+                                        </span>
+                                        <span>{opt.label}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => {
-                      const filtered = registrations.filter(r => {
-                        const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                        const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-                        const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
-                        return (matName || matReg) && matStatus;
-                      });
-                      const unique = Array.from(new Map(filtered.map(item => [item.rollNumber, item])).values());
+                      const unique = Array.from(new Map(filteredRegistrations.map(item => [item.rollNumber, item])).values());
                       exportFilteredPlayersCSV(unique, `${admin.sport.toUpperCase()} PARTICIPANTS - ${statusFilter.toUpperCase()}`);
                     }}
                     style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
@@ -331,21 +532,10 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.filter(r => {
-                      const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                      const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-                      const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
-                      return (matName || matReg) && matStatus;
-                    }).length === 0 ? (
+                    {filteredRegistrations.length === 0 ? (
                       <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
-                      registrations
-                        .filter(r => {
-                          const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                          const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-                          const matStatus = statusFilter === 'all' ? true : r.status === statusFilter;
-                          return (matName || matReg) && matStatus;
-                        })
+                      filteredRegistrations
                         .map(r => (
                           <tr key={r._id} style={ds.tr}>
                             <td style={ds.td}>
@@ -359,7 +549,19 @@ export default function Dashboard() {
                             </td>
                             <td style={ds.td}>
                               <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
-                              <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>📧 <a href={`mailto:${r.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a></div>
+                              <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                📧 <a
+                                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: 'inherit', textDecoration: 'none' }}
+                                >
+                                  {r.email}
+                                </a>
+                              </div>
+                              {r.nicNo ? (
+                                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
+                              ) : null}
                             </td>
                             <td style={ds.td}>
                               <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>

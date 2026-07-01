@@ -99,8 +99,8 @@ input, select, textarea {
   transition: all 0.2s;
 }
 input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
-select option { background: #0F172A; color: #FFF; }
-body.light-mode select option { background: #FFFFFF; color: #0F172A; }
+select option, select optgroup { background: #0F172A; color: #FFF; }
+body.light-mode select option, body.light-mode select optgroup { background: #FFFFFF; color: #0F172A; }
 
 .modal-overlay {
   position: fixed;
@@ -129,6 +129,7 @@ body.light-mode select option { background: #FFFFFF; color: #0F172A; }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 
 /* RESPONSIVE UTILITIES */
 .responsive-grid-3 {
@@ -398,4 +399,13 @@ body.light-mode .dropdown-item-btn:hover {
 }
 .dropdown-item-btn:active {
   transform: scale(0.98);
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--primary) !important;
+}
+
+body.light-mode .context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
 }
