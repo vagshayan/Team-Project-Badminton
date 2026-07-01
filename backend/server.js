@@ -3,9 +3,22 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
+const getRequiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+};
+
+const PORT = process.env.PORT || 5000;
+const MONGODB_URI = getRequiredEnv('MONGODB_URI');
+getRequiredEnv('JWT_SECRET');
+
 const app = express();
 
-app.use(cors());
+const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
 
 // Welcome route
@@ -45,9 +58,6 @@ app.use((err, req, res, next) => {
     details: process.env.NODE_ENV === 'development' ? err.message : 'Check server logs'
   });
 });
-
-const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI;
 
 mongoose
   .connect(MONGODB_URI, {
