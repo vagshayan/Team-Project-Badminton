@@ -8,7 +8,7 @@ const { protect } = require('../middleware/auth');
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
-    const sportTournaments = await Tournament.find({ sport: req.admin.sport });
+    const sportTournaments = await Tournament.find({ createdBy: req.admin._id });
     const tournamentIds = sportTournaments.map(t => t._id);
 
     const registrations = await Registration.find({
@@ -32,7 +32,7 @@ router.patch('/:id/status', protect, async (req, res) => {
     const reg = await Registration.findById(req.params.id).populate('tournament');
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
-    if (reg.tournament.sport !== req.admin.sport)
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
       return res.status(401).json({ message: 'Unauthorized' });
 
     // If rejecting, just update status (don't delete)

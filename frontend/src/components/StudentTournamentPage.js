@@ -36,6 +36,7 @@ export default function StudentTournamentPage({ sport }) {
   const [positions, setPositions] = useState({});
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode, toggleTheme } = useTheme();
 
@@ -194,13 +195,14 @@ export default function StudentTournamentPage({ sport }) {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
 
-      <nav style={sh.nav}>
-        <div style={sh.brand} onClick={() => navigate('/')}>
-          <div style={sh.logoCircle}>🏆</div>
-          <span style={sh.brandName}>UoJ SPORTS</span>
+      <nav style={sh.nav} className="mobile-nav">
+        <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
+          <div style={sh.logoCircle} className="mobile-logo">🏆</div>
+          <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
         </div>
 
-        <div style={sh.sportSwitcher}>
+        {/* Desktop inline tabs */}
+        <div style={sh.sportSwitcher} className="desktop-sport-switcher">
           {Object.keys(SPORT_META).map((s) => (
             <button
               key={s}
@@ -213,23 +215,54 @@ export default function StudentTournamentPage({ sport }) {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <button onClick={toggleTheme} style={sh.themeToggle}>{isDarkMode ? '🌞' : '🌙'}</button>
-          <button onClick={() => navigate('/admin/login')} style={sh.adminBtn}>ADMIN LOGIN</button>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
+          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
+          <button onClick={() => navigate('/admin/login')} style={sh.adminBtn} className="mobile-btn">
+            <span className="admin-full-text">ADMIN LOGIN</span>
+            <span className="admin-short-text">ADMIN</span>
+          </button>
+          {/* Mobile hamburger button — last item, far right */}
+          <button
+            className="hamburger-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle game menu"
+          >
+            <span className="hamburger-icon">{menuOpen ? '✕' : '☰'}</span>
+          </button>
         </div>
       </nav>
 
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="mobile-dropdown-overlay" onClick={() => setMenuOpen(false)}>
+          <div className="mobile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+            {Object.keys(SPORT_META).map((s) => (
+              <button
+                key={s}
+                className={`mobile-dropdown-item${sport === s ? ' active' : ''}`}
+                style={{ '--sport-color': SPORT_META[s].color }}
+                onClick={() => { navigate(`/${s}`); setMenuOpen(false); }}
+              >
+                <span style={{ fontSize: 22 }}>{SPORT_META[s].icon}</span>
+                <span style={{ fontWeight: 800, fontSize: 15 }}>{SPORT_META[s].label}</span>
+                {sport === s && <span style={{ marginLeft: 'auto', fontSize: 14 }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={sh.hero}>
         <div style={{ ...sh.heroBlob, background: meta.color }} />
-        <h1 style={sh.heroTitle}>{meta.label} RESULTS</h1>
+        <h1 style={sh.heroTitle} className="mobile-hero-title">{meta.label} RESULTS</h1>
         <div style={sh.liveIndicator}>
           <span className="live-dot" style={{ background: '#10B981' }} />
           <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
         </div>
       </div>
 
-      <main style={sh.mainContent}>
-        <div style={sh.containerCard}>
+      <main style={sh.mainContent} className="mobile-padding-x">
+        <div style={sh.containerCard} className="mobile-card">
           {loading ? (
             <div style={sh.statusFill}>
               <div className="spinner" style={{ width: 44, height: 44, borderTopColor: meta.color }} />
@@ -242,9 +275,9 @@ export default function StudentTournamentPage({ sport }) {
               <p style={{ color: 'var(--text-muted)', fontSize: 16 }}>No tournaments are currently active for registration.</p>
             </div>
           ) : (
-            <div style={sh.grid}>
+            <div className="responsive-grid-auto">
               {tournaments.map(t => (
-                <div key={t._id} style={sh.card}>
+                <div key={t._id} style={sh.card} className="mobile-card">
                   <div style={sh.cardHeader}>
                     <div style={{ fontSize: 44, fontWeight: 950, color: meta.color }}>{t.year}</div>
                     <div style={{ ...sh.catBadge, border: `1px solid ${meta.color}40`, color: meta.color }}>{CAT_LABELS[t.category]}</div>
@@ -414,7 +447,6 @@ const sh = {
   mainContent: { maxWidth: 1200, margin: '0 auto', padding: '0 40px 100px' },
   containerCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, padding: '60px', boxShadow: 'var(--shadow)' },
   statusFill: { minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 32 },
   card: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 32, padding: '40px', transition: 'transform 0.3s' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
   catBadge: { background: 'rgba(255,255,255,0.08)', padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 950, letterSpacing: 0.5, border: '1px solid rgba(255,255,255,0.1)' },

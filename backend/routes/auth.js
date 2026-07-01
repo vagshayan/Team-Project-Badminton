@@ -15,6 +15,9 @@ router.post('/register', async (req, res) => {
   try {
     const existing = await Admin.findOne({ username: username.trim() });
     if (existing) return res.status(400).json({ message: 'Username already taken' });
+    
+    
+
     const admin = await Admin.create({ username: username.trim(), password, sport, name, securityQuestion, securityAnswer });
     res.status(201).json({
       token: generateToken(admin._id),
@@ -47,8 +50,19 @@ router.post('/login', async (req, res) => {
 });
 
 // Get current admin
-router.get('/me', protect, async (req, res) => {
-  res.json(req.admin);
+router.get('/me', async (req, res) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+  if (!token) return res.json(null);
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
+    const admin = await Admin.findById(decoded.id).select('-password');
+    res.json(admin || null);
+  } catch (err) {
+    res.json(null);
+  }
 });
 
 // Get all admins
@@ -67,6 +81,8 @@ router.post('/create-admin', protect, async (req, res) => {
   try {
     const existing = await Admin.findOne({ username });
     if (existing) return res.status(400).json({ message: 'Username already exists' });
+
+    
     const admin = await Admin.create({ username, password, sport, name, securityQuestion, securityAnswer });
     res.status(201).json({ id: admin._id, username: admin.username, name: admin.name, sport: admin.sport });
   } catch (err) {
