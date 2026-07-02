@@ -25,11 +25,8 @@ async function resetAdminPassword() {
       process.exit(1);
     }
 
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    // Update the password
-    admin.password = hashedPassword;
+    // Update the password - schema pre-save hook will handle hashing
+    admin.password = newPassword;
     await admin.save();
 
     console.log(`✅ Password reset successful for admin "${username}"`);

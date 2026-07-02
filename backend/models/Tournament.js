@@ -20,7 +20,8 @@ const tournamentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Prevent duplicate tournaments for same sport, year and category
-tournamentSchema.index({ sport: 1, year: 1, category: 1 }, { unique: true });
+// Prevent duplicate tournaments for same sport, year, category, and admin
+tournamentSchema.index({ sport: 1, year: 1, category: 1, createdBy: 1 }, { unique: true });
+
 
 module.exports = mongoose.model('Tournament', tournamentSchema);

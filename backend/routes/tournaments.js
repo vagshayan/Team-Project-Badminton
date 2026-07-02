@@ -140,7 +140,7 @@ async function advanceWinner(match) {
 router.get('/stats', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
-    const sportTournaments = await Tournament.find({ sport: req.admin.sport });
+    const sportTournaments = await Tournament.find({ createdBy: req.admin._id });
     const tournamentIds = sportTournaments.map(t => t._id);
     const totalPlayers = await Registration.countDocuments({ tournament: { $in: tournamentIds }, status: 'confirmed' });
     const pendingApprovals = await Registration.countDocuments({ tournament: { $in: tournamentIds }, status: 'pending' });
@@ -202,7 +202,7 @@ router.get('/public/:tournamentId/matches', async (req, res) => {
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
-    const tournaments = await Tournament.find({ sport: req.admin.sport })
+    const tournaments = await Tournament.find({ createdBy: req.admin._id })
       .populate('createdBy', 'name')
       .sort({ createdAt: -1 });
     res.json(tournaments);
@@ -220,7 +220,7 @@ router.post('/', protect, async (req, res) => {
   if (new Date(date) < today) return res.status(400).json({ message: 'Date cannot be in the past' });
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
-    const existing = await Tournament.findOne({ sport: req.admin.sport, year, category });
+    const existing = await Tournament.findOne({ sport: req.admin.sport, year, category, createdBy: req.admin._id });
     if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
     const tournament = await Tournament.create({
       sport: req.admin.sport, year, date, time, venue, category, createdBy: req.admin._id,
@@ -244,10 +244,10 @@ router.put('/:id', protect, async (req, res) => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     if (new Date(date) < today) return res.status(400).json({ message: 'Date cannot be in the past' });
     const { Tournament } = getModelsForSport(req.admin.sport);
-    const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category });
+    const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category, createdBy: req.admin._id });
     if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
     const tournament = await Tournament.findOneAndUpdate(
-      { _id: req.params.id, sport: req.admin.sport },
+      { _id: req.params.id, createdBy: req.admin._id },
       { year, date, time, venue, category },
       { new: true }
     );
@@ -264,7 +264,7 @@ router.delete('/:id/reset-draw', protect, async (req, res) => {
     const { Tournament } = getModelsForSport(req.admin.sport);
     const tournament = await Tournament.findOne({
       _id: req.params.id,
-      sport: req.admin.sport
+      createdBy: req.admin._id
     });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     if (tournament.isPublished) return res.status(400).json({ message: 'Cannot reset a published draw. Draw is already public!' });
@@ -283,7 +283,7 @@ router.delete('/:id/force-unlock', protect, async (req, res) => {
     const { Tournament } = getModelsForSport(req.admin.sport);
     const tournament = await Tournament.findOne({
       _id: req.params.id,
-      sport: req.admin.sport
+      createdBy: req.admin._id
     });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     tournament.isLocked = false;
@@ -305,11 +305,11 @@ router.delete('/:id', protect, async (req, res) => {
     const isMatch = await admin.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
-    const tournament = await Tournament.findOne({ _id: req.params.id, sport: req.admin.sport });
+    const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     await Registration.updateMany({ tournament: req.params.id }, { status: 'cancelled' });
     await Match.deleteMany({ tournament: req.params.id });
-    await Tournament.findOneAndDelete({ _id: req.params.id, sport: req.admin.sport });
+     await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id });
     res.json({ message: 'Tournament deleted successfully. All registrations have been cancelled.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -339,7 +339,7 @@ router.get('/:id/matches', protect, async (req, res) => {
 router.post('/:id/generate-draws', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
-    const tournament = await Tournament.findOne({ _id: req.params.id, sport: req.admin.sport });
+    const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     if (tournament.isLocked) return res.status(400).json({ message: 'Draws already generated' });
 
@@ -438,7 +438,7 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
     const { Tournament } = getModelsForSport(req.admin.sport);
     const tournament = await Tournament.findOne({
       _id: req.params.id,
-      sport: req.admin.sport
+      createdBy: req.admin._id
     });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     if (!tournament.isLocked) return res.status(400).json({ message: 'Generate draw first before publishing' });

@@ -34,6 +34,25 @@ export default function BracketsView({ admin, color }) {
   const [positions, setPositions] = useState({});
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.custom-select-container')) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [dropdownOpen]);
 
   useEffect(() => { fetchTournaments(); }, []);
 
@@ -309,24 +328,99 @@ export default function BracketsView({ admin, color }) {
     <div style={s.container}>
       {toast && <div style={s.toast}>{toast}</div>}
 
-      <header style={s.header}>
-        <h2 style={s.title}>BRACKET MANAGEMENT</h2>
-        <select
-          value={selectedTournament?._id || ''}
-          onChange={(e) => {
-            const t = tournaments.find(t => t._id === e.target.value);
-            if (t) handleSelectTournament(t);
-          }}
-          style={s.select}
-        >
-          <option value="">-- SELECT TOURNAMENT --</option>
-          {tournaments.map(t => (
-            <option key={t._id} value={t._id}>
-              {t.year} - {CAT_LABELS[t.category]}
-              {t.isPublished ? ' 🌐' : t.isLocked ? ' 🔒' : ' 📋'}
-            </option>
-          ))}
-        </select>
+      <header style={{
+        ...s.header,
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: isMobile ? 16 : 24,
+      }}>
+        <h2 style={{
+          ...s.title,
+          fontSize: isMobile ? 22 : 28,
+        }}>BRACKET MANAGEMENT</h2>
+
+        <div className="custom-select-container" style={{ ...s.selectWrapper, minWidth: isMobile ? 'auto' : 380, width: isMobile ? '100%' : 'auto' }}>
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            style={s.selectTrigger}
+            className="custom-select-trigger"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {selectedTournament ? (
+                <>
+                  <span style={{ fontSize: 11, background: 'var(--border)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-muted)', fontWeight: 800 }}>
+                    {selectedTournament.year}
+                  </span>
+                  <span style={{ fontWeight: 800 }}>
+                    {CAT_LABELS[selectedTournament.category]}
+                  </span>
+                  {selectedTournament.isPublished && (
+                    <span style={{
+                      ...s.miniBadge,
+                      background: '#10B98115',
+                      color: '#10B981',
+                      border: '1px solid #10B98130'
+                    }}>
+                      🌐 PUBLISHED
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontWeight: 800 }}>-- SELECT TOURNAMENT --</span>
+              )}
+            </div>
+            <span style={{ 
+              transition: 'transform 0.2s ease', 
+              transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              display: 'inline-block',
+              fontSize: 10,
+              color: 'var(--text-muted)'
+            }}>▼</span>
+          </button>
+
+          {dropdownOpen && (
+            <div style={s.dropdownList}>
+              {tournaments.length === 0 ? (
+                <div style={{ padding: '16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
+                  No tournaments found
+                </div>
+              ) : (
+                tournaments.map(t => (
+                  <button
+                    key={t._id}
+                    onClick={() => {
+                      handleSelectTournament(t);
+                      setDropdownOpen(false);
+                    }}
+                    style={{
+                      ...s.dropdownItem,
+                      background: selectedTournament?._id === t._id ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                    }}
+                    className="dropdown-item-btn"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, background: 'var(--border)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-muted)', fontWeight: 800 }}>{t.year}</span>
+                      <span style={{ fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[t.category]}</span>
+                      {t.isPublished && (
+                        <span style={{
+                          ...s.miniBadge,
+                          background: '#10B98115',
+                          color: '#10B981',
+                          border: '1px solid #10B98130'
+                        }}>
+                          🌐 PUBLISHED
+                        </span>
+                      )}
+                    </div>
+                    {selectedTournament?._id === t._id && (
+                      <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: 16, marginLeft: 8 }}>✓</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {!selectedTournament ? (
@@ -599,6 +693,11 @@ const s = {
   container: { padding: '40px 0' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   title: { fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: 1 },
+  selectWrapper: { position: 'relative', minWidth: 380, zIndex: 999 },
+  selectTrigger: { width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, outline: 'none', boxSizing: 'border-box' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 8, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 12px 30px rgba(0,0,0,0.3)', maxHeight: 280, overflowY: 'auto', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 6, gap: 2 },
+  dropdownItem: { width: '100%', padding: '10px 14px', borderRadius: 10, border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', outline: 'none' },
+  miniBadge: { fontSize: 9, fontWeight: 900, padding: '2px 8px', borderRadius: 4, letterSpacing: 0.5, textTransform: 'uppercase', display: 'inline-block' },
   select: { padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', fontSize: 14 },
   emptyState: { padding: 100, textAlign: 'center', background: 'var(--bg-card)', borderRadius: 20, color: 'var(--text-muted)', fontSize: 18, border: '1px dashed var(--border)' },
   emptyBracket: { textAlign: 'center', padding: '60px 20px', background: 'var(--bg-card)', borderRadius: 16, border: '1px dashed var(--border)' },
