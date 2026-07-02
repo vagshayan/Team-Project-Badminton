@@ -198,14 +198,21 @@ router.post('/', async (req, res) => {
 
     const { Registration } = getModelsForSport(targetSport);
 
+    const duplicateChecks = [
+      { rollNumber: cleanedRoll },
+      { partnerRollNumber: cleanedRoll },
+    ];
+
+    if (cleanedPartnerRoll) {
+      duplicateChecks.push(
+        { rollNumber: cleanedPartnerRoll },
+        { partnerRollNumber: cleanedPartnerRoll }
+      );
+    }
+
     const duplicate = await Registration.findOne({
       tournament,
-      $or: [
-        { rollNumber: cleanedRoll },
-        { partnerRollNumber: cleanedRoll },
-        { rollNumber: cleanedPartnerRoll },
-        { partnerRollNumber: cleanedPartnerRoll },
-      ].filter(Boolean)
+      $or: duplicateChecks
     });
 
     if (duplicate) {
