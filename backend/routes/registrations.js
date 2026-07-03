@@ -137,6 +137,32 @@ router.get('/tournament/:tournamentId', protect, async (req, res) => {
   }
 });
 
+// Public — lookup registration by number within a tournament
+router.get('/lookup/:regNo?', async (req, res) => {
+  const tournament = req.query.tournament;
+  const regNo = req.params.regNo || req.query.regNo;
+  if (!tournament || !regNo) return res.status(400).json({ message: 'Tournament and registration number are required' });
+
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let foundReg = null;
+
+    for (const s of sports) {
+      const { Registration } = getModelsForSport(s);
+      const reg = await Registration.findOne({ tournament, rollNumber: regNo.trim().toUpperCase() });
+      if (reg) {
+        foundReg = reg;
+        break;
+      }
+    }
+
+    if (!foundReg) return res.status(404).json({ message: 'No registration found with this number.' });
+    return res.json({ registration: foundReg });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Public — student registers
 router.post('/', async (req, res) => {
   const {
@@ -198,35 +224,33 @@ router.post('/', async (req, res) => {
 
     const { Registration } = getModelsForSport(targetSport);
 
-    const duplicateChecks = [
-      { rollNumber: cleanedRoll },
-      { partnerRollNumber: cleanedRoll },
-    ];
-
-    if (cleanedPartnerRoll) {
-      duplicateChecks.push(
-        { rollNumber: cleanedPartnerRoll },
-        { partnerRollNumber: cleanedPartnerRoll }
-      );
+    const existingSelf = await Registration.findOne({ tournament, rollNumber: cleanedRoll });
+    if (existingSelf) {
+      return res.status(400).json({ message: `This registration number is already registered for this tournament: ${cleanedRoll}` });
     }
 
-    const duplicate = await Registration.findOne({
-      tournament,
-      $or: duplicateChecks
-    });
-
-    if (duplicate) {
-      const duplicateRoll = [cleanedRoll, cleanedPartnerRoll].find((candidate) =>
-        candidate && (duplicate.rollNumber === candidate || duplicate.partnerRollNumber === candidate)
-      );
-      if (duplicateRoll) {
-        const isPartnerDuplicate = duplicateRoll === cleanedPartnerRoll;
-        const message = isPartnerDuplicate
-          ? `This partner registration number is already registered for this tournament: ${duplicateRoll}`
-          : `This registration number is already registered for this tournament: ${duplicateRoll}`;
-        return res.status(400).json({ message });
+    let partnerRecord = null;
+    if (cleanedPartnerRoll) {
+      partnerRecord = await Registration.findOne({ tournament, rollNumber: cleanedPartnerRoll });
+      if (!partnerRecord) {
+        return res.status(400).json({ message: 'Partner registration number is not registered for this tournament.' });
       }
-      return res.status(400).json({ message: 'Duplicate registration: one of these registration numbers is already enrolled in this tournament.' });
+
+      const partnerAlreadyPaired = partnerRecord.partnerRollNumber?.trim() && partnerRecord.partnerRollNumber.trim() !== cleanedRoll;
+      const partnerAlreadyUsed = await Registration.findOne({
+        tournament,
+        partnerRollNumber: cleanedPartnerRoll,
+        rollNumber: { $ne: cleanedRoll }
+      });
+      const selfAlreadyAssignedAsPartner = await Registration.findOne({
+        tournament,
+        partnerRollNumber: cleanedRoll,
+        rollNumber: { $ne: cleanedPartnerRoll }
+      });
+
+      if (partnerAlreadyPaired || partnerAlreadyUsed || selfAlreadyAssignedAsPartner) {
+        return res.status(400).json({ message: 'This player already has a partner assigned.' });
+      }
     }
 
     const nicExists = await Registration.findOne({ tournament, nicNo: cleanedNic });
@@ -245,6 +269,30 @@ router.post('/', async (req, res) => {
       partnerName: cleanedPartnerName || '',
       partnerRollNumber: cleanedPartnerRoll || '',
     });
+
+    if (cleanedPartnerRoll) {
+      // Try a direct match first
+      let updated = await Registration.findOneAndUpdate(
+        { tournament, rollNumber: cleanedPartnerRoll },
+        { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
+        { new: true }
+      );
+
+      // Fallback: case-insensitive / flexible match to handle formatting mismatches
+      if (!updated) {
+        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`^${escapeRegex(cleanedPartnerRoll)}$`, 'i');
+        updated = await Registration.findOneAndUpdate(
+          { tournament, rollNumber: { $regex: regex } },
+          { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
+          { new: true }
+        );
+      }
+
+      if (!updated) {
+        console.warn(`Partner update failed: could not locate partner ${cleanedPartnerRoll} in tournament ${tournament}`);
+      }
+    }
 
     res.status(201).json(reg);
   } catch (err) {
