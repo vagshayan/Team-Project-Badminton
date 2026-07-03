@@ -84,13 +84,20 @@ const validateField = (field, value) => {
 
 export default function RegisterModal({ tournament, onClose }) {
   const isDoubles = DOUBLES.includes(tournament.category);
+  const isMixed = tournament.category === 'mixed-doubles';
   const sportColor = tournament.sport === 'badminton' ? '#C8A84B' : (tournament.sport === 'table-tennis' ? '#8B5CF6' : '#EC4899');
 
-  const [form, setForm] = useState({ playerName: '', regNo: '', nicNo: '', address: '', email: '', phone: '', faculty: '', partnerName: '', partnerRegNo: '' });
+  const [form, setForm] = useState({ playerName: '', regNo: '', nicNo: '', address: '', email: '', phone: '', faculty: '', partnerName: '', partnerRegNo: '', gender: 'Male', partnerNIC: '', partnerEmail: '', partnerPhone: '', partnerFaculty: '', partnerAddress: '', partnerGender: 'Male' });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [havePartnerChoice, setHavePartnerChoice] = useState('unknown'); // 'yes' | 'no' | 'unknown'
+  const [enterFullPartnerDetails, setEnterFullPartnerDetails] = useState(false);
+  const [findPartnerResult, setFindPartnerResult] = useState('');
+  const [existingPartner, setExistingPartner] = useState(null);
+  const [partnerLookupMessage, setPartnerLookupMessage] = useState('');
+  const [partnerLookupError, setPartnerLookupError] = useState('');
 
   const getRequiredMessage = (k) => {
     switch (k) {
@@ -160,6 +167,7 @@ export default function RegisterModal({ tournament, onClose }) {
       if (!partnerRegNo) newErrors.partnerRegNo = 'Partner registration number is required';
       else if (!validateRegNo(partnerRegNo)) newErrors.partnerRegNo = 'Use 20XX/XX/XXX or 20XX/XXX/XXX';
       else if (partnerRegNo === regNo) newErrors.partnerRegNo = 'Partner registration number must differ from yours';
+    }
     }
 
     return newErrors;
@@ -268,6 +276,18 @@ export default function RegisterModal({ tournament, onClose }) {
             </div>
           </div>
 
+          {isMixed && (
+            <div style={sh.field}>
+              <label style={sh.label}>GENDER</label>
+              <select value={form.gender} onChange={(e) => setField('gender', e.target.value)} style={sh.input}>
+                <option value="">Select gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+              {errors.gender && <span style={sh.errMsg}>{errors.gender}</span>}
+            </div>
+          )}
+
           <div style={sh.grid}>
             <div style={sh.field}>
               <label style={sh.label}>EMAIL ADDRESS</label>
@@ -325,6 +345,7 @@ export default function RegisterModal({ tournament, onClose }) {
 
           {isDoubles && (
             <div style={sh.doublesSection}>
+<<<<<<< HEAD
               <div style={{ fontSize: 11, fontWeight: 900, color: sportColor, letterSpacing: 2, marginBottom: 16 }}>PARTNER DETAILS (DOUBLES)</div>
               <div style={sh.grid}>
                 <div style={sh.field}>
@@ -351,7 +372,124 @@ export default function RegisterModal({ tournament, onClose }) {
                   />
                   {errors.partnerRegNo && <span style={sh.errMsg}>{errors.partnerRegNo}</span>}
                 </div>
+=======
+              <div style={{ fontSize: 11, fontWeight: 900, color: sportColor, letterSpacing: 2, marginBottom: 12 }}>PARTNER SELECTION</div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                <label style={{ fontWeight: 800 }}>Do you have a partner?</label>
+                <label><input type="radio" name="havePartner" checked={havePartnerChoice==='yes'} onChange={() => setHavePartnerChoice('yes')} /> Yes</label>
+                <label><input type="radio" name="havePartner" checked={havePartnerChoice==='no'} onChange={() => setHavePartnerChoice('no')} /> No</label>
+>>>>>>> 32dff5c (Add pair approval and dashboard updates)
               </div>
+              {errors.partnerChoice && <div style={sh.errMsg}>{errors.partnerChoice}</div>}
+
+              {havePartnerChoice === 'yes' && (
+                <>
+                  <div style={sh.grid}>
+                    <div style={sh.field}>
+                      <label style={sh.label}>PARTNER REG NO</label>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={form.partnerRegNo}
+                          onChange={(e) => setField('partnerRegNo', sanitizeRegNo(e.target.value))}
+                          placeholder="2023/CSE/002"
+                          style={{ ...sh.input, flex: 1 }}
+                        />
+                        <button type="button" onClick={fetchPartnerDetails} style={{ ...sh.submitBtn, width: 180, padding: '14px 18px' }}>Load Partner</button>
+                      </div>
+                      {errors.partnerRegNo && <span style={sh.errMsg}>{errors.partnerRegNo}</span>}
+                      {partnerLookupMessage && <span style={{ ...sh.errMsg, color: '#10B981' }}>{partnerLookupMessage}</span>}
+                      {partnerLookupError && <span style={sh.errMsg}>{partnerLookupError}</span>}
+                    </div>
+                    <div style={sh.field}>
+                      <label style={sh.label}>ENTER FULL PARTNER DETAILS?</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <label><input type="checkbox" checked={enterFullPartnerDetails} onChange={() => setEnterFullPartnerDetails(p => !p)} /> Fill full details</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {existingPartner && !enterFullPartnerDetails && (
+                    <div style={sh.partnerSummary}>
+                      <div style={sh.partnerSummaryTitle}>Loaded partner details</div>
+                      <div style={sh.partnerSummaryGrid}>
+                        <div><strong>Name:</strong> {existingPartner.playerName}</div>
+                        <div><strong>Reg No:</strong> {existingPartner.rollNumber}</div>
+                        <div><strong>Faculty:</strong> {existingPartner.department}</div>
+                        <div><strong>Phone:</strong> {existingPartner.phone}</div>
+                        <div><strong>Email:</strong> {existingPartner.email}</div>
+                        <div><strong>NIC:</strong> {existingPartner.nicNo}</div>
+                      </div>
+                    </div>
+                  )}
+                  {enterFullPartnerDetails && (
+                    <>
+                      <div style={sh.grid}>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER NAME</label>
+                          <input type="text" value={form.partnerName} onChange={(e) => setField('partnerName', formatNameInput(e.target.value))} style={sh.input} />
+                          {errors.partnerName && <span style={sh.errMsg}>{errors.partnerName}</span>}
+                        </div>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER NIC</label>
+                          <input type="text" value={form.partnerNIC} onChange={(e) => setField('partnerNIC', sanitizeNIC(e.target.value))} style={sh.input} />
+                        </div>
+                      </div>
+                      <div style={sh.grid}>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER EMAIL</label>
+                          <input type="email" value={form.partnerEmail} onChange={(e) => setField('partnerEmail', e.target.value)} style={sh.input} />
+                        </div>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER PHONE</label>
+                          <input type="tel" value={form.partnerPhone} onChange={(e) => setField('partnerPhone', sanitizePhone(e.target.value))} style={sh.input} />
+                        </div>
+                      </div>
+                      <div style={sh.field}>
+                        <label style={sh.label}>PARTNER ADDRESS</label>
+                        <input type="text" value={form.partnerAddress} onChange={(e) => setField('partnerAddress', formatAddressInput(e.target.value))} style={sh.input} />
+                      </div>
+                      <div style={sh.grid}>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER FACULTY</label>
+                          <select value={form.partnerFaculty} onChange={(e) => setField('partnerFaculty', e.target.value)} style={sh.input}>
+                            <option value="">Select</option>
+                            {FACULTIES.map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        </div>
+                        <div style={sh.field}>
+                          <label style={sh.label}>PARTNER GENDER</label>
+                          <select value={form.partnerGender} onChange={(e) => setField('partnerGender', e.target.value)} style={sh.input}>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+              {havePartnerChoice === 'no' && (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>You'll be listed as looking for a partner; an admin can view you.</div>
+              )}
+            </div>
+          )}
+
+          {isDoubles && (
+            <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>Already registered? Find Partner</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input placeholder="Your reg no" value={form.regNo} onChange={(e) => setField('regNo', sanitizeRegNo(e.target.value))} style={{ ...sh.input, flex: 1 }} />
+                <input placeholder="Partner reg no" value={form.partnerRegNo} onChange={(e) => setField('partnerRegNo', sanitizeRegNo(e.target.value))} style={{ ...sh.input, flex: 1 }} />
+                <button type="button" onClick={async () => {
+                  setFindPartnerResult('');
+                  try {
+                    const resp = await axios.post('/api/registrations/find-partner', { tournament: tournament._id, yourRollNumber: form.regNo.trim(), partnerRollNumber: form.partnerRegNo.trim() });
+                    setFindPartnerResult(resp.data.message || 'Request sent');
+                  } catch (err) { setFindPartnerResult(err.response?.data?.message || 'Failed'); }
+                }} style={{ ...sh.submitBtn, width: 160 }}>Send</button>
+              </div>
+              {findPartnerResult && <div style={{ marginTop: 8, color: 'var(--text-muted)' }}>{findPartnerResult}</div>}
             </div>
           )}
 

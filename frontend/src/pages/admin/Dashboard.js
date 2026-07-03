@@ -18,6 +18,7 @@ const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
 };
+const DOUBLES_CATEGORIES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
 
 const STATUS_STYLE = {
   pending: { bg: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', label: 'Pending' },
@@ -27,6 +28,34 @@ const STATUS_STYLE = {
 };
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const groupConfirmedPairs = (registrations) => {
+  const pairMap = {};
+  const remaining = [];
+
+  registrations.forEach((reg) => {
+    const category = reg.tournament?.category;
+    const isCompletedPair = DOUBLES_CATEGORIES.includes(category) && reg.pairStatus === 'complete' && reg.partnerStatus === 'paired' && reg.pairId;
+
+    if (isCompletedPair) {
+      pairMap[reg.pairId] = pairMap[reg.pairId] || [];
+      pairMap[reg.pairId].push(reg);
+    } else {
+      remaining.push(reg);
+    }
+  });
+
+  const pairs = Object.values(pairMap).map((group) => ({
+    type: 'pair',
+    pairId: group[0]?.pairId,
+    category: group[0]?.tournament?.category,
+    year: group[0]?.tournament?.year,
+    status: group[0]?.status,
+    players: group,
+  }));
+
+  return [...pairs, ...remaining];
+};
 
 const FILTER_CATEGORIES = [
   {
@@ -188,6 +217,23 @@ export default function Dashboard() {
     catch (err) {
       alert('Action failed');
     }
+  };
+
+  const handleUpdatePairStatus = async (pair, status) => {
+    try {
+      await Promise.all(pair.players.map((player) => axios.patch(`/api/registrations/${player._id}/status`, { status })));
+      fetchData();
+      const message = status === 'confirmed' ? '✅ Pair confirmed!' : '✅ Pair rejected!';
+      showToast(message);
+    } catch (err) {
+      alert('Pair action failed');
+    }
+  };
+
+  const getPairBadgeText = (status) => {
+    if (status === 'confirmed') return 'Confirmed Pair';
+    if (status === 'rejected') return 'Pair Rejected';
+    return 'Pair Pending Approval';
   };
 
   const handleCreate = async (data) => {
@@ -532,11 +578,58 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRegistrations.length === 0 ? (
+                    {groupedRegistrations.length === 0 ? (
                       <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
-                      filteredRegistrations
-                        .map(r => (
+                      groupedRegistrations.map((item, idx) => {
+                        if (item.type === 'pair') {
+                          const [player1 = {}, player2 = {}] = item.players;
+                          const badgeText = getPairBadgeText(item.status);
+
+                          return (
+                            <tr key={item.players.map((x) => x._id).join('-')} style={ds.tr}>
+                              <td colSpan={5} style={{ padding: '24px 32px' }}>
+                                <div style={ds.pairCard}>
+                                  <div style={ds.pairCardHeader}>
+                                    <div>
+                                      <span style={ds.pairBadge}>{badgeText}</span>
+                                      <div style={ds.pairCardTitle}>{CAT_LABELS[item.category]} | Year: {item.year}</div>
+                                    </div>
+                                    {item.status === 'pending' && (
+                                      <div style={ds.pairActions}>
+                                        <button onClick={() => handleUpdatePairStatus(item, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE PAIR</button>
+                                        <button onClick={() => handleUpdatePairStatus(item, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT PAIR</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={ds.pairBody}>
+                                    <div style={ds.pairColumn}>
+                                      <div style={ds.pairPlayerTitle}>Player 1</div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Name</span><span style={ds.pairFieldValue}>{player1.playerName || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Reg No</span><span style={ds.pairFieldValue}>{player1.rollNumber || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Faculty</span><span style={ds.pairFieldValue}>{player1.department || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Phone</span><span style={ds.pairFieldValue}>{player1.phone || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Email</span><span style={ds.pairFieldValue}>{player1.email || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>NIC</span><span style={ds.pairFieldValue}>{player1.nicNo || '—'}</span></div>
+                                    </div>
+                                    <div style={ds.pairColumn}>
+                                      <div style={ds.pairPlayerTitle}>Player 2</div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Name</span><span style={ds.pairFieldValue}>{player2.playerName || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Reg No</span><span style={ds.pairFieldValue}>{player2.rollNumber || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Faculty</span><span style={ds.pairFieldValue}>{player2.department || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Phone</span><span style={ds.pairFieldValue}>{player2.phone || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>Email</span><span style={ds.pairFieldValue}>{player2.email || '—'}</span></div>
+                                      <div style={ds.pairField}><span style={ds.pairFieldLabel}>NIC</span><span style={ds.pairFieldValue}>{player2.nicNo || '—'}</span></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const r = item;
+                        return (
                           <tr key={r._id} style={ds.tr}>
                             <td style={ds.td}>
                               <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
@@ -579,7 +672,8 @@ export default function Dashboard() {
                               </div>
                             </td>
                           </tr>
-                        ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -662,6 +756,7 @@ const ds = {
   td: { padding: '20px 16px', whiteSpace: 'nowrap' },
   actionBtn: { border: 'none', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer', letterSpacing: 0.5 },
   revertBtn: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer' },
+
   tournCard: { background: 'var(--bg-card)', padding: '40px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: 28 },
   catBadge: { background: 'var(--bg-input)', padding: '10px 18px', borderRadius: 14, fontSize: 13, fontWeight: 950, letterSpacing: 0.5, border: '1px solid var(--border)' },
   tournInfo: { color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 10 },
