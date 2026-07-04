@@ -29,7 +29,7 @@ const registrationSchema = new mongoose.Schema({
   partnerRollNumber: { type: String, default: '' },
   gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
   partnerStatus: { type: String, enum: ['none', 'looking', 'requested', 'paired'], default: 'none' },
-  pairStatus: { type: String, enum: ['none', 'incomplete', 'complete'], default: 'none' },
+  pairStatus: { type: String, enum: ['none', 'incomplete', 'complete', 'approved'], default: 'none' },
   pairId: { type: mongoose.Schema.Types.ObjectId, default: null },
   status: { type: String, default: 'pending' },
 }, { timestamps: true });

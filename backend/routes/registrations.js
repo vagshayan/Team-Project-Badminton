@@ -156,7 +156,61 @@ router.patch('/:id/status', protect, async (req, res) => {
   }
 });
 
-// Admin — view registrations for a tournament
+// Admin — approve a pair (sets pairStatus: 'approved' on both players)
+router.patch('/:id/approve-pair', protect, async (req, res) => {
+  try {
+    const { Registration } = getModelsForSport(req.admin.sport);
+    const reg = await Registration.findById(req.params.id).populate('tournament');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
+      return res.status(401).json({ message: 'Unauthorized' });
+
+    if (!reg.partnerRollNumber)
+      return res.status(400).json({ message: 'No partner linked to this registration.' });
+
+    // Set pairStatus to 'approved' on both players
+    reg.pairStatus = 'approved';
+    await reg.save();
+
+    await Registration.findOneAndUpdate(
+      { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+      { pairStatus: 'approved' }
+    );
+
+    res.json({ message: 'Pair approved successfully.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Admin — reset an approved pair back to 'complete' so it can be re-approved
+router.patch('/:id/reset-pair', protect, async (req, res) => {
+  try {
+    const { Registration } = getModelsForSport(req.admin.sport);
+    const reg = await Registration.findById(req.params.id).populate('tournament');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
+      return res.status(401).json({ message: 'Unauthorized' });
+
+    reg.pairStatus = 'complete';
+    await reg.save();
+
+    if (reg.partnerRollNumber) {
+      await Registration.findOneAndUpdate(
+        { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+        { pairStatus: 'complete' }
+      );
+    }
+
+    res.json({ message: 'Pair reset to pending approval.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
