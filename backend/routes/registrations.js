@@ -210,6 +210,47 @@ router.patch('/:id/reset-pair', protect, async (req, res) => {
   }
 });
 
+// Admin — manually link two solo registrations as partners (bidirectional)
+router.patch('/:id/link-partner', protect, async (req, res) => {
+  try {
+    const { partnerId } = req.body;
+    if (!partnerId) return res.status(400).json({ message: 'partnerId is required.' });
+
+    const { Registration } = getModelsForSport(req.admin.sport);
+
+    const reg = await Registration.findById(req.params.id).populate('tournament');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
+      return res.status(401).json({ message: 'Unauthorized' });
+
+    const partner = await Registration.findById(partnerId).populate('tournament');
+    if (!partner) return res.status(404).json({ message: 'Partner registration not found' });
+
+    // Must be in the same tournament
+    if (reg.tournament._id.toString() !== partner.tournament._id.toString())
+      return res.status(400).json({ message: 'Both players must be in the same tournament.' });
+
+    // Neither should already have a partner
+    if (reg.partnerRollNumber && reg.partnerRollNumber.trim())
+      return res.status(400).json({ message: 'This player already has a partner assigned.' });
+    if (partner.partnerRollNumber && partner.partnerRollNumber.trim())
+      return res.status(400).json({ message: 'The selected player already has a partner assigned.' });
+
+    // Link bidirectionally
+    reg.partnerRollNumber = partner.rollNumber;
+    reg.partnerName = partner.playerName;
+    await reg.save();
+
+    partner.partnerRollNumber = reg.rollNumber;
+    partner.partnerName = reg.playerName;
+    await partner.save();
+
+    res.json({ message: 'Players linked as partners successfully.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
