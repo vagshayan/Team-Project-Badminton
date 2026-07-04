@@ -23,7 +23,7 @@ router.get('/admin', protect, async (req, res) => {
 
 // Update registration status
 router.patch('/:id/status', protect, async (req, res) => {
-  const { status } = req.body;
+  const { status, pairStatus } = req.body;
   if (!['pending', 'confirmed', 'rejected', 'cancelled'].includes(status))
     return res.status(400).json({ message: 'Invalid status' });
 
@@ -61,15 +61,47 @@ router.patch('/:id/status', protect, async (req, res) => {
         if (pt && pt.tournamentHistory.length === 0) await Player.deleteOne({ rollNumber: reg.partnerRollNumber });
       }
 
-      // Update the registration status to rejected
+      // Update the registration status to rejected and break pair status
       reg.status = 'rejected';
+      reg.pairStatus = 'none';
       await reg.save();
+
+      // Reset partner's pairStatus
+      if (reg.partnerRollNumber) {
+        await Registration.findOneAndUpdate(
+          { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+          { pairStatus: 'none' }
+        );
+      }
 
       return res.json({ message: 'Registration marked as rejected.' });
     }
 
     // For other status changes (pending, confirmed, cancelled)
     reg.status = status;
+    
+    // If not confirmed, pair is broken
+    if (status !== 'confirmed') {
+      reg.pairStatus = 'none';
+      if (reg.partnerRollNumber) {
+        await Registration.findOneAndUpdate(
+          { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+          { pairStatus: 'none' }
+        );
+      }
+    }
+
+    // If pairStatus is passed
+    if (pairStatus) {
+      reg.pairStatus = pairStatus;
+      if (pairStatus === 'complete' && reg.partnerRollNumber) {
+        await Registration.findOneAndUpdate(
+          { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+          { pairStatus: 'complete' }
+        );
+      }
+    }
+
     await reg.save();
 
     if (status === 'confirmed') {
