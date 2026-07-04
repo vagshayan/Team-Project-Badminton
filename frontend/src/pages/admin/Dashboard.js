@@ -103,6 +103,12 @@ export default function Dashboard() {
   const [hoverCategory, setHoverCategory] = useState(null);
   const filterRef = useRef(null);
 
+  // Link Partner modal state
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkSelected, setLinkSelected] = useState(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (filterRef.current && !filterRef.current.contains(event.target)) {
@@ -178,14 +184,40 @@ export default function Dashboard() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
-  const handleApprovePair = async (group) => {
-    if (!group[1]) return;
+  const handleApprovePair = async (leadId) => {
     try {
-      await Promise.all(group.filter(Boolean).map((r) => axios.patch(`/api/registrations/${r._id}/status`, { status: 'confirmed' })));
+      await axios.patch(`/api/registrations/${leadId}/approve-pair`);
       fetchData();
-      showToast('✅ Pair approved');
+      showToast('✅ Pair confirmed!');
     } catch (err) {
-      alert('Pair approval failed');
+      alert(err.response?.data?.message || 'Pair approval failed');
+    }
+  };
+
+  const handleResetPair = async (leadId) => {
+    try {
+      await axios.patch(`/api/registrations/${leadId}/reset-pair`);
+      fetchData();
+      showToast('🔄 Pair reset to pending');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair reset failed');
+    }
+  };
+
+  const handleLinkPartner = async () => {
+    if (!linkTarget || !linkSelected) return;
+    setLinkLoading(true);
+    try {
+      await axios.patch(`/api/registrations/${linkTarget._id}/link-partner`, { partnerId: linkSelected._id });
+      setLinkTarget(null);
+      setLinkSelected(null);
+      setLinkSearch('');
+      fetchData();
+      showToast('✅ Players linked as partners!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Linking failed');
+    } finally {
+      setLinkLoading(false);
     }
   };
 
@@ -265,7 +297,7 @@ export default function Dashboard() {
         return;
       }
 
-      groups.push({ kind: 'single', player: r });
+      groups.push({ kind: 'pair', players: [r, null] });
       seen.add(key);
     });
 
@@ -668,6 +700,7 @@ export default function Dashboard() {
 
                         const [first, second] = entry.players;
                         const pairReady = second && first?.status === 'confirmed' && second?.status === 'confirmed';
+                        const pairApproved = first?.pairStatus === 'approved' || second?.pairStatus === 'approved';
                         const topCellBase = { ...ds.td, border: '1px solid var(--border)', borderBottom: 'none' };
                         const middleCellBase = { ...ds.td, borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderTop: '1px solid var(--border)', borderBottom: 'none' };
                         const footerCell = { ...ds.td, border: '1px solid var(--border)', borderTop: 'none', padding: '18px 18px' };
@@ -725,7 +758,27 @@ export default function Dashboard() {
                                     <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{second.department}</div>
                                   </>
                                 ) : (
-                                  <div style={{ fontWeight: 900, fontSize: 18, opacity: 0.65 }}>No partner yet</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ fontWeight: 900, fontSize: 18, opacity: 0.65 }}>No partner yet</div>
+                                    <button
+                                      onClick={() => { setLinkTarget(first); setLinkSearch(''); setLinkSelected(null); }}
+                                      style={{
+                                        background: 'rgba(59,130,246,0.12)',
+                                        border: '1px solid rgba(59,130,246,0.4)',
+                                        color: 'var(--primary)',
+                                        padding: '7px 14px',
+                                        borderRadius: 10,
+                                        fontSize: 11,
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        letterSpacing: 0.5,
+                                        width: 'fit-content',
+                                        transition: 'all 0.2s',
+                                      }}
+                                    >
+                                      + LINK PARTNER
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                               <td style={middleCellBase}>
@@ -778,21 +831,51 @@ export default function Dashboard() {
                             </tr>
                             <tr style={ds.tr}>
                               <td colSpan={5} style={{ ...footerCell, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, background: 'var(--bg-card)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                                  {pairApproved && (
+                                    <button
+                                      onClick={() => handleResetPair(first._id)}
+                                      style={{
+                                        ...ds.actionBtn,
+                                        background: 'var(--bg-input)',
+                                        border: '1px solid var(--border)',
+                                        color: 'var(--text-muted)',
+                                        fontSize: 11,
+                                        padding: '10px 16px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      RESET PAIR
+                                    </button>
+                                  )}
                                   <button
-                                    disabled={!pairReady}
-                                    onClick={() => handleApprovePair(entry.players)}
+                                    disabled={!pairReady || pairApproved}
+                                    onClick={() => pairReady && !pairApproved && handleApprovePair(first._id)}
                                     style={{
                                       ...ds.actionBtn,
-                                      width: 180,
+                                      minWidth: 180,
                                       justifyContent: 'center',
-                                      border: !pairReady ? '1px solid var(--border)' : 'none',
-                                      background: !pairReady ? 'var(--bg-input)' : '#2563EB',
-                                      color: !pairReady ? 'var(--text-muted)' : '#FFF',
-                                      cursor: !pairReady ? 'not-allowed' : 'pointer'
+                                      border: (!pairReady && !pairApproved) ? '1px solid var(--border)' : 'none',
+                                      background: pairApproved
+                                        ? '#16A34A'
+                                        : pairReady
+                                          ? '#2563EB'
+                                          : 'var(--bg-input)',
+                                      color: pairApproved
+                                        ? '#FFF'
+                                        : pairReady
+                                          ? '#FFF'
+                                          : 'var(--text-muted)',
+                                      cursor: (pairReady && !pairApproved) ? 'pointer' : 'not-allowed',
+                                      boxShadow: pairApproved
+                                        ? '0 4px 16px rgba(22,163,74,0.35)'
+                                        : pairReady
+                                          ? '0 4px 16px rgba(37,99,235,0.35)'
+                                          : 'none',
+                                      transition: 'all 0.25s ease',
                                     }}
                                   >
-                                    APPROVE PAIR
+                                    {pairApproved ? '✓ PAIR APPROVED' : 'APPROVE PAIR'}
                                   </button>
                                 </div>
                               </td>
@@ -845,6 +928,149 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+
+      {/* ── Link Partner Modal ── */}
+      {linkTarget && (() => {
+        const tournId = linkTarget.tournament?._id?.toString() || linkTarget.tournament?.toString();
+        const soloOptions = registrations.filter(r => {
+          const rTournId = r.tournament?._id?.toString() || r.tournament?.toString();
+          return (
+            r._id !== linkTarget._id &&
+            rTournId === tournId &&
+            (!r.partnerRollNumber || r.partnerRollNumber.trim() === '') &&
+            r.status !== 'rejected' && r.status !== 'cancelled'
+          );
+        }).filter(r =>
+          !linkSearch ||
+          r.playerName.toLowerCase().includes(linkSearch.toLowerCase()) ||
+          r.rollNumber.toLowerCase().includes(linkSearch.toLowerCase())
+        );
+
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); } }}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.72)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div style={{
+              background: 'var(--bg-card)',
+              borderRadius: 28,
+              border: '1px solid var(--border)',
+              boxShadow: '0 40px 80px rgba(0,0,0,0.4)',
+              padding: '40px',
+              width: 540,
+              maxWidth: '100%',
+              display: 'flex', flexDirection: 'column', gap: 24,
+              animation: 'fadeIn 0.2s ease',
+            }}>
+              {/* Header */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary)', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Manual Partner Link</div>
+                <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.5, marginBottom: 4 }}>
+                  Assign partner for <span style={{ color: 'var(--primary)' }}>{linkTarget.playerName}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  {CAT_LABELS[linkTarget.tournament?.category]} &middot; Year {linkTarget.tournament?.year} &middot; REG: {linkTarget.rollNumber}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search by name or reg number..."
+                  value={linkSearch}
+                  onChange={e => setLinkSearch(e.target.value)}
+                  style={{ ...ds.input, paddingLeft: 46, borderRadius: 14, fontSize: 14 }}
+                />
+              </div>
+
+              {/* Player list */}
+              <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
+                {soloOptions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600 }}>
+                    {linkSearch ? 'No matching solo players found.' : 'No other unpaired players in this category.'}
+                  </div>
+                ) : soloOptions.map(r => {
+                  const isSelected = linkSelected?._id === r._id;
+                  return (
+                    <div
+                      key={r._id}
+                      onClick={() => setLinkSelected(isSelected ? null : r)}
+                      style={{
+                        padding: '14px 18px',
+                        borderRadius: 14,
+                        cursor: 'pointer',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        background: isSelected ? 'rgba(59,130,246,0.1)' : 'var(--bg-input)',
+                        transition: 'all 0.15s',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>{r.playerName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 600 }}>
+                          REG: {r.rollNumber} &middot; {r.department}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%',
+                        border: isSelected ? 'none' : '2px solid var(--border)',
+                        background: isSelected ? 'var(--primary)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, color: '#fff', flexShrink: 0, transition: 'all 0.15s'
+                      }}>
+                        {isSelected ? '✓' : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 4 }}>
+                <button
+                  onClick={() => { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); }}
+                  style={{ ...ds.revertBtn, padding: '14px 28px', borderRadius: 14 }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  disabled={!linkSelected || linkLoading}
+                  onClick={handleLinkPartner}
+                  style={{
+                    ...ds.actionBtn,
+                    padding: '14px 28px',
+                    borderRadius: 14,
+                    fontSize: 13,
+                    background: linkSelected ? 'var(--primary)' : 'var(--bg-input)',
+                    color: linkSelected ? '#FFF' : 'var(--text-muted)',
+                    border: linkSelected ? 'none' : '1px solid var(--border)',
+                    cursor: (!linkSelected || linkLoading) ? 'not-allowed' : 'pointer',
+                    boxShadow: linkSelected ? '0 8px 24px rgba(59,130,246,0.35)' : 'none',
+                    transition: 'all 0.2s',
+                    minWidth: 160,
+                  }}
+                >
+                  {linkLoading
+                    ? 'Linking...'
+                    : linkSelected
+                      ? `LINK WITH ${linkSelected.playerName.split(' ')[0].toUpperCase()}`
+                      : 'SELECT A PLAYER'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

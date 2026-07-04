@@ -427,4 +427,201 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Find partner for already-registered players: create a partner request between two existing waiting players
+router.post('/find-partner', async (req, res) => {
+  const { tournament, yourRollNumber, partnerRollNumber } = req.body;
+  if (!tournament || !yourRollNumber || !partnerRollNumber) return res.status(400).json({ message: 'Required fields missing.' });
+  if (yourRollNumber === partnerRollNumber) return res.status(400).json({ message: 'Cannot request yourself.' });
+
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let targetSport = null;
+    let tournamentDoc = null;
+    for (const s of sports) {
+      const { Tournament } = getModelsForSport(s);
+      const t = await Tournament.findById(tournament);
+      if (t) { targetSport = s; tournamentDoc = t; break; }
+    }
+    if (!targetSport) return res.status(404).json({ message: 'Tournament not found' });
+    const { Registration, PartnerRequest } = getModelsForSport(targetSport);
+
+    const a = await Registration.findOne({ tournament, rollNumber: yourRollNumber });
+    const b = await Registration.findOne({ tournament, rollNumber: partnerRollNumber });
+    if (!a || !b) return res.status(404).json({ message: 'One or both registration numbers not found for this tournament.' });
+    if (a.pairStatus === 'complete' || b.pairStatus === 'complete') return res.status(400).json({ message: 'One of the players is already paired.' });
+    if (a.partnerStatus !== 'looking' || b.partnerStatus !== 'looking') return res.status(400).json({ message: 'Both players must be looking for partner.' });
+
+    // Prevent duplicate active pending request from requester
+    const existing = await PartnerRequest.findOne({ tournament, requesterRegistration: a._id, status: 'pending' });
+    if (existing) return res.status(400).json({ message: 'You already have an active pending request.' });
+
+    const reqDoc = await PartnerRequest.create({ tournament, requesterRegistration: a._id, requesterRollNumber: yourRollNumber, targetRegistration: b._id, targetRollNumber: partnerRollNumber });
+    return res.json({ message: 'Partner request sent.', request: reqDoc });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Lookup a partner by registration number in a tournament
+router.get('/partner-lookup', async (req, res) => {
+  const { tournament, rollNumber } = req.query;
+  if (!tournament || !rollNumber) return res.status(400).json({ message: 'Tournament and registration number are required.' });
+
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let targetSport = null;
+    for (const s of sports) {
+      const { Tournament } = getModelsForSport(s);
+      const t = await Tournament.findById(tournament);
+      if (t) { targetSport = s; break; }
+    }
+    if (!targetSport) return res.status(404).json({ message: 'Tournament not found.' });
+
+    const { Registration } = getModelsForSport(targetSport);
+    const normalizedRoll = String(rollNumber).trim().toUpperCase();
+    const partnerReg = await Registration.findOne({ tournament, rollNumber: normalizedRoll });
+    if (!partnerReg) return res.status(404).json({ message: 'Partner not found.' });
+
+    if (!(partnerReg.partnerStatus === 'looking' && partnerReg.pairStatus === 'incomplete')) {
+      return res.status(400).json({ message: 'Partner registration number already exists.' });
+    }
+
+    return res.json({
+      playerName: partnerReg.playerName,
+      rollNumber: partnerReg.rollNumber,
+      department: partnerReg.department,
+      phone: partnerReg.phone,
+      email: partnerReg.email,
+      nicNo: partnerReg.nicNo,
+      gender: partnerReg.gender,
+      partnerStatus: partnerReg.partnerStatus,
+      pairStatus: partnerReg.pairStatus,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get pending partner requests for a given registration number (as target)
+router.get('/partner-requests/:rollNumber', async (req, res) => {
+  const roll = req.params.rollNumber;
+  const tournament = req.query.tournament;
+  if (!tournament) return res.status(400).json({ message: 'Tournament required.' });
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let targetSport = null;
+    for (const s of sports) {
+      const { Tournament } = getModelsForSport(s);
+      const t = await Tournament.findById(tournament);
+      if (t) { targetSport = s; break; }
+    }
+    if (!targetSport) return res.status(404).json({ message: 'Tournament not found' });
+    const { PartnerRequest } = getModelsForSport(targetSport);
+    const requests = await PartnerRequest.find({ tournament, targetRollNumber: roll, status: 'pending' }).populate('requesterRegistration');
+    return res.json(requests);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get all pending partner requests for a tournament
+router.get('/partner-requests', async (req, res) => {
+  const tournament = req.query.tournament;
+  if (!tournament) return res.status(400).json({ message: 'Tournament required.' });
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let targetSport = null;
+    for (const s of sports) {
+      const { Tournament } = getModelsForSport(s);
+      const t = await Tournament.findById(tournament);
+      if (t) { targetSport = s; break; }
+    }
+    if (!targetSport) return res.status(404).json({ message: 'Tournament not found' });
+    const { PartnerRequest } = getModelsForSport(targetSport);
+    const requests = await PartnerRequest.find({ tournament, status: 'pending' }).populate('requesterRegistration targetRegistration');
+    return res.json(requests);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Accept a partner request
+router.post('/partner-requests/:id/accept', async (req, res) => {
+  const id = req.params.id;
+  try {
+    // find request across sports
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let found = null; let models = null;
+    for (const s of sports) {
+      const { PartnerRequest, Registration, Pair } = getModelsForSport(s);
+      const r = await PartnerRequest.findById(id);
+      if (r) { found = r; models = { PartnerRequest, Registration, Pair }; break; }
+    }
+    if (!found) return res.status(404).json({ message: 'Partner request not found.' });
+
+    if (found.status !== 'pending') return res.status(400).json({ message: 'Request is not pending.' });
+
+    const { PartnerRequest, Registration, Pair } = models;
+    const requester = await Registration.findById(found.requesterRegistration);
+    const target = await Registration.findById(found.targetRegistration);
+    if (!requester || !target) return res.status(404).json({ message: 'One of the registrations was removed.' });
+    if (requester.pairStatus === 'complete' || target.pairStatus === 'complete') return res.status(400).json({ message: 'One of the players is already paired.' });
+
+    // Find tournament and enforce gender rules based on category
+    let tournamentDoc = null; let tournamentSport = null;
+    for (const s of sports) {
+      const { Tournament } = getModelsForSport(s);
+      const t = await Tournament.findById(found.tournament);
+      if (t) { tournamentDoc = t; tournamentSport = s; break; }
+    }
+    if (!tournamentDoc) return res.status(404).json({ message: 'Tournament not found for this request.' });
+
+    const category = (tournamentDoc.category || '').toLowerCase();
+    if (category.includes('doubles-men')) {
+      if (requester.gender !== 'Male' || target.gender !== 'Male') return res.status(400).json({ message: 'Doubles Men requires two male players.' });
+    } else if (category.includes('doubles-women')) {
+      if (requester.gender !== 'Female' || target.gender !== 'Female') return res.status(400).json({ message: 'Doubles Women requires two female players.' });
+    } else if (category.includes('mixed')) {
+      const genders = [requester.gender, target.gender];
+      if (!(genders.includes('Male') && genders.includes('Female'))) return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
+    }
+
+    // Create pair
+    const pair = await Pair.create({ tournament: found.tournament, players: [requester._id, target._id] });
+    requester.partnerName = target.playerName; requester.partnerRollNumber = target.rollNumber;
+    target.partnerName = requester.playerName; target.partnerRollNumber = requester.rollNumber;
+    requester.partnerStatus = 'paired'; requester.pairStatus = 'complete'; requester.pairId = pair._id;
+    target.partnerStatus = 'paired'; target.pairStatus = 'complete'; target.pairId = pair._id;
+    await requester.save(); await target.save();
+
+    // mark the request accepted and remove other pending requests related to either player
+    found.status = 'accepted'; await found.save();
+    await PartnerRequest.updateMany({ tournament: found.tournament, $or: [ { requesterRegistration: requester._id }, { targetRegistration: requester._id }, { requesterRegistration: target._id }, { targetRegistration: target._id } ], status: 'pending' }, { status: 'rejected' });
+
+    return res.json({ message: 'Partner request accepted and pair created.', pair });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Reject a partner request
+router.post('/partner-requests/:id/reject', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let found = null; let models = null;
+    for (const s of sports) {
+      const { PartnerRequest } = getModelsForSport(s);
+      const r = await PartnerRequest.findById(id);
+      if (r) { found = r; models = { PartnerRequest }; break; }
+    }
+    if (!found) return res.status(404).json({ message: 'Partner request not found.' });
+    if (found.status !== 'pending') return res.status(400).json({ message: 'Request is not pending.' });
+    found.status = 'rejected'; await found.save();
+    return res.json({ message: 'Partner request rejected.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
