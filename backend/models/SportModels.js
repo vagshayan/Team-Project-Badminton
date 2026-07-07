@@ -27,9 +27,15 @@ const registrationSchema = new mongoose.Schema({
   year: { type: String, default: 'N/A' },
   partnerName: { type: String, default: '' },
   partnerRollNumber: { type: String, default: '' },
+  gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
+  partnerStatus: { type: String, enum: ['none', 'looking', 'requested', 'paired'], default: 'none' },
+  pairStatus: { type: String, enum: ['none', 'incomplete', 'complete', 'approved'], default: 'none' },
+  pairId: { type: mongoose.Schema.Types.ObjectId, default: null },
   status: { type: String, default: 'pending' },
 }, { timestamps: true });
-registrationSchema.index({ tournament: 1, nicNo: 1 }, { unique: true });
+// Unique constraints per tournament
+registrationSchema.index({ tournament: 1, nicNo: 1 }, { unique: true, sparse: true });
+registrationSchema.index({ tournament: 1, rollNumber: 1 }, { unique: true, sparse: true });
 
 const playerSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -47,6 +53,8 @@ function getModelsForSport(sport) {
   const tModelName = `${prefix}Tournament`;
   const rModelName = `${prefix}Registration`;
   const pModelName = `${prefix}Player`;
+  const pairModelName = `${prefix}Pair`;
+  const partnerRequestModelName = `${prefix}PartnerRequest`;
 
   // 1. Tournament Model
   let Tournament;
@@ -78,7 +86,34 @@ function getModelsForSport(sport) {
     Player = mongoose.model(pModelName, sPlayerSchema, `${prefix}players`);
   }
   
-  return { Tournament, Registration, Player };
+    // 4. Pair Model — groups two registrations as a completed pair
+    let Pair;
+    if (mongoose.models[pairModelName]) {
+      Pair = mongoose.models[pairModelName];
+    } else {
+      const pairSchema = new mongoose.Schema({
+        tournament: { type: mongoose.Schema.Types.ObjectId, ref: tModelName, required: true },
+        players: [{ type: mongoose.Schema.Types.ObjectId, ref: rModelName }],
+      }, { timestamps: true });
+      Pair = mongoose.model(pairModelName, pairSchema, `${prefix}pairs`);
+    }
+
+    // 5. Partner Request Model
+    let PartnerRequest;
+    if (mongoose.models[partnerRequestModelName]) {
+      PartnerRequest = mongoose.models[partnerRequestModelName];
+    } else {
+      const prSchema = new mongoose.Schema({
+        tournament: { type: mongoose.Schema.Types.ObjectId, ref: tModelName, required: true },
+        requesterRegistration: { type: mongoose.Schema.Types.ObjectId, ref: rModelName, required: true },
+        requesterRollNumber: { type: String, required: true },
+        targetRegistration: { type: mongoose.Schema.Types.ObjectId, ref: rModelName, required: true },
+        targetRollNumber: { type: String, required: true },
+        status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+      }, { timestamps: true });
+      PartnerRequest = mongoose.model(partnerRequestModelName, prSchema, `${prefix}partner_requests`);
+    }
+  return { Tournament, Registration, Player, Pair, PartnerRequest };
 }
 
 module.exports = { getModelsForSport };

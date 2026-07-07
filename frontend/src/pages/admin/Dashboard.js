@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -103,6 +103,12 @@ export default function Dashboard() {
   const [hoverCategory, setHoverCategory] = useState(null);
   const filterRef = useRef(null);
 
+  // Link Partner modal state
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkSelected, setLinkSelected] = useState(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (filterRef.current && !filterRef.current.contains(event.target)) {
@@ -178,6 +184,43 @@ export default function Dashboard() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
+  const handleApprovePair = async (leadId) => {
+    try {
+      await axios.patch(`/api/registrations/${leadId}/approve-pair`);
+      fetchData();
+      showToast('✅ Pair confirmed!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair approval failed');
+    }
+  };
+
+  const handleResetPair = async (leadId) => {
+    try {
+      await axios.patch(`/api/registrations/${leadId}/reset-pair`);
+      fetchData();
+      showToast('🔄 Pair reset to pending');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair reset failed');
+    }
+  };
+
+  const handleLinkPartner = async () => {
+    if (!linkTarget || !linkSelected) return;
+    setLinkLoading(true);
+    try {
+      await axios.patch(`/api/registrations/${linkTarget._id}/link-partner`, { partnerId: linkSelected._id });
+      setLinkTarget(null);
+      setLinkSelected(null);
+      setLinkSearch('');
+      fetchData();
+      showToast('✅ Players linked as partners!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Linking failed');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   const handleUpdateStatus = async (id, status) => {
     try {
       const res = await axios.patch(`/api/registrations/${id}/status`, { status });
@@ -189,6 +232,77 @@ export default function Dashboard() {
       alert('Action failed');
     }
   };
+
+  const groupedRegistrations = useMemo(() => {
+    const regByKey = {};
+    const reverseRefs = {};
+    const doublesCategories = new Set(['doubles-men', 'doubles-women', 'mixed-doubles']);
+
+    filteredRegistrations.forEach((r) => {
+      const rollKey = r.rollNumber?.trim().toUpperCase();
+      const tournamentId = r.tournament?._id?.toString() || r.tournament;
+      if (!rollKey || !tournamentId) return;
+
+      const key = `${tournamentId}|${rollKey}`;
+      regByKey[key] = r;
+
+      const partnerKey = r.partnerRollNumber?.trim().toUpperCase();
+      if (partnerKey) {
+        const partnerRefKey = `${tournamentId}|${partnerKey}`;
+        reverseRefs[partnerRefKey] = reverseRefs[partnerRefKey] || [];
+        reverseRefs[partnerRefKey].push(r);
+      }
+    });
+
+    const groups = [];
+    const seen = new Set();
+
+    filteredRegistrations.forEach((r) => {
+      const rollKey = r.rollNumber?.trim().toUpperCase();
+      const tournamentId = r.tournament?._id?.toString() || r.tournament;
+      if (!rollKey || !tournamentId) return;
+
+      const key = `${tournamentId}|${rollKey}`;
+      if (seen.has(key)) return;
+
+      const category = r.tournament?.category;
+      if (!doublesCategories.has(category)) {
+        groups.push({ kind: 'single', player: r });
+        seen.add(key);
+        return;
+      }
+
+      const partnerKey = r.partnerRollNumber?.trim().toUpperCase();
+      const partnerKeyWithTournament = partnerKey ? `${tournamentId}|${partnerKey}` : null;
+      const partner = partnerKeyWithTournament ? regByKey[partnerKeyWithTournament] : null;
+
+      if (partner && partner.rollNumber?.trim().toUpperCase() !== rollKey && !seen.has(partnerKeyWithTournament)) {
+        groups.push({ kind: 'pair', players: [r, partner] });
+        seen.add(key);
+        seen.add(partnerKeyWithTournament);
+        return;
+      }
+
+      const reverse = (reverseRefs[key] || []).find((ref) => {
+        const refRoll = ref.rollNumber?.trim().toUpperCase();
+        const refKey = `${tournamentId}|${refRoll}`;
+        return refRoll !== rollKey && !seen.has(refKey);
+      });
+
+      if (reverse) {
+        const reverseKey = `${tournamentId}|${reverse.rollNumber?.trim().toUpperCase()}`;
+        groups.push({ kind: 'pair', players: [reverse, r] });
+        seen.add(key);
+        seen.add(reverseKey);
+        return;
+      }
+
+      groups.push({ kind: 'pair', players: [r, null] });
+      seen.add(key);
+    });
+
+    return groups;
+  }, [filteredRegistrations]);
 
   const handleCreate = async (data) => {
     try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast('✅ Tournament created!'); }
@@ -535,51 +649,240 @@ export default function Dashboard() {
                     {filteredRegistrations.length === 0 ? (
                       <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
-                      filteredRegistrations
-                        .map(r => (
-                          <tr key={r._id} style={ds.tr}>
-                            <td style={ds.td}>
-                              <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
-                              <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
-                              <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
-                              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
-                              <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                📧 <a
-                                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ color: 'inherit', textDecoration: 'none' }}
-                                >
-                                  {r.email}
-                                </a>
-                              </div>
-                              {r.nicNo ? (
-                                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
-                              ) : null}
-                            </td>
-                            <td style={ds.td}>
-                              <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ display: 'flex', gap: 10 }}>
-                                {r.status === 'pending' ? (
+                      groupedRegistrations.map((entry, index) => {
+                        if (entry.kind === 'single') {
+                          const r = entry.player;
+                          return (
+                            <tr key={r._id} style={ds.tr}>
+                              <td style={ds.td}>
+                                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
+                                <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
+                                <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                                <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                  📧 <a
+                                    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'inherit', textDecoration: 'none' }}
+                                  >
+                                    {r.email}
+                                  </a>
+                                </div>
+                                {r.nicNo ? (
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
+                                ) : null}
+                              </td>
+                              <td style={ds.td}>
+                                <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  {r.status === 'pending' ? (
+                                    <>
+                                      <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                      <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const [first, second] = entry.players;
+                        const pairReady = second && first?.status === 'confirmed' && second?.status === 'confirmed';
+                        const pairApproved = first?.pairStatus === 'approved' || second?.pairStatus === 'approved';
+                        const topCellBase = { ...ds.td, border: '1px solid var(--border)', borderBottom: 'none' };
+                        const middleCellBase = { ...ds.td, borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderTop: '1px solid var(--border)', borderBottom: 'none' };
+                        const footerCell = { ...ds.td, border: '1px solid var(--border)', borderTop: 'none', padding: '18px 18px' };
+
+                        return (
+                          <React.Fragment key={`${first._id}-${second ? second._id : 'solo'}`}>
+                            <tr style={ds.tr}>
+                              <td style={{ ...topCellBase, borderTopLeftRadius: 24 }}>
+                                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{first.playerName}</div>
+                                <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {first.rollNumber}</div>
+                                <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{first.department}</div>
+                              </td>
+                              <td style={topCellBase}>
+                                <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[first.tournament?.category]}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {first.tournament?.year}</div>
+                              </td>
+                              <td style={topCellBase}>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${first.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{first.phone}</a></div>
+                                <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                  📧 <a
+                                    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(first.email || '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'inherit', textDecoration: 'none' }}
+                                  >
+                                    {first.email}
+                                  </a>
+                                </div>
+                                {first.nicNo ? (
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {first.nicNo}</div>
+                                ) : null}
+                              </td>
+                              <td style={topCellBase}>
+                                <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[first.status] }}>{STATUS_STYLE[first.status].label.toUpperCase()}</span>
+                              </td>
+                              <td style={{ ...topCellBase, borderTopRightRadius: 24 }}>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  {first.status === 'pending' ? (
+                                    <>
+                                      <button onClick={() => handleUpdateStatus(first._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                      <button onClick={() => handleUpdateStatus(first._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => handleUpdateStatus(first._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            <tr style={ds.tr}>
+                              <td style={middleCellBase}>
+                                {second ? (
                                   <>
-                                    <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
-                                    <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{second.playerName}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {second.rollNumber}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{second.department}</div>
                                   </>
                                 ) : (
-                                  <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ fontWeight: 900, fontSize: 18, opacity: 0.65 }}>No partner yet</div>
+                                    <button
+                                      onClick={() => { setLinkTarget(first); setLinkSearch(''); setLinkSelected(null); }}
+                                      style={{
+                                        background: 'rgba(59,130,246,0.12)',
+                                        border: '1px solid rgba(59,130,246,0.4)',
+                                        color: 'var(--primary)',
+                                        padding: '7px 14px',
+                                        borderRadius: 10,
+                                        fontSize: 11,
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        letterSpacing: 0.5,
+                                        width: 'fit-content',
+                                        transition: 'all 0.2s',
+                                      }}
+                                    >
+                                      + LINK PARTNER
+                                    </button>
+                                  </div>
                                 )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <>
+                                    <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[second.tournament?.category]}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {second.tournament?.year}</div>
+                                  </>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <>
+                                    <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${second.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{second.phone}</a></div>
+                                    <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                      📧 <a
+                                        href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(second.email || '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: 'inherit', textDecoration: 'none' }}
+                                      >
+                                        {second.email}
+                                      </a>
+                                    </div>
+                                    {second.nicNo ? (
+                                      <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {second.nicNo}</div>
+                                    ) : null}
+                                  </>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[second.status] }}>{STATUS_STYLE[second.status].label.toUpperCase()}</span>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <div style={{ display: 'flex', gap: 10 }}>
+                                    {second.status === 'pending' ? (
+                                      <>
+                                        <button onClick={() => handleUpdateStatus(second._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                        <button onClick={() => handleUpdateStatus(second._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                      </>
+                                    ) : (
+                                      <button onClick={() => handleUpdateStatus(second._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </td>
+                            </tr>
+                            <tr style={ds.tr}>
+                              <td colSpan={5} style={{ ...footerCell, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, background: 'var(--bg-card)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                                  {pairApproved && (
+                                    <button
+                                      onClick={() => handleResetPair(first._id)}
+                                      style={{
+                                        ...ds.actionBtn,
+                                        background: 'var(--bg-input)',
+                                        border: '1px solid var(--border)',
+                                        color: 'var(--text-muted)',
+                                        fontSize: 11,
+                                        padding: '10px 16px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      RESET PAIR
+                                    </button>
+                                  )}
+                                  <button
+                                    disabled={!pairReady || pairApproved}
+                                    onClick={() => pairReady && !pairApproved && handleApprovePair(first._id)}
+                                    style={{
+                                      ...ds.actionBtn,
+                                      minWidth: 180,
+                                      justifyContent: 'center',
+                                      border: (!pairReady && !pairApproved) ? '1px solid var(--border)' : 'none',
+                                      background: pairApproved
+                                        ? '#16A34A'
+                                        : pairReady
+                                          ? '#2563EB'
+                                          : 'var(--bg-input)',
+                                      color: pairApproved
+                                        ? '#FFF'
+                                        : pairReady
+                                          ? '#FFF'
+                                          : 'var(--text-muted)',
+                                      cursor: (pairReady && !pairApproved) ? 'pointer' : 'not-allowed',
+                                      boxShadow: pairApproved
+                                        ? '0 4px 16px rgba(22,163,74,0.35)'
+                                        : pairReady
+                                          ? '0 4px 16px rgba(37,99,235,0.35)'
+                                          : 'none',
+                                      transition: 'all 0.25s ease',
+                                    }}
+                                  >
+                                    {pairApproved ? '✓ PAIR APPROVED' : 'APPROVE PAIR'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -625,6 +928,149 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+
+      {/* ── Link Partner Modal ── */}
+      {linkTarget && (() => {
+        const tournId = linkTarget.tournament?._id?.toString() || linkTarget.tournament?.toString();
+        const soloOptions = registrations.filter(r => {
+          const rTournId = r.tournament?._id?.toString() || r.tournament?.toString();
+          return (
+            r._id !== linkTarget._id &&
+            rTournId === tournId &&
+            (!r.partnerRollNumber || r.partnerRollNumber.trim() === '') &&
+            r.status !== 'rejected' && r.status !== 'cancelled'
+          );
+        }).filter(r =>
+          !linkSearch ||
+          r.playerName.toLowerCase().includes(linkSearch.toLowerCase()) ||
+          r.rollNumber.toLowerCase().includes(linkSearch.toLowerCase())
+        );
+
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); } }}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.72)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div style={{
+              background: 'var(--bg-card)',
+              borderRadius: 28,
+              border: '1px solid var(--border)',
+              boxShadow: '0 40px 80px rgba(0,0,0,0.4)',
+              padding: '40px',
+              width: 540,
+              maxWidth: '100%',
+              display: 'flex', flexDirection: 'column', gap: 24,
+              animation: 'fadeIn 0.2s ease',
+            }}>
+              {/* Header */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary)', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Manual Partner Link</div>
+                <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.5, marginBottom: 4 }}>
+                  Assign partner for <span style={{ color: 'var(--primary)' }}>{linkTarget.playerName}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  {CAT_LABELS[linkTarget.tournament?.category]} &middot; Year {linkTarget.tournament?.year} &middot; REG: {linkTarget.rollNumber}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search by name or reg number..."
+                  value={linkSearch}
+                  onChange={e => setLinkSearch(e.target.value)}
+                  style={{ ...ds.input, paddingLeft: 46, borderRadius: 14, fontSize: 14 }}
+                />
+              </div>
+
+              {/* Player list */}
+              <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
+                {soloOptions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600 }}>
+                    {linkSearch ? 'No matching solo players found.' : 'No other unpaired players in this category.'}
+                  </div>
+                ) : soloOptions.map(r => {
+                  const isSelected = linkSelected?._id === r._id;
+                  return (
+                    <div
+                      key={r._id}
+                      onClick={() => setLinkSelected(isSelected ? null : r)}
+                      style={{
+                        padding: '14px 18px',
+                        borderRadius: 14,
+                        cursor: 'pointer',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        background: isSelected ? 'rgba(59,130,246,0.1)' : 'var(--bg-input)',
+                        transition: 'all 0.15s',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>{r.playerName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 600 }}>
+                          REG: {r.rollNumber} &middot; {r.department}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%',
+                        border: isSelected ? 'none' : '2px solid var(--border)',
+                        background: isSelected ? 'var(--primary)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, color: '#fff', flexShrink: 0, transition: 'all 0.15s'
+                      }}>
+                        {isSelected ? '✓' : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 4 }}>
+                <button
+                  onClick={() => { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); }}
+                  style={{ ...ds.revertBtn, padding: '14px 28px', borderRadius: 14 }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  disabled={!linkSelected || linkLoading}
+                  onClick={handleLinkPartner}
+                  style={{
+                    ...ds.actionBtn,
+                    padding: '14px 28px',
+                    borderRadius: 14,
+                    fontSize: 13,
+                    background: linkSelected ? 'var(--primary)' : 'var(--bg-input)',
+                    color: linkSelected ? '#FFF' : 'var(--text-muted)',
+                    border: linkSelected ? 'none' : '1px solid var(--border)',
+                    cursor: (!linkSelected || linkLoading) ? 'not-allowed' : 'pointer',
+                    boxShadow: linkSelected ? '0 8px 24px rgba(59,130,246,0.35)' : 'none',
+                    transition: 'all 0.2s',
+                    minWidth: 160,
+                  }}
+                >
+                  {linkLoading
+                    ? 'Linking...'
+                    : linkSelected
+                      ? `LINK WITH ${linkSelected.playerName.split(' ')[0].toUpperCase()}`
+                      : 'SELECT A PLAYER'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
