@@ -6,6 +6,7 @@ import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
+import RegisterModal from '../../components/RegisterModal';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 
 const SPORT_META = {
@@ -27,6 +28,11 @@ const STATUS_STYLE = {
 };
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDeadline = (d, fallback) => {
+  const target = d || fallback;
+  if (!target) return 'N/A';
+  return new Date(target).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 const FILTER_CATEGORIES = [
   {
@@ -82,7 +88,7 @@ const FILTER_CATEGORIES = [
 ];
 
 export default function Dashboard() {
-  const { admin, logout } = useAuth();
+  const { admin, logout, loginHistory } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -97,11 +103,20 @@ export default function Dashboard() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
+  const [editRegistrationTarget, setEditRegistrationTarget] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverCategory, setHoverCategory] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [lastSeenLoginTimestamp, setLastSeenLoginTimestamp] = useState(localStorage.getItem('lastSeenLoginTimestamp') || '');
+  // Audit Log states
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditFrom, setAuditFrom] = useState('');
+  const [auditTo, setAuditTo] = useState('');
   const filterRef = useRef(null);
+  const notificationsRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -113,7 +128,18 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
+  const loginTimeFormatted = new Date(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now()).toLocaleString('en-IN', { hour12: true });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -142,6 +168,19 @@ export default function Dashboard() {
   });
 
   const activeCatId = statusFilter.includes(':') ? statusFilter.split(':')[0] : null;
+  const loginEvents = Array.isArray(loginHistory) && loginHistory.length > 0 ? loginHistory : [];
+  const sortedLoginEvents = [...loginEvents].sort((a, b) => new Date(b) - new Date(a));
+  const unreadCount = lastSeenLoginTimestamp
+    ? sortedLoginEvents.filter((ts) => new Date(ts) > new Date(lastSeenLoginTimestamp)).length
+    : sortedLoginEvents.length;
+
+  const notificationItems = sortedLoginEvents.length > 0
+    ? sortedLoginEvents.map((timestamp) => ({
+        id: timestamp,
+        title: 'Admin login',
+        description: `Logged in at ${new Date(timestamp).toLocaleString('en-IN', { hour12: true })}`,
+      }))
+    : [{ id: 'none', title: 'No login notifications yet', description: 'Your recent login history will appear here.' }];
 
   let selectedLabel = 'All Registrations';
   let selectedCategoryLabel = 'Showing all';
@@ -154,6 +193,18 @@ export default function Dashboard() {
     }
   }
 
+  const approvalSummary = FILTER_CATEGORIES.map((category) => {
+    const categoryRegs = registrations.filter(r => r.tournament?.category === category.id);
+    return {
+      id: category.id,
+      label: category.label,
+      total: categoryRegs.length,
+      approved: categoryRegs.filter(r => r.status === 'confirmed').length,
+      pending: categoryRegs.filter(r => r.status === 'pending').length,
+    };
+  });
+
+  const pendingRegistrations = registrations.filter(r => r.status === 'pending');
 
   const fetchData = useCallback(async () => {
     if (!admin) return;
@@ -174,7 +225,25 @@ export default function Dashboard() {
     }
   }, [admin]);
 
+  const fetchAuditLogs = useCallback(async () => {
+    if (!admin) return;
+    setLoading(true);
+    try {
+      const params = {};
+      if (auditSearch) params.search = auditSearch;
+      if (auditFrom) params.from = auditFrom;
+      if (auditTo) params.to = auditTo;
+      const res = await axios.get('/api/tournaments/audit-logs', { params });
+      setAuditLogs(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [admin, auditSearch, auditFrom, auditTo]);
+
   useEffect(() => { if (admin) fetchData(); }, [admin, fetchData]);
+  useEffect(() => { if (admin && activeTab === 'audit-log') fetchAuditLogs(); }, [admin, activeTab, fetchAuditLogs]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
@@ -227,7 +296,9 @@ export default function Dashboard() {
         transition: isMobile
           ? 'transform 0.3s cubic-bezier(0.4,0,0.2,1)'
           : 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+          //overflow: 'hidden',
         zIndex: isMobile ? 200 : 20,
       }}>
         {/* Brand / Toggle Row */}
@@ -237,7 +308,7 @@ export default function Dashboard() {
           <button
             onClick={() => isMobile ? setMobileSidebarOpen(false) : setSidebarCollapsed(c => !c)}
             title={(!isMobile && sidebarCollapsed) ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 6, borderRadius: 8, flexShrink: 0, transition: 'color 0.2s' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 8, borderRadius: 10, flexShrink: 0, transition: 'color 0.2s' }}
           >
             {(!isMobile && sidebarCollapsed) ? '☰' : '✕'}
           </button>
@@ -269,11 +340,12 @@ export default function Dashboard() {
 
         <nav style={ds.nav}>
           {[
-            { id: 'dashboard', label: 'DASHBOARD VIEW', icon: '💎' },
-            { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: '🎯' },
-            { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: '🏆' },
-            { id: 'brackets', label: 'BRACKETS & DRAWS', icon: '🌳' },
-          ].map((tab) => (
+              { id: 'dashboard', label: 'DASHBOARD VIEW', icon: '💎' },
+              { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: '🎯' },
+              { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: '🏆' },
+              { id: 'brackets', label: 'BRACKETS & DRAWS', icon: '🌳' },
+              { id: 'audit-log', label: 'AUDIT LOG', icon: '🗂️' },
+            ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); if (isMobile) setMobileSidebarOpen(false); }}
@@ -323,7 +395,34 @@ export default function Dashboard() {
               <div style={{ ...ds.logoBox, background: meta.color, width: 32, height: 32, fontSize: 18 }}>{meta.icon}</div>
               <span style={{ fontWeight: 950, fontSize: 14, letterSpacing: 0.5 }}>ADMIN PANEL</span>
             </div>
-            <div style={{ width: 32 }} />
+            <div ref={notificationsRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setNotificationsOpen(o => !o);
+                  if (unreadCount > 0 && sortedLoginEvents.length > 0) {
+                    localStorage.setItem('lastSeenLoginTimestamp', sortedLoginEvents[0]);
+                    setLastSeenLoginTimestamp(sortedLoginEvents[0]);
+                  }
+                }}
+                style={ds.notificationBtn}
+                aria-label="Open notifications"
+              >
+                🔔
+                {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
+              </button>
+              {notificationsOpen && (
+                <div style={ds.notificationMenu}>
+                  <div style={ds.notificationTitle}>Notification</div>
+                  {notificationItems.map((item) => (
+                    <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
+                      <div style={ds.notificationItemTitle}>{item.title}</div>
+                      <div style={ds.notificationItemDescription}>{item.description}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -335,6 +434,36 @@ export default function Dashboard() {
                 {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
+            </div>
+            <div style={ds.headerActions}>
+              <div ref={notificationsRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotificationsOpen(o => !o);
+                    if (unreadCount > 0 && sortedLoginEvents.length > 0) {
+                      localStorage.setItem('lastSeenLoginTimestamp', sortedLoginEvents[0]);
+                      setLastSeenLoginTimestamp(sortedLoginEvents[0]);
+                    }
+                  }}
+                  style={ds.notificationBtn}
+                  aria-label="Open notifications"
+                >
+                  🔔
+                  {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div style={ds.notificationMenu}>
+                    <div style={ds.notificationTitle}>Notification</div>
+                    {notificationItems.map((item) => (
+                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
+                        <div style={ds.notificationItemTitle}>{item.title}</div>
+                        <div style={ds.notificationItemDescription}>{item.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </header>
         )}
@@ -359,16 +488,122 @@ export default function Dashboard() {
 
               <div className="responsive-grid-3" style={{ marginBottom: isMobile ? 32 : 70 }}>
                 {[
-                  { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: '👥' },
-                  { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: '⏳' },
-                  { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: '🎖️' },
+                  { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: '👥', target: 'confirmed-summary' },
+                  { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: '⏳', target: 'pending-approvals' },
+                  { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: '🎖️', target: 'tournament-setup' },
                 ].map((s) => (
-                  <div key={s.label} style={{ ...ds.statCard, padding: isMobile ? '24px 20px' : '48px 32px', borderRadius: isMobile ? 24 : 40 }} className="mobile-card">
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => { setActiveTab(s.target); if (isMobile) setMobileSidebarOpen(false); }}
+                    style={{ ...ds.statCard, padding: isMobile ? '24px 20px' : '48px 32px', borderRadius: isMobile ? 24 : 40, cursor: 'pointer', textAlign: 'left' }}
+                    className="mobile-card"
+                  >
                     <div style={{ ...ds.cardSymbol, color: s.color, background: `${s.color}15` }}>{s.icon}</div>
                     <div style={{ fontSize: isMobile ? 42 : 64, fontWeight: 950 }}>{s.val}</div>
                     <div style={{ fontSize: isMobile ? 11 : 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 2 }}>{s.label.toUpperCase()}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'confirmed-summary' && (
+            <div style={ds.section}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
+                <div>
+                  <h2 style={ds.sectionTitle}>CONFIRMED PLAYERS SUMMARY</h2>
+                  <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Details by category for registered and approved players.</p>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 18, marginBottom: 30 }}>
+                {approvalSummary.map((summary) => (
+                  <div key={summary.id} style={{ ...ds.summaryCard, padding: 22, borderRadius: 24, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: 1.2 }}>{summary.label.toUpperCase()}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Registrations</div>
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 950, color: 'var(--text)' }}>{summary.total}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 120px', padding: 14, borderRadius: 18, background: 'rgba(16, 185, 129, 0.12)', color: '#0F766E', fontWeight: 800 }}>
+                        Approved
+                        <div style={{ fontSize: 20, fontWeight: 950, marginTop: 6 }}>{summary.approved}</div>
+                      </div>
+                      <div style={{ flex: '1 1 120px', padding: 14, borderRadius: 18, background: 'rgba(239, 68, 68, 0.12)', color: '#B91C1C', fontWeight: 800 }}>
+                        Pending
+                        <div style={{ fontSize: 20, fontWeight: 950, marginTop: 6 }}>{summary.pending}</div>
+                      </div>
+                    </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'pending-approvals' && (
+            <div style={ds.section}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 24 }}>
+                <div>
+                  <h2 style={ds.sectionTitle}>PENDING PLAYER APPROVALS</h2>
+                  <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Only registrations still waiting for approval.</p>
+                </div>
+                <button onClick={() => setActiveTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
+                  ← BACK TO DASHBOARD
+                </button>
+              </div>
+              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={ds.thead}>
+                    <tr>
+                      <th style={{ ...ds.th_header, width: '25%' }}>PARTICIPANT</th>
+                      <th style={{ ...ds.th_header, width: '20%' }}>CATEGORY & YEAR</th>
+                      <th style={{ ...ds.th_header, width: '20%' }}>CONTACT</th>
+                      <th style={{ ...ds.th_header, width: '15%' }}>STATUS</th>
+                      <th style={{ ...ds.th_header, width: '12%' }}>ACTION CENTER</th>
+                      <th style={{ ...ds.th_header, width: '8%' }}>EDIT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingRegistrations.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No pending registrations found.</td></tr>
+                    ) : (
+                      pendingRegistrations.map(r => (
+                        <tr key={r._id} style={ds.tr}>
+                          <td style={ds.td}>
+                            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
+                            <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
+                            <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
+                          </td>
+                          <td style={ds.td}>
+                            <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
+                          </td>
+                          <td style={ds.td}>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                            <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                              📧 <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a>
+                            </div>
+                            {r.nicNo ? <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div> : null}
+                          </td>
+                          <td style={ds.td}>
+                            <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
+                          </td>
+                          <td style={ds.td}>
+                            <div style={{ display: 'flex', gap: 10 }}>
+                              <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                              <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                            </div>
+                          </td>
+                          <td style={ds.td}>
+                            <button onClick={() => setEditRegistrationTarget(r)} style={{ ...ds.actionBtn, background: '#3B82F6', color: '#FFF', width: '100%' }}>EDIT</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -528,12 +763,13 @@ export default function Dashboard() {
                       <th style={{ ...ds.th_header, width: '20%' }}>CATEGORY & YEAR</th>
                       <th style={{ ...ds.th_header, width: '20%' }}>CONTACT</th>
                       <th style={{ ...ds.th_header, width: '15%' }}>STATUS</th>
-                      <th style={{ ...ds.th_header, width: '20%' }}>ACTION CENTER</th>
+                      <th style={{ ...ds.th_header, width: '12%' }}>ACTION CENTER</th>
+                      <th style={{ ...ds.th_header, width: '8%' }}>EDIT</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRegistrations.length === 0 ? (
-                      <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
+                      <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
                       filteredRegistrations
                         .map(r => (
@@ -578,6 +814,9 @@ export default function Dashboard() {
                                 )}
                               </div>
                             </td>
+                            <td style={ds.td}>
+                              <button onClick={() => setEditRegistrationTarget(r)} style={{ ...ds.actionBtn, background: '#3B82F6', color: '#FFF', width: '100%' }}>EDIT</button>
+                            </td>
                           </tr>
                         ))
                     )}
@@ -601,7 +840,8 @@ export default function Dashboard() {
                       <div style={{ ...ds.catBadge, color: 'var(--primary)' }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={ds.tournInfo}>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>{fmtDate(t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>Event: {fmtDate(t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>⏳ <span>Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</span></div>
                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>📍 <span>{t.venue}</span></div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -625,6 +865,16 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+      {editRegistrationTarget && (
+        <RegisterModal
+          tournament={editRegistrationTarget.tournament}
+          initialData={editRegistrationTarget}
+          onClose={() => {
+            setEditRegistrationTarget(null);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -632,12 +882,19 @@ export default function Dashboard() {
 const ds = {
   container: { display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' },
   sidebar: { width: 340, background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0 },
-  sidebarBrand: { height: 110, display: 'flex', alignItems: 'center', px: 32, gap: 16, borderBottom: '1px solid var(--border)', padding: '0 32px' },
-  logoBox: { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
-  profileCard: { padding: '40px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, borderBottom: '1px solid var(--border)' },
-  avatarBox: { position: 'relative', width: 90, height: 90 },
+  sidebarBrand: { minHeight: 100, display: 'flex', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', padding: '0 24px' },
+  //sidebarBrand: { height: 110, display: 'flex', alignItems: 'center', px: 32, gap: 16, borderBottom: '1px solid var(--border)', padding: '0 32px' },
+  // logoBox: { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
+  // profileCard: { padding: '40px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, borderBottom: '1px solid var(--border)' },
+  // avatarBox: { position: 'relative', width: 90, height: 90 },
+  // avatar: { width: '100%', height: '100%', borderRadius: 32, objectFit: 'cover', border: '3px solid var(--border)' },
+  // statusDot: { position: 'absolute', bottom: -5, right: -5, width: 22, height: 22, background: '#10B981', border: '4px solid var(--bg-card)', borderRadius: '50%' },
+  logoBox: { width: 48, height: 48, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 22px rgba(59, 130, 246, 0.18)' },
+  profileCard: { padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', borderRadius: '0 0 24px 24px' },
+  avatarBox: { position: 'relative', width: 84, height: 84 },
   avatar: { width: '100%', height: '100%', borderRadius: 32, objectFit: 'cover', border: '3px solid var(--border)' },
-  statusDot: { position: 'absolute', bottom: -5, right: -5, width: 22, height: 22, background: '#10B981', border: '4px solid var(--bg-card)', borderRadius: '50%' },
+  statusDot: { position: 'absolute', bottom: -6, right: -6, width: 18, height: 18, background: '#10B981', border: '3px solid var(--bg-card)', borderRadius: '50%' },
+  
   pName: { fontSize: 16, fontWeight: 950, letterSpacing: 0.5 },
   pRole: { fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1.5, marginTop: 4 },
   nav: { flex: 1, padding: '32px 0', display: 'flex', flexDirection: 'column', gap: 4 },
@@ -645,9 +902,20 @@ const ds = {
   mainWrapper: { flex: 1, marginLeft: 340 },
   header: { height: 110, background: 'var(--nav-bg)', backdropFilter: 'blur(30px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 60px', position: 'sticky', top: 0, zIndex: 10 },
   greetBox: { display: 'flex', flexDirection: 'column', gap: 4 },
+  headerActions: { display: 'flex', alignItems: 'center', gap: 18 },
   domainBadge: { padding: '10px 24px', borderRadius: 40, fontSize: 11, fontWeight: 900, border: '1px solid' },
   themeBtn: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px', borderRadius: '14px', fontSize: 12, fontWeight: 900, cursor: 'pointer' },
   logoutBtn: { color: '#EF4444', fontWeight: 950, border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, letterSpacing: 1 },
+  notificationBtn: { position: 'relative', border: 'none', background: 'var(--bg-input)', color: 'var(--text)', width: 48, height: 48, borderRadius: 16, fontSize: 18, cursor: 'pointer', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'grid', placeItems: 'center' },
+  notificationBadge: { position: 'absolute', top: 8, right: 8, minWidth: 18, height: 18, borderRadius: 999, background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' },
+  notificationMenu: { position: 'absolute', right: 0, top: 'calc(100% + 12px)', width: 320, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, boxShadow: '0 30px 70px rgba(0,0,0,0.12)', padding: 16, zIndex: 1000 },
+  notificationTitle: { fontSize: 14, fontWeight: 900, color: 'var(--text)', marginBottom: 8 },
+  notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: 14, borderRadius: 16, cursor: 'pointer', transition: 'background 0.2s', color: 'var(--text)', display: 'grid', gap: 8, marginBottom: 6 },
+  notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 0 },
+  notificationItemDescription: { fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 },
+  notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: 14, borderRadius: 18, cursor: 'pointer', transition: 'background 0.2s', color: 'var(--text)' },
+  notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 4 },
+  notificationItemDescription: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 },
   title: { fontSize: 56, fontWeight: 950, marginBottom: 8, letterSpacing: -2, textTransform: 'uppercase' },
   subtitle: { color: 'var(--text-muted)', marginBottom: 60, fontSize: 18, fontWeight: 500 },
   statCard: { background: 'var(--bg-card)', padding: '48px 32px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', position: 'relative' },

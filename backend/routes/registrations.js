@@ -124,6 +124,168 @@ router.patch('/:id/status', protect, async (req, res) => {
   }
 });
 
+// Admin — update registration details
+router.put('/:id', protect, async (req, res) => {
+  const {
+    playerName, nicNo, address, email, phone,
+    rollNumber, department, partnerName, partnerRollNumber,
+  } = req.body;
+
+  const normalize = (value = '') => String(value).trim();
+  const cleanedRoll = normalize(rollNumber).toUpperCase();
+  const cleanedPartnerRoll = normalize(partnerRollNumber).toUpperCase();
+  const cleanedName = normalize(playerName);
+  const cleanedPartnerName = normalize(partnerName);
+  const cleanedNic = normalize(nicNo).replace(/V/g, 'v');
+  const cleanedAddress = normalize(address);
+  const cleanedEmail = normalize(email);
+  const cleanedPhone = normalize(phone);
+
+  if (!cleanedName || !cleanedNic || !cleanedAddress || !cleanedEmail || !cleanedPhone || !cleanedRoll || !department)
+    return res.status(400).json({ message: 'All required fields must be filled' });
+
+  const REG_NO_REGEX = /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/;
+  const OLD_NIC_REGEX = /^9\d{8}v$/;
+  const NEW_NIC_REGEX = /^20\d{10}$/;
+  const PHONE_REGEX = /^07\d{8}$/;
+  const NAME_REGEX = /^(?!.* {2})[A-Za-z.]+(?: [A-Za-z.]+)*$/;
+  const ADDRESS_REGEX = /^(?!.* {2})[A-Za-z0-9.,/ \-]+$/;
+  const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+
+  if (!NAME_REGEX.test(cleanedName)) return res.status(400).json({ message: 'Full name must contain only letters, dots and single spaces.' });
+  if (!REG_NO_REGEX.test(cleanedRoll)) return res.status(400).json({ message: 'Registration number must match 20XX/XX/XXX or 20XX/XXX/XXX format.' });
+  if (!OLD_NIC_REGEX.test(cleanedNic) && !NEW_NIC_REGEX.test(cleanedNic)) return res.status(400).json({ message: 'NIC must be old format 991234567v or new format 200012345678.' });
+  if (!ADDRESS_REGEX.test(cleanedAddress)) return res.status(400).json({ message: 'Address contains invalid characters.' });
+  if (!EMAIL_REGEX.test(cleanedEmail)) return res.status(400).json({ message: 'Email must be valid.' });
+  if (!PHONE_REGEX.test(cleanedPhone)) return res.status(400).json({ message: 'Phone must begin with 07 and be 10 digits.' });
+
+  if (cleanedPartnerName || cleanedPartnerRoll) {
+    if (!cleanedPartnerName) return res.status(400).json({ message: 'Partner name is required.' });
+    if (!cleanedPartnerRoll) return res.status(400).json({ message: 'Partner registration number is required.' });
+    if (!NAME_REGEX.test(cleanedPartnerName)) return res.status(400).json({ message: 'Partner name must contain only letters, dots and single spaces.' });
+    if (!REG_NO_REGEX.test(cleanedPartnerRoll)) return res.status(400).json({ message: 'Partner registration number must match 20XX/XX/XXX or 20XX/XXX/XXX format.' });
+    if (cleanedPartnerRoll === cleanedRoll) return res.status(400).json({ message: 'Partner registration number must be different from yours.' });
+  }
+
+  try {
+    const { Tournament, Registration, Player } = getModelsForSport(req.admin.sport);
+    const reg = await Registration.findById(req.params.id).populate('tournament');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
+      return res.status(401).json({ message: 'Unauthorized' });
+
+    // Check duplicates excluding this registration
+    const duplicateChecks = [
+      { rollNumber: cleanedRoll },
+      { partnerRollNumber: cleanedRoll },
+    ];
+
+    if (cleanedPartnerRoll) {
+      duplicateChecks.push(
+        { rollNumber: cleanedPartnerRoll },
+        { partnerRollNumber: cleanedPartnerRoll }
+      );
+    }
+
+    const duplicate = await Registration.findOne({
+      _id: { $ne: reg._id },
+      tournament: reg.tournament._id,
+      $or: duplicateChecks
+    });
+
+    if (duplicate) {
+      const duplicateRoll = [cleanedRoll, cleanedPartnerRoll].find((candidate) =>
+        candidate && (duplicate.rollNumber === candidate || duplicate.partnerRollNumber === candidate)
+      );
+      if (duplicateRoll) {
+        const isPartnerDuplicate = duplicateRoll === cleanedPartnerRoll;
+        const message = isPartnerDuplicate
+          ? `This partner registration number is already registered for this tournament: ${duplicateRoll}`
+          : `This registration number is already registered for this tournament: ${duplicateRoll}`;
+        return res.status(400).json({ message });
+      }
+      return res.status(400).json({ message: 'Duplicate registration: one of these registration numbers is already enrolled in this tournament.' });
+    }
+
+    const nicExists = await Registration.findOne({
+      _id: { $ne: reg._id },
+      tournament: reg.tournament._id,
+      nicNo: cleanedNic
+    });
+    if (nicExists) return res.status(400).json({ message: `Duplicate registration: NIC ${cleanedNic} is already registered.` });
+
+    const oldRollNumber = reg.rollNumber;
+    const oldPartnerRollNumber = reg.partnerRollNumber;
+
+    // Save changes
+    reg.playerName = cleanedName;
+    reg.nicNo = cleanedNic;
+    reg.address = cleanedAddress;
+    reg.email = cleanedEmail;
+    reg.phone = cleanedPhone;
+    reg.rollNumber = cleanedRoll;
+    reg.department = department;
+    reg.partnerName = cleanedPartnerName || '';
+    reg.partnerRollNumber = cleanedPartnerRoll || '';
+
+    await reg.save();
+
+    // If confirmed, update/sync central Player table
+    if (reg.status === 'confirmed') {
+      if (oldRollNumber !== cleanedRoll) {
+        await Player.findOneAndUpdate(
+          { rollNumber: oldRollNumber },
+          { $pull: { tournamentHistory: reg.tournament._id } }
+        );
+        const oldP = await Player.findOne({ rollNumber: oldRollNumber });
+        if (oldP && oldP.tournamentHistory.length === 0) {
+          await Player.deleteOne({ rollNumber: oldRollNumber });
+        }
+      }
+
+      await Player.findOneAndUpdate(
+        { rollNumber: cleanedRoll },
+        {
+          name: cleanedName,
+          nicNo: cleanedNic,
+          email: cleanedEmail,
+          phone: cleanedPhone,
+          department: department,
+          $addToSet: { tournamentHistory: reg.tournament._id }
+        },
+        { upsert: true, new: true }
+      );
+
+      if (oldPartnerRollNumber && oldPartnerRollNumber !== cleanedPartnerRoll) {
+        await Player.findOneAndUpdate(
+          { rollNumber: oldPartnerRollNumber },
+          { $pull: { tournamentHistory: reg.tournament._id } }
+        );
+        const oldPt = await Player.findOne({ rollNumber: oldPartnerRollNumber });
+        if (oldPt && oldPt.tournamentHistory.length === 0) {
+          await Player.deleteOne({ rollNumber: oldPartnerRollNumber });
+        }
+      }
+
+      if (cleanedPartnerRoll) {
+        await Player.findOneAndUpdate(
+          { rollNumber: cleanedPartnerRoll },
+          {
+            name: cleanedPartnerName,
+            $addToSet: { tournamentHistory: reg.tournament._id }
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
+    res.json(reg);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Admin — view registrations for a tournament
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
@@ -195,6 +357,9 @@ router.post('/', async (req, res) => {
 
     if (!targetSport) return res.status(404).json({ message: 'Tournament not found' });
     if (tournamentDoc.isLocked) return res.status(400).json({ message: 'Registrations are closed for this tournament.' });
+    if (tournamentDoc.registrationDeadline && new Date() > new Date(tournamentDoc.registrationDeadline)) {
+      return res.status(400).json({ message: 'Registration deadline has passed for this tournament.' });
+    }
 
     const { Registration } = getModelsForSport(targetSport);
 

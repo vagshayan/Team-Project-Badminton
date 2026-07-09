@@ -5,8 +5,24 @@ require('dotenv').config();
 
 const app = express();
 
-app.use(cors());
+const { securitySanitizer, securityHeaders } = require('./middleware/security');
+
+// Apply security headers globally
+app.use(securityHeaders);
+
+// Restrict CORS options
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
+
 app.use(express.json());
+
+// Apply XSS and NoSQL injection sanitizer
+app.use(securitySanitizer);
 
 // Welcome route
 app.get('/', (req, res) => {
@@ -53,8 +69,38 @@ mongoose
   .connect(MONGODB_URI, {
     serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
   })
-  .then(() => {
+  .then(async () => {
     console.log('✅ MongoDB connected successfully');
+
+    // Run database migration to default registrationDeadline of existing tournaments to their event date
+    try {
+      const { getModelsForSport } = require('./models/SportModels');
+      const sports = ['badminton', 'table-tennis', 'carrom'];
+      for (const sport of sports) {
+        const { Tournament } = getModelsForSport(sport);
+        const docs = await Tournament.find({ registrationDeadline: { $exists: false } });
+        for (const doc of docs) {
+          doc.registrationDeadline = doc.date;
+          await doc.save();
+        }
+        if (docs.length > 0) {
+          console.log(`📡 Migrated ${docs.length} ${sport} tournaments`);
+        }
+      }
+
+      const StandaloneTournament = require('./models/Tournament');
+      const standaloneDocs = await StandaloneTournament.find({ registrationDeadline: { $exists: false } });
+      for (const doc of standaloneDocs) {
+        doc.registrationDeadline = doc.date;
+        await doc.save();
+      }
+      if (standaloneDocs.length > 0) {
+        console.log(`📡 Migrated ${standaloneDocs.length} standalone tournaments`);
+      }
+    } catch (migrationErr) {
+      console.error('❌ Database migration error:', migrationErr.message);
+    }
+
     app.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`);
     });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -16,6 +16,11 @@ const SPORT_META = {
 };
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDeadline = (d, fallback) => {
+  const target = d || fallback;
+  if (!target) return 'N/A';
+  return new Date(target).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 const CARD_HEIGHT = 96;
 const GAP = 28;
@@ -37,6 +42,7 @@ export default function StudentTournamentPage({ sport }) {
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
   const [menuOpen, setMenuOpen] = useState(false);
+  const pollingRef = useRef(null);
   const navigate = useNavigate();
   const { isDarkMode, toggleTheme } = useTheme();
 
@@ -49,6 +55,19 @@ export default function StudentTournamentPage({ sport }) {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [sport]);
+
+  const fetchBracketMatches = async (t) => {
+    try {
+      const res = await axios.get(`/api/tournaments/public/${t._id}/matches?sport=${sport}`);
+      setMatches(res.data);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        // Silently ignore 404 during polling — bracket may have been unpublished
+      } else {
+        console.error(err);
+      }
+    }
+  };
 
   const loadBrackets = async (t) => {
     setViewBracketsFor(t);
@@ -65,6 +84,26 @@ export default function StudentTournamentPage({ sport }) {
       }
     } finally { setBracketLoading(false); }
   };
+
+  // FR-5.3 — Auto-refresh bracket every 10 seconds while the modal is open
+  useEffect(() => {
+    if (!viewBracketsFor) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+    pollingRef.current = setInterval(() => {
+      fetchBracketMatches(viewBracketsFor);
+    }, 10000);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [viewBracketsFor]);
 
   // Group raw matches by round
   const roundsMap = {};
@@ -276,32 +315,42 @@ export default function StudentTournamentPage({ sport }) {
             </div>
           ) : (
             <div className="responsive-grid-auto">
-              {tournaments.map(t => (
-                <div key={t._id} style={sh.card} className="mobile-card">
-                  <div style={sh.cardHeader}>
-                    <div style={{ fontSize: 44, fontWeight: 950, color: meta.color }}>{t.year}</div>
-                    <div style={{ ...sh.catBadge, border: `1px solid ${meta.color}40`, color: meta.color }}>{CAT_LABELS[t.category]}</div>
-                  </div>
-                  <div style={sh.cardBody}>
-                    <div style={sh.infoLine}>🗓️ {fmtDate(t.date)}</div>
-                    <div style={sh.infoLine}>🕐 {t.time}</div>
-                    <div style={sh.infoLine}>📍 {t.venue}</div>
-                  </div>
-                  {t.isPublished ? (
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
-                      <button onClick={() => loadBrackets(t)} style={{ ...sh.regBtn, background: meta.color, flex: 2 }}>VIEW BRACKETS</button>
+              {tournaments.map(t => {
+                const deadlineVal = t.registrationDeadline || t.date;
+                const isDeadlinePassed = deadlineVal && new Date() > new Date(deadlineVal);
+                return (
+                  <div key={t._id} style={sh.card} className="mobile-card">
+                    <div style={sh.cardHeader}>
+                      <div style={{ fontSize: 44, fontWeight: 950, color: meta.color }}>{t.year}</div>
+                      <div style={{ ...sh.catBadge, border: `1px solid ${meta.color}40`, color: meta.color }}>{CAT_LABELS[t.category]}</div>
                     </div>
-                  ) : t.isLocked ? (
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
-                      <button style={{ ...sh.regBtn, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)', cursor: 'default', flex: 2 }}>BRACKET PENDING...</button>
+                    <div style={sh.cardBody}>
+                      <div style={sh.infoLine}>🗓️ Event: {fmtDate(t.date)}</div>
+                      <div style={sh.infoLine}>⏳ Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</div>
+                      <div style={sh.infoLine}>🕐 {t.time}</div>
+                      <div style={sh.infoLine}>📍 {t.venue}</div>
                     </div>
-                  ) : (
-                    <button onClick={() => setRegisterFor(t)} style={{ ...sh.regBtn, background: meta.color }}>REGISTER TO COMPETE</button>
-                  )}
-                </div>
-              ))}
+                    {t.isPublished ? (
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
+                        <button onClick={() => loadBrackets(t)} style={{ ...sh.regBtn, background: meta.color, flex: 2 }}>VIEW BRACKETS</button>
+                      </div>
+                    ) : t.isLocked ? (
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
+                        <button style={{ ...sh.regBtn, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)', cursor: 'default', flex: 2 }}>BRACKET PENDING...</button>
+                      </div>
+                    ) : isDeadlinePassed ? (
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button style={{ ...sh.regBtn, background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'not-allowed', flex: 1 }}>CLOSED</button>
+                        <button style={{ ...sh.regBtn, background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'default', flex: 2 }}>DEADLINE PASSED</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setRegisterFor(t)} style={{ ...sh.regBtn, background: meta.color }}>REGISTER TO COMPETE</button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -320,7 +369,13 @@ export default function StudentTournamentPage({ sport }) {
         <div style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
           <div style={bh.card}>
             <div style={bh.header}>
-              <h2 style={{ margin: 0 }}>{viewBracketsFor.year} {CAT_LABELS[viewBracketsFor.category]} BRACKET</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0 }}>{viewBracketsFor.year} {CAT_LABELS[viewBracketsFor.category]} BRACKET</h2>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#10B981', background: '#10B98115', border: '1px solid #10B98130', padding: '3px 10px', borderRadius: 20 }}>
+                  <span className="live-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+                  LIVE · updates every 10s
+                </span>
+              </div>
               <button onClick={() => setViewBracketsFor(null)} style={bh.close}>✕</button>
             </div>
             {bracketLoading ? <div style={{ padding: 100, textAlign: 'center' }}>Loading bracket...</div> : (

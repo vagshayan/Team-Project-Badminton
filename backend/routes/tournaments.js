@@ -4,6 +4,7 @@ const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const Match = require('../models/Match');
 const { protect } = require('../middleware/auth');
+const { logAdminAction } = require('../utils/auditLogger');
 
 const SINGLES = ['singles-men', 'singles-women'];
 
@@ -213,17 +214,32 @@ router.get('/admin', protect, async (req, res) => {
 
 // ─── CREATE ───────────────────────────────────────────────
 router.post('/', protect, async (req, res) => {
-  const { year, date, time, venue, category } = req.body;
+  const { year, date, time, venue, category, registrationDeadline } = req.body;
+  if (!registrationDeadline) return res.status(400).json({ message: 'Registration deadline is required' });
   const currentYear = new Date().getFullYear();
   if (year < currentYear) return res.status(400).json({ message: 'Year cannot be in the past' });
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (new Date(date) < today) return res.status(400).json({ message: 'Date cannot be in the past' });
+  
+  const deadlineDate = new Date(registrationDeadline);
+  if (deadlineDate < today) return res.status(400).json({ message: 'Registration deadline cannot be in the past' });
+  if (deadlineDate > new Date(date)) return res.status(400).json({ message: 'Registration deadline cannot be after the tournament date' });
+
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
     const existing = await Tournament.findOne({ sport: req.admin.sport, year, category, createdBy: req.admin._id });
     if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
     const tournament = await Tournament.create({
-      sport: req.admin.sport, year, date, time, venue, category, createdBy: req.admin._id,
+      sport: req.admin.sport, year, date, time, venue, category, registrationDeadline: deadlineDate, createdBy: req.admin._id,
+    });
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'CREATE_TOURNAMENT',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { sport: req.admin.sport, year, category, date, venue },
+      req
     });
     res.status(201).json(tournament);
   } catch (err) {
@@ -233,7 +249,7 @@ router.post('/', protect, async (req, res) => {
 
 // ─── UPDATE — password required ──────────────────────────
 router.put('/:id', protect, async (req, res) => {
-  const { password, year, date, time, venue, category } = req.body;
+  const { password, year, date, time, venue, category, registrationDeadline } = req.body;
   if (!password) return res.status(400).json({ message: 'Password is required to update' });
   try {
     const admin = await Admin.findById(req.admin._id);
@@ -243,15 +259,33 @@ router.put('/:id', protect, async (req, res) => {
     if (year < currentYear) return res.status(400).json({ message: 'Year cannot be in the past' });
     const today = new Date(); today.setHours(0, 0, 0, 0);
     if (new Date(date) < today) return res.status(400).json({ message: 'Date cannot be in the past' });
+
+    if (registrationDeadline && new Date(registrationDeadline) > new Date(date)) {
+      return res.status(400).json({ message: 'Registration deadline cannot be after the tournament date' });
+    }
+
     const { Tournament } = getModelsForSport(req.admin.sport);
     const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category, createdBy: req.admin._id });
     if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
+
+    const updateFields = { year, date, time, venue, category };
+    if (registrationDeadline) updateFields.registrationDeadline = new Date(registrationDeadline);
+
     const tournament = await Tournament.findOneAndUpdate(
       { _id: req.params.id, createdBy: req.admin._id },
-      { year, date, time, venue, category },
+      updateFields,
       { new: true }
     );
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'UPDATE_TOURNAMENT',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { updatedFields },
+      req
+    });
     res.json(tournament);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -272,6 +306,15 @@ router.delete('/:id/reset-draw', protect, async (req, res) => {
     tournament.winner = null;
     await tournament.save();
     await Match.deleteMany({ tournament: req.params.id });
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'RESET_DRAW',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { category: tournament.category, year: tournament.year },
+      req
+    });
     res.json({ message: 'Draw reset successfully. You can now regenerate.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -291,6 +334,15 @@ router.delete('/:id/force-unlock', protect, async (req, res) => {
     tournament.winner = null;
     await tournament.save();
     await Match.deleteMany({ tournament: req.params.id });
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'FORCE_UNLOCK_DRAW',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { category: tournament.category, year: tournament.year },
+      req
+    });
     res.json({ message: 'Tournament force-unlocked for testing. Draw, lock, and publish status all reset.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -309,7 +361,16 @@ router.delete('/:id', protect, async (req, res) => {
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
     await Registration.updateMany({ tournament: req.params.id }, { status: 'cancelled' });
     await Match.deleteMany({ tournament: req.params.id });
-     await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id });
+    await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id });
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'DELETE_TOURNAMENT',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { category: tournament.category, year: tournament.year },
+      req
+    });
     res.json({ message: 'Tournament deleted successfully. All registrations have been cancelled.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -425,6 +486,23 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
       }
     }
 
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'GENERATE_DRAW',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { 
+        category: tournament.category, 
+        year: tournament.year, 
+        confirmedPlayersCount: confirmedRegs.length, 
+        bracketSize,
+        championId: req.body.championId || null,
+        runnerUpId: req.body.runnerUpId || null
+      },
+      req
+    });
+
     res.json({ message: 'Draws generated successfully', rounds: matchesByRound.length });
   } catch (err) {
     console.error(err);
@@ -445,6 +523,15 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
     if (tournament.isPublished) return res.status(400).json({ message: 'Draw already published' });
     tournament.isPublished = true;
     await tournament.save();
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'PUBLISH_DRAW',
+      targetId: tournament._id,
+      targetModel: 'Tournament',
+      details: { category: tournament.category, year: tournament.year },
+      req
+    });
     res.json({ message: 'Draw published! Students can now see the bracket.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -503,6 +590,23 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
       const { Tournament } = getModelsForSport(req.admin.sport);
       await Tournament.findByIdAndUpdate(match.tournament, { winner: match.winner });
     }
+
+    // Log Audit action
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'UPDATE_MATCH_SCORE',
+      targetId: match._id,
+      targetModel: 'Match',
+      details: { 
+        tournamentId: match.tournament,
+        round: match.round, 
+        matchNumber: match.matchNumber, 
+        winnerId,
+        player1: match.player1,
+        player2: match.player2
+      },
+      req
+    });
 
     res.json({ message: 'Result updated', match });
   } catch (err) {
