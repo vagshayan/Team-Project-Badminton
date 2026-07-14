@@ -4,21 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import axios from 'axios';
 
-const EyeIcon = (props) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
 
-const EyeOffIcon = (props) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 3l18 18" />
-    <path d="M10.6 10.6A3 3 0 0 0 13.4 13.4" />
-    <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a14.64 14.64 0 0 1-2.56 3.36" />
-    <path d="M6.61 6.61A14.92 14.92 0 0 0 2 12s3.5 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-  </svg>
-);
 
 const SparklesIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -226,11 +212,11 @@ export default function RegisterPage() {
                    <label style={sh.label}>PASSWORD</label>
                    <div style={sh.passwordInputWrapper}>
                      <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} onFocus={handlePasswordFocus} onBlur={handlePasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 72 }} required />
-                     <button type="button" title="Suggest strong password" onClick={generateStrongPassword} style={sh.suggestPasswordBtn} aria-label="Suggest strong password">
+                     <button type="button" title="Generate strong password" onClick={generateStrongPassword} style={sh.suggestPasswordBtn} aria-label="Generate strong password">
                        <SparklesIcon style={sh.suggestPasswordIcon} />
                      </button>
                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? <EyeOffIcon style={sh.passwordIcon} /> : <EyeIcon style={sh.passwordIcon} />}
+                       {showPassword ? '👁️' : '🔒'}
                      </button>
                    </div>
                    {showPasswordRequirements && (
@@ -263,7 +249,7 @@ export default function RegisterPage() {
                    <div style={sh.passwordInputWrapper}>
                      <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} required />
                      <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? <EyeOffIcon style={sh.passwordIcon} /> : <EyeIcon style={sh.passwordIcon} />}
+                       {showConfirmPassword ? '👁️' : '🔒'}
                      </button>
                    </div>
                    {showPasswordMatchMessage && (
@@ -329,10 +315,9 @@ const sh = {
   footerLinkWrap: { textAlign: 'center', marginTop: 32, fontSize: 14, color: 'var(--text-muted)' },
   footerLink: { color: 'var(--primary)', fontWeight: 800, textDecoration: 'none', marginLeft: 5 },
   passwordInputWrapper: { position: 'relative' },
-  passwordToggleBtn: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  suggestPasswordBtn: { position: 'absolute', right: 38, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  passwordToggleBtn: { position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  suggestPasswordBtn: { position: 'absolute', right: 45, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   suggestPasswordIcon: { width: 14, height: 14 },
-  passwordIcon: { width: 18, height: 18 },
   passwordReqBox: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' },
   requirement: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: 600, transition: 'color 0.2s ease' },
   reqIcon: { fontSize: '14px', fontWeight: 900, minWidth: '18px', textAlign: 'center' },
