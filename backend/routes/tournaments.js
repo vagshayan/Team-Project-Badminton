@@ -336,6 +336,7 @@ router.get('/:id/matches', protect, async (req, res) => {
 });
 
 // ─── GENERATE DRAWS ───────────────────────────────────────
+/*
 router.post('/:id/generate-draws', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -345,16 +346,7 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
     const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
     if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
-    /*
-     const n = confirmedRegs.length;
-     const bracketSize = nextPowerOf2(n);
-         // Expand bracket if seeds need bye slots but bracket is already full
-     if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
-       const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
-       if (bracketSize === n) bracketSize = bracketSize * 2;
-     }
-     const rounds = Math.log2(bracketSize);
-     */
+    
     const n = confirmedRegs.length;
     let bracketSize = nextPowerOf2(n);
     const rounds = Math.log2(bracketSize);
@@ -418,6 +410,156 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
         match.isCompleted = true;
         match.score1 = 0;
         match.score2 = 1;
+        await match.save();
+        await advanceWinner(match);
+      } else {
+        await match.save();
+      }
+    }
+
+    res.json({ message: 'Draws generated successfully', rounds: matchesByRound.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+});*/
+// ─── GENERATE DRAWS ───────────────────────────────────────
+// ─── GENERATE DRAWS ───────────────────────────────────────
+router.post('/:id/generate-draws', protect, async (req, res) => {
+  try {
+    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    if (tournament.isLocked) return res.status(400).json({ message: 'Draws already generated' });
+
+    const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
+    if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
+
+    const n = confirmedRegs.length;
+    let bracketSize, rounds, orderedPlayers;
+
+    if (!SINGLES.includes(tournament.category)) {
+      // ── DOUBLES / MIXED: only use approved pairs ──
+      const approvedRegs = confirmedRegs.filter(r => r.pairStatus === 'approved');
+
+      if (approvedRegs.length < 2) {
+        return res.status(400).json({
+          message: 'At least 2 players in approved pairs required. Make sure pairs are approved before generating draw.'
+        });
+      }
+
+      const used = new Set();
+      const pairs = [];
+
+      // Pass 1 — group by pairId
+      approvedRegs.forEach(r => {
+        if (r.pairId && !used.has(r._id.toString())) {
+          const partner = approvedRegs.find(
+            p => p.pairId?.toString() === r.pairId.toString()
+                 && p._id.toString() !== r._id.toString()
+          );
+          if (partner) {
+            const rep = r.createdAt <= partner.createdAt ? r : partner;
+            pairs.push(rep);
+            used.add(r._id.toString());
+            used.add(partner._id.toString());
+          }
+        }
+      });
+
+      // Pass 2 — group by partnerRollNumber
+      approvedRegs.forEach(r => {
+        if (used.has(r._id.toString())) return;
+        if (r.partnerRollNumber && r.partnerRollNumber.trim()) {
+          const partner = approvedRegs.find(
+            p => p.rollNumber === r.partnerRollNumber.trim()
+                 && !used.has(p._id.toString())
+          );
+          if (partner) {
+            pairs.push(r);
+            used.add(r._id.toString());
+            used.add(partner._id.toString());
+          }
+        }
+      });
+
+      // ── NO Pass 3 — solo players excluded from doubles draw ──
+
+      if (pairs.length < 2) {
+        return res.status(400).json({
+          message: `Only ${pairs.length} approved pair(s) found. Need at least 2 pairs to generate draw.`
+        });
+      }
+      
+      // ── DEBUG — remove after testing ──
+      console.log('DEBUG pairs count:', pairs.length);
+      console.log('DEBUG pairs:', pairs.map(p => `${p.playerName} & ${p.partnerName}`));
+      console.log('DEBUG bracketSize:', nextPowerOf2(pairs.length));
+      // ── END DEBUG ──
+
+      bracketSize    = nextPowerOf2(pairs.length);
+      rounds         = Math.log2(bracketSize);
+      orderedPlayers = shuffle(pairs);
+
+    } else {
+      // ── SINGLES: seeded/random logic unchanged ──
+      bracketSize    = nextPowerOf2(n);
+      rounds         = Math.log2(bracketSize);
+      const { championId, runnerUpId } = req.body;
+      orderedPlayers = buildSeededOrder(confirmedRegs, championId, runnerUpId, bracketSize);
+    }
+
+    await Match.deleteMany({ tournament: req.params.id });
+    tournament.isLocked = true;
+    await tournament.save();
+
+    const matchesByRound = [];
+    for (let round = 1; round <= rounds; round++) {
+      const matchCount = bracketSize / Math.pow(2, round);
+      const roundMatches = [];
+      for (let m = 0; m < matchCount; m++) {
+        const match = new Match({
+          tournament: tournament._id,
+          round,
+          matchNumber: m + 1,
+        });
+        roundMatches.push(match);
+      }
+      matchesByRound.push(roundMatches);
+    }
+
+    for (let round = 0; round < matchesByRound.length - 1; round++) {
+      const currentRoundMatches = matchesByRound[round];
+      const nextRoundMatches    = matchesByRound[round + 1];
+      currentRoundMatches.forEach((match, idx) => {
+        const nextMatch = nextRoundMatches[Math.floor(idx / 2)];
+        match.nextMatchId         = nextMatch._id;
+        match.positionInNextMatch = (idx % 2) === 0 ? 1 : 2;
+      });
+    }
+
+    await Promise.all(matchesByRound.flat().map(match => match.save()));
+
+    const round1Matches = matchesByRound[0];
+    for (let i = 0; i < bracketSize / 2; i++) {
+      const p1    = orderedPlayers[i * 2];
+      const p2    = orderedPlayers[i * 2 + 1];
+      const match = round1Matches[i];
+      match.player1 = p1 ? p1._id : null;
+      match.player2 = p2 ? p2._id : null;
+
+      if (p1 && !p2) {
+        match.winner      = p1._id;
+        match.isCompleted = true;
+        match.score1      = 1;
+        match.score2      = 0;
+        await match.save();
+        await advanceWinner(match);
+      } else if (!p1 && p2) {
+        match.winner      = p2._id;
+        match.isCompleted = true;
+        match.score1      = 0;
+        match.score2      = 1;
         await match.save();
         await advanceWinner(match);
       } else {
