@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -32,6 +32,98 @@ const fmtDeadline = (d, fallback) => {
   const target = d || fallback;
   if (!target) return 'N/A';
   return new Date(target).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const AUDIT_ACTION_LABELS = {
+  CREATE_TOURNAMENT: 'Created Tournament',
+  UPDATE_TOURNAMENT: 'Updated Tournament',
+  DELETE_TOURNAMENT: 'Deleted Tournament',
+  RESET_DRAW: 'Reset Draw',
+  FORCE_UNLOCK_DRAW: 'Force Unlock Draw',
+  GENERATE_DRAW: 'Generated Draw',
+  PUBLISH_DRAW: 'Published Draw',
+  UPDATE_MATCH_SCORE: 'Updated Match Result',
+  APPROVE_PAIR: 'Approved Pair',
+  RESET_PAIR: 'Reset Pair',
+  LINK_PARTNER: 'Linked Partner',
+  REJECT_REGISTRATION: 'Rejected Registration',
+  CONFIRMED_REGISTRATION: 'Confirmed Registration',
+  PENDING_REGISTRATION: 'Pending Registration',
+  CANCELLED_REGISTRATION: 'Cancelled Registration',
+  UPDATED_REGISTRATION: 'Updated Player',
+};
+
+const AUDIT_MODULE_LABELS = {
+  Registration: 'Registrations',
+  Tournament: 'Tournaments',
+  Match: 'Matches',
+  Admin: 'Admins',
+};
+
+const formatAuditAction = (action) => AUDIT_ACTION_LABELS[action] || action || 'Unknown Action';
+
+const formatAuditModule = (log) => AUDIT_MODULE_LABELS[log.targetModel] || log.targetModel || 'Unknown';
+
+const formatAuditDetails = (log) => {
+  if (!log?.details) return '—';
+  const details = log.details;
+  if (typeof details === 'string') return details;
+
+  const lbl = (category) => CAT_LABELS[category] || category;
+
+  switch (log.action) {
+    case 'CREATE_TOURNAMENT':
+      return `Created tournament ${lbl(details.category)} ${details.year}`;
+    case 'UPDATE_TOURNAMENT': {
+      const fields = details.updatedFields || details.after;
+      if (fields && Object.keys(fields).length > 0) {
+        const updated = Object.keys(fields).map((key) => {
+          const value = fields[key];
+          if (key === 'category') return `Category to ${lbl(value)}`;
+          if (key === 'year') return `Year to ${value}`;
+          if (key === 'date') return `Date to ${new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+          if (key === 'registrationDeadline') return `Registration deadline to ${new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+          return `${key} to ${value}`;
+        }).join(', ');
+        return `Updated tournament — ${updated}`;
+      }
+      return 'Updated tournament details';
+    }
+    case 'DELETE_TOURNAMENT':
+      return `Deleted tournament ${lbl(details.category)} ${details.year}`;
+    case 'RESET_DRAW':
+      return `Reset draw for ${lbl(details.category)}`;
+    case 'FORCE_UNLOCK_DRAW':
+      return `Force unlocked draw for ${lbl(details.category)}`;
+    case 'GENERATE_DRAW':
+      return `Generated draw for ${lbl(details.category)} with ${details.confirmedPlayersCount} confirmed players`;
+    case 'PUBLISH_DRAW':
+      return `Published draw for ${lbl(details.category)}`;
+    case 'UPDATE_MATCH_SCORE':
+      return `Updated result for round ${details.round}, match ${details.matchNumber}`;
+    case 'APPROVE_PAIR':
+      return `Approved partner pair ${details.partnerRollNumber || ''}`;
+    case 'RESET_PAIR':
+      return `Reset approved pair for ${details.partnerRollNumber || 'player'}`;
+    case 'LINK_PARTNER':
+      return `Linked partner ${details.partnerRollNumber || details.partnerId || ''}`;
+    case 'REJECT_REGISTRATION':
+      return `Rejected registration ${details.rollNumber}`;
+    case 'CONFIRMED_REGISTRATION':
+      return `Confirmed registration ${details.rollNumber}`;
+    case 'PENDING_REGISTRATION':
+      return `Marked registration ${details.rollNumber} as pending`;
+    case 'CANCELLED_REGISTRATION':
+      return `Cancelled registration ${details.rollNumber}`;
+    case 'UPDATED_REGISTRATION':
+      if (details.updatedFields && Object.keys(details.updatedFields).length > 0) {
+        const fields = Object.keys(details.updatedFields).map((key) => key.replace(/([A-Z])/g, ' $1')).join(', ');
+        return `Updated player ${details.rollNumber} (${fields})`;
+      }
+      return `Updated player ${details.rollNumber}`;
+    default:
+      return JSON.stringify(details, null, 0);
+  }
 };
 
 const FILTER_CATEGORIES = [
@@ -104,19 +196,37 @@ export default function Dashboard() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
   const [editRegistrationTarget, setEditRegistrationTarget] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverCategory, setHoverCategory] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileName, setProfileName] = useState(admin?.name || '');
+  const [profileUsername, setProfileUsername] = useState(admin?.username || '');
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState(admin?.avatarUrl || '');
+  const [profileMessage, setProfileMessage] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [lastSeenLoginTimestamp, setLastSeenLoginTimestamp] = useState(localStorage.getItem('lastSeenLoginTimestamp') || '');
   // Audit Log states
   const [auditLogs, setAuditLogs] = useState([]);
-  const [auditSearch, setAuditSearch] = useState('');
-  const [auditFrom, setAuditFrom] = useState('');
-  const [auditTo, setAuditTo] = useState('');
+  const [auditDate, setAuditDate] = useState('');
   const filterRef = useRef(null);
   const notificationsRef = useRef(null);
+  const sidebarProfileMenuRef = useRef(null);
+  const headerProfileMenuRef = useRef(null);
+
+  // Link Partner modal state
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkSelected, setLinkSelected] = useState(null);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -138,7 +248,29 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const sidebarNode = sidebarProfileMenuRef.current;
+      const headerNode = headerProfileMenuRef.current;
+      if (
+        !sidebarNode?.contains(event.target) &&
+        !headerNode?.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setProfileName(admin?.name || '');
+    setProfileUsername(admin?.username || '');
+    setProfileAvatarUrl(admin?.avatarUrl || '');
+  }, [admin]);
+
   const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
+
   const loginTimeFormatted = new Date(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now()).toLocaleString('en-IN', { hour12: true });
 
   useEffect(() => {
@@ -225,14 +357,16 @@ export default function Dashboard() {
     }
   }, [admin]);
 
-  const fetchAuditLogs = useCallback(async () => {
+  const fetchAuditLogs = useCallback(async (dateOverride) => {
     if (!admin) return;
     setLoading(true);
     try {
       const params = {};
-      if (auditSearch) params.search = auditSearch;
-      if (auditFrom) params.from = auditFrom;
-      if (auditTo) params.to = auditTo;
+      const useDate = typeof dateOverride !== 'undefined' ? dateOverride : auditDate;
+      if (useDate) {
+        params.from = useDate;
+        params.to = useDate;
+      }
       const res = await axios.get('/api/tournaments/audit-logs', { params });
       setAuditLogs(res.data);
     } catch (err) {
@@ -240,12 +374,49 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [admin, auditSearch, auditFrom, auditTo]);
+  }, [admin, auditDate]);
 
   useEffect(() => { if (admin) fetchData(); }, [admin, fetchData]);
   useEffect(() => { if (admin && activeTab === 'audit-log') fetchAuditLogs(); }, [admin, activeTab, fetchAuditLogs]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
+
+  const handleApprovePair = async (leadId) => {
+    try {
+      await axios.patch(`/api/registrations/${leadId}/approve-pair`);
+      fetchData();
+      showToast('✅ Pair confirmed!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair approval failed');
+    }
+  };
+
+  const handleResetPair = async (leadId) => {
+    try {
+      await axios.patch(`/api/registrations/${leadId}/reset-pair`);
+      fetchData();
+      showToast('🔄 Pair reset to pending');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair reset failed');
+    }
+  };
+
+  const handleLinkPartner = async () => {
+    if (!linkTarget || !linkSelected) return;
+    setLinkLoading(true);
+    try {
+      await axios.patch(`/api/registrations/${linkTarget._id}/link-partner`, { partnerId: linkSelected._id });
+      setLinkTarget(null);
+      setLinkSelected(null);
+      setLinkSearch('');
+      fetchData();
+      showToast('✅ Players linked as partners!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Linking failed');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
 
   const handleUpdateStatus = async (id, status) => {
     try {
@@ -258,6 +429,77 @@ export default function Dashboard() {
       alert('Action failed');
     }
   };
+
+  const groupedRegistrations = useMemo(() => {
+    const regByKey = {};
+    const reverseRefs = {};
+    const doublesCategories = new Set(['doubles-men', 'doubles-women', 'mixed-doubles']);
+
+    filteredRegistrations.forEach((r) => {
+      const rollKey = r.rollNumber?.trim().toUpperCase();
+      const tournamentId = r.tournament?._id?.toString() || r.tournament;
+      if (!rollKey || !tournamentId) return;
+
+      const key = `${tournamentId}|${rollKey}`;
+      regByKey[key] = r;
+
+      const partnerKey = r.partnerRollNumber?.trim().toUpperCase();
+      if (partnerKey) {
+        const partnerRefKey = `${tournamentId}|${partnerKey}`;
+        reverseRefs[partnerRefKey] = reverseRefs[partnerRefKey] || [];
+        reverseRefs[partnerRefKey].push(r);
+      }
+    });
+
+    const groups = [];
+    const seen = new Set();
+
+    filteredRegistrations.forEach((r) => {
+      const rollKey = r.rollNumber?.trim().toUpperCase();
+      const tournamentId = r.tournament?._id?.toString() || r.tournament;
+      if (!rollKey || !tournamentId) return;
+
+      const key = `${tournamentId}|${rollKey}`;
+      if (seen.has(key)) return;
+
+      const category = r.tournament?.category;
+      if (!doublesCategories.has(category)) {
+        groups.push({ kind: 'single', player: r });
+        seen.add(key);
+        return;
+      }
+
+      const partnerKey = r.partnerRollNumber?.trim().toUpperCase();
+      const partnerKeyWithTournament = partnerKey ? `${tournamentId}|${partnerKey}` : null;
+      const partner = partnerKeyWithTournament ? regByKey[partnerKeyWithTournament] : null;
+
+      if (partner && partner.rollNumber?.trim().toUpperCase() !== rollKey && !seen.has(partnerKeyWithTournament)) {
+        groups.push({ kind: 'pair', players: [r, partner] });
+        seen.add(key);
+        seen.add(partnerKeyWithTournament);
+        return;
+      }
+
+      const reverse = (reverseRefs[key] || []).find((ref) => {
+        const refRoll = ref.rollNumber?.trim().toUpperCase();
+        const refKey = `${tournamentId}|${refRoll}`;
+        return refRoll !== rollKey && !seen.has(refKey);
+      });
+
+      if (reverse) {
+        const reverseKey = `${tournamentId}|${reverse.rollNumber?.trim().toUpperCase()}`;
+        groups.push({ kind: 'pair', players: [reverse, r] });
+        seen.add(key);
+        seen.add(reverseKey);
+        return;
+      }
+
+      groups.push({ kind: 'pair', players: [r, null] });
+      seen.add(key);
+    });
+
+    return groups;
+  }, [filteredRegistrations]);
 
   const handleCreate = async (data) => {
     try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast('✅ Tournament created!'); }
@@ -272,9 +514,22 @@ export default function Dashboard() {
     catch (err) { alert(err.response?.data?.message || 'Invalid password.'); }
   };
 
-  if (!admin) return null;
+  const handleClearAllAuditLogs = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL audit logs? This action cannot be undone.')) return;
+    try {
+      await axios.delete('/api/tournaments/audit-logs/clear-all');
+      setAuditLogs([]);
+      showToast('✅ All audit logs cleared successfully.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error clearing audit logs.');
+    }
+  };
 
-  /* ── computed sidebar width for desktop ── */
+  if (!admin) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading admin...</div>;
+
+  const safeAdminName = admin.name || admin.username || 'ADMIN';
+  const safeAdminFirstName = (safeAdminName.split(' ')[0] || admin.username || 'ADMIN').toUpperCase();
+  const safeMetaLabel = meta.label || 'ADMIN';
   const desktopSidebarW = sidebarCollapsed ? 72 : 340;
 
   return (
@@ -318,12 +573,12 @@ export default function Dashboard() {
         {(isMobile || !sidebarCollapsed) && (
           <div style={ds.profileCard}>
             <div style={ds.avatarBox}>
-              <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={ds.avatar} />
+              <img src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`} alt="Admin" style={ds.avatar} />
               <div style={ds.statusDot} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={ds.pName}>{admin.name.toUpperCase()}</div>
-              <div style={ds.pRole}>{meta.label.toUpperCase()} MANAGER</div>
+              <div style={ds.pName}>{safeAdminName.toUpperCase()}</div>
+              <div style={ds.pRole}>{safeMetaLabel.toUpperCase()} MANAGER</div>
             </div>
           </div>
         )}
@@ -332,7 +587,7 @@ export default function Dashboard() {
         {!isMobile && sidebarCollapsed && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ position: 'relative', width: 42, height: 42 }}>
-              <img src={`https://ui-avatars.com/api/?name=${admin.name}&background=random&size=128`} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
+              <img src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
               <div style={{ position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, background: '#10B981', border: '2px solid var(--bg-card)', borderRadius: '50%' }} />
             </div>
           </div>
@@ -367,17 +622,103 @@ export default function Dashboard() {
         </nav>
 
         <div style={{ padding: (!isMobile && sidebarCollapsed) ? '24px 8px' : '24px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: (!isMobile && sidebarCollapsed) ? 'center' : 'stretch' }}>
-          {(!isMobile && sidebarCollapsed) ? (
-            <>
-              <button onClick={toggleTheme} title={isDarkMode ? 'Day Mode' : 'Night Mode'} style={{ ...ds.themeBtn, width: 44, height: 44, padding: 0, fontSize: 20, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{isDarkMode ? '⛅' : '🌙'}</button>
-              <button onClick={logout} title="Sign Out" style={{ ...ds.logoutBtn, fontSize: 18 }}>🚪</button>
-            </>
-          ) : (
-            <>
-              <button onClick={toggleTheme} style={ds.themeBtn}>{isDarkMode ? '⛅ DAY MODE' : '🌙 NIGHT MODE'}</button>
-              <button onClick={logout} style={ds.logoutBtn}>SIGN OUT</button>
-            </>
-          )}
+          <div ref={sidebarProfileMenuRef} style={{ position: 'relative', width: '100%' }}>
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((open) => !open)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '14px 18px',
+                borderRadius: 18,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-input)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                fontWeight: 900,
+                fontSize: 13,
+                justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'flex-start',
+              }}
+            >
+              <img
+                src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=64`}
+                alt="Profile"
+                style={{ width: 34, height: 34, borderRadius: 14, objectFit: 'cover' }}
+              />
+              {((isMobile && !sidebarCollapsed) || (!isMobile && !sidebarCollapsed)) && (
+                <>
+                  <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                    <div style={{ fontSize: 13, letterSpacing: 0.5, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{safeAdminFirstName.toUpperCase()}</div>
+                  </div>
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>{profileMenuOpen ? '▲' : '▼'}</span>
+                </>
+              )}
+            </button>
+
+            {profileMenuOpen && (
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                bottom: 'calc(100% + 12px)',
+                width: 280,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 20,
+                boxShadow: '0 30px 70px rgba(0,0,0,0.14)',
+                padding: 14,
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                backdropFilter: 'blur(25px)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=64`}
+                    alt="Profile"
+                    style={{ width: 40, height: 40, borderRadius: 14, objectFit: 'cover' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 950 }}>{safeAdminName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveTab('profile');
+                    setProfileMenuOpen(false);
+                    if (isMobile) setMobileSidebarOpen(false);
+                  }}
+                  style={ds.profileMenuItem}
+                >
+                  <span style={{ fontSize: 16 }}>👤</span>
+                  <span style={{ flex: 1, fontWeight: 800 }}>Profile Settings</span>
+                </button>
+                <button
+                  onClick={() => {
+                    toggleTheme();
+                    setProfileMenuOpen(false);
+                  }}
+                  style={ds.profileMenuItem}
+                >
+                  <span style={{ fontSize: 16 }}>{isDarkMode ? '⛅' : '🌙'}</span>
+                  <span style={{ flex: 1, fontWeight: 800 }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    setProfileMenuOpen(false);
+                  }}
+                  style={{ ...ds.profileMenuItem, color: '#EF4444' }}
+                >
+                  <span style={{ fontSize: 16 }}>🚪</span>
+                  <span style={{ flex: 1, fontWeight: 800 }}>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -395,33 +736,35 @@ export default function Dashboard() {
               <div style={{ ...ds.logoBox, background: meta.color, width: 32, height: 32, fontSize: 18 }}>{meta.icon}</div>
               <span style={{ fontWeight: 950, fontSize: 14, letterSpacing: 0.5 }}>ADMIN PANEL</span>
             </div>
-            <div ref={notificationsRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setNotificationsOpen(o => !o);
-                  if (unreadCount > 0 && sortedLoginEvents.length > 0) {
-                    localStorage.setItem('lastSeenLoginTimestamp', sortedLoginEvents[0]);
-                    setLastSeenLoginTimestamp(sortedLoginEvents[0]);
-                  }
-                }}
-                style={ds.notificationBtn}
-                aria-label="Open notifications"
-              >
-                🔔
-                {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
-              </button>
-              {notificationsOpen && (
-                <div style={ds.notificationMenu}>
-                  <div style={ds.notificationTitle}>Notification</div>
-                  {notificationItems.map((item) => (
-                    <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
-                      <div style={ds.notificationItemTitle}>{item.title}</div>
-                      <div style={ds.notificationItemDescription}>{item.description}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div ref={notificationsRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotificationsOpen(o => !o);
+                    if (unreadCount > 0 && sortedLoginEvents.length > 0) {
+                      localStorage.setItem('lastSeenLoginTimestamp', sortedLoginEvents[0]);
+                      setLastSeenLoginTimestamp(sortedLoginEvents[0]);
+                    }
+                  }}
+                  style={ds.notificationBtn}
+                  aria-label="Open notifications"
+                >
+                  🔔
+                  {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div style={ds.notificationMenu}>
+                    <div style={ds.notificationTitle}>Notification</div>
+                    {notificationItems.map((item) => (
+                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
+                        <div style={ds.notificationItemTitle}>{item.title}</div>
+                        <div style={ds.notificationItemDescription}>{item.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -431,7 +774,7 @@ export default function Dashboard() {
           <header style={ds.header}>
             <div style={ds.greetBox}>
               <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
-                {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
+                {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
             </div>
@@ -472,7 +815,7 @@ export default function Dashboard() {
         {isMobile && (
           <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <h2 style={{ fontSize: 18, fontWeight: 950, margin: 0, letterSpacing: -0.5 }}>
-              {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{admin.name.split(' ')[0].toUpperCase()}</span>
+              {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
             </h2>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
           </div>
@@ -500,7 +843,7 @@ export default function Dashboard() {
                     className="mobile-card"
                   >
                     <div style={{ ...ds.cardSymbol, color: s.color, background: `${s.color}15` }}>{s.icon}</div>
-                    <div style={{ fontSize: isMobile ? 42 : 64, fontWeight: 950 }}>{s.val}</div>
+                    <div style={{ fontSize: isMobile ? 42 : 64, fontWeight: 950, color: 'var(--text)' }}>{s.val}</div>
                     <div style={{ fontSize: isMobile ? 11 : 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 2 }}>{s.label.toUpperCase()}</div>
                   </button>
                 ))}
@@ -549,10 +892,26 @@ export default function Dashboard() {
                   <h2 style={ds.sectionTitle}>PENDING PLAYER APPROVALS</h2>
                   <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Only registrations still waiting for approval.</p>
                 </div>
-                <button onClick={() => setActiveTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
-                  ← BACK TO DASHBOARD
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 14, transition: 'all 0.3s' }}>
+                      <input type="checkbox" checked={isEditMode} onChange={() => setIsEditMode(!isEditMode)} style={{ display: 'none' }} />
+                      <div style={{ width: 50, height: 28, background: isEditMode ? '#10B981' : '#D1D5DB', borderRadius: 14, position: 'relative', transition: 'background 0.3s', display: 'flex', alignItems: 'center', padding: '2px' }}>
+                        <div style={{ width: 24, height: 24, background: '#FFF', borderRadius: '50%', transition: 'transform 0.3s', transform: isEditMode ? 'translateX(22px)' : 'translateX(0)' }} />
+                      </div>
+                      <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', userSelect: 'none' }}>Edit Mode</span>
+                    </label>
+                  </div>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
+                    ← BACK TO DASHBOARD
+                  </button>
+                </div>
               </div>
+              {isEditMode && (
+                <div style={{ marginBottom: 18, color: 'var(--primary)', fontWeight: 700 }}>
+                  Click a registration entry to open edit mode.
+                </div>
+              )}
               <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
@@ -561,20 +920,23 @@ export default function Dashboard() {
                       <th style={{ ...ds.th_header, width: '20%' }}>CATEGORY & YEAR</th>
                       <th style={{ ...ds.th_header, width: '20%' }}>CONTACT</th>
                       <th style={{ ...ds.th_header, width: '15%' }}>STATUS</th>
-                      <th style={{ ...ds.th_header, width: '12%' }}>ACTION CENTER</th>
-                      <th style={{ ...ds.th_header, width: '8%' }}>EDIT</th>
+                      <th style={{ ...ds.th_header, width: '20%' }}>ACTION CENTER</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pendingRegistrations.length === 0 ? (
-                      <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No pending registrations found.</td></tr>
+                      <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No pending registrations found.</td></tr>
                     ) : (
                       pendingRegistrations.map(r => (
                         <tr key={r._id} style={ds.tr}>
-                          <td style={ds.td}>
+                          <td
+                            style={{ ...ds.td, cursor: isEditMode ? 'pointer' : 'default' }}
+                            onClick={() => isEditMode && setEditRegistrationTarget(r)}
+                          >
                             <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
                             <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
                             <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
+                            {isEditMode && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>Click to edit</div>}
                           </td>
                           <td style={ds.td}>
                             <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
@@ -596,9 +958,6 @@ export default function Dashboard() {
                               <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
                             </div>
                           </td>
-                          <td style={ds.td}>
-                            <button onClick={() => setEditRegistrationTarget(r)} style={{ ...ds.actionBtn, background: '#3B82F6', color: '#FFF', width: '100%' }}>EDIT</button>
-                          </td>
                         </tr>
                       ))
                     )}
@@ -611,9 +970,21 @@ export default function Dashboard() {
           {activeTab === 'player-approvals' && (
             <div style={ds.section}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
-                <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
+                <div>
+                  <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
+                </div>
                 <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
-                  {/* Custom Nested Filter Dropdown (Windows Context Menu Style) */}
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 14, transition: 'all 0.3s' }}>
+                    <input type="checkbox" checked={isEditMode} onChange={() => setIsEditMode(!isEditMode)} style={{ display: 'none' }} />
+                    <div style={{ width: 50, height: 28, background: isEditMode ? '#10B981' : '#D1D5DB', borderRadius: 14, position: 'relative', transition: 'background 0.3s', display: 'flex', alignItems: 'center', padding: '2px' }}>
+                      <div style={{ width: 24, height: 24, background: '#FFF', borderRadius: '50%', transition: 'transform 0.3s', transform: isEditMode ? 'translateX(22px)' : 'translateX(0)' }} />
+                    </div>
+                    <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', userSelect: 'none' }}>Edit Mode</span>
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+                {/* Custom Nested Filter Dropdown (Windows Context Menu Style) */}
                   <div ref={filterRef} style={{ position: 'relative', width: 350, zIndex: 50 }}>
                     <div
                       onClick={() => {
@@ -754,7 +1125,6 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
-              </div>
               <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
@@ -763,62 +1133,254 @@ export default function Dashboard() {
                       <th style={{ ...ds.th_header, width: '20%' }}>CATEGORY & YEAR</th>
                       <th style={{ ...ds.th_header, width: '20%' }}>CONTACT</th>
                       <th style={{ ...ds.th_header, width: '15%' }}>STATUS</th>
-                      <th style={{ ...ds.th_header, width: '12%' }}>ACTION CENTER</th>
-                      <th style={{ ...ds.th_header, width: '8%' }}>EDIT</th>
+                      <th style={{ ...ds.th_header, width: '20%' }}>ACTION CENTER</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRegistrations.length === 0 ? (
-                      <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
+                      <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
-                      filteredRegistrations
-                        .map(r => (
-                          <tr key={r._id} style={ds.tr}>
-                            <td style={ds.td}>
-                              <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
-                              <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
-                              <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
-                              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
-                              <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                📧 <a
-                                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ color: 'inherit', textDecoration: 'none' }}
-                                >
-                                  {r.email}
-                                </a>
-                              </div>
-                              {r.nicNo ? (
-                                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
-                              ) : null}
-                            </td>
-                            <td style={ds.td}>
-                              <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
-                            </td>
-                            <td style={ds.td}>
-                              <div style={{ display: 'flex', gap: 10 }}>
-                                {r.status === 'pending' ? (
+                      groupedRegistrations.map((entry, index) => {
+                        if (entry.kind === 'single') {
+                          const r = entry.player;
+                          return (
+                            <tr key={r._id} style={ds.tr}>
+                              <td
+                                style={{ ...ds.td, cursor: isEditMode ? 'pointer' : 'default' }}
+                                onClick={() => isEditMode && setEditRegistrationTarget(r)}
+                              >
+                                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{r.playerName}</div>
+                                <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {r.rollNumber}</div>
+                                <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 800, marginTop: 4 }}>{r.department}</div>
+                                {isEditMode && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>Click to edit</div>}
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[r.tournament?.category]}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                                <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                  📧 <a
+                                    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'inherit', textDecoration: 'none' }}
+                                  >
+                                    {r.email}
+                                  </a>
+                                </div>
+                                {r.nicNo ? (
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
+                                ) : null}
+                              </td>
+                              <td style={ds.td}>
+                                <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
+                              </td>
+                              <td style={ds.td}>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  {r.status === 'pending' ? (
+                                    <>
+                                      <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                      <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const [first, second] = entry.players;
+                        const pairReady = second && first?.status === 'confirmed' && second?.status === 'confirmed';
+                        const pairApproved = first?.pairStatus === 'approved' || second?.pairStatus === 'approved';
+                        const topCellBase = { ...ds.td, border: '1px solid var(--border)', borderBottom: 'none' };
+                        const middleCellBase = { ...ds.td, borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderTop: '1px solid var(--border)', borderBottom: 'none' };
+                        const footerCell = { ...ds.td, border: '1px solid var(--border)', borderTop: 'none', padding: '18px 18px' };
+
+                        return (
+                          <React.Fragment key={`${first._id}-${second ? second._id : 'solo'}`}>
+                            <tr style={ds.tr}>
+                              <td style={{ ...topCellBase, borderTopLeftRadius: 24 }}>
+                                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{first.playerName}</div>
+                                <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {first.rollNumber}</div>
+                                <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{first.department}</div>
+                              </td>
+                              <td style={topCellBase}>
+                                <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[first.tournament?.category]}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {first.tournament?.year}</div>
+                              </td>
+                              <td style={topCellBase}>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${first.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{first.phone}</a></div>
+                                <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                  📧 <a
+                                    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(first.email || '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'inherit', textDecoration: 'none' }}
+                                  >
+                                    {first.email}
+                                  </a>
+                                </div>
+                                {first.nicNo ? (
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {first.nicNo}</div>
+                                ) : null}
+                              </td>
+                              <td style={topCellBase}>
+                                <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[first.status] }}>{STATUS_STYLE[first.status].label.toUpperCase()}</span>
+                              </td>
+                              <td style={{ ...topCellBase, borderTopRightRadius: 24 }}>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  {first.status === 'pending' ? (
+                                    <>
+                                      <button onClick={() => handleUpdateStatus(first._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                      <button onClick={() => handleUpdateStatus(first._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => handleUpdateStatus(first._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            <tr style={ds.tr}>
+                              <td style={middleCellBase}>
+                                {second ? (
                                   <>
-                                    <button onClick={() => handleUpdateStatus(r._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
-                                    <button onClick={() => handleUpdateStatus(r._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                    <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{second.playerName}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {second.rollNumber}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{second.department}</div>
                                   </>
                                 ) : (
-                                  <button onClick={() => handleUpdateStatus(r._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ fontWeight: 900, fontSize: 18, opacity: 0.65 }}>No partner yet</div>
+                                    <button
+                                      onClick={() => { setLinkTarget(first); setLinkSearch(''); setLinkSelected(null); }}
+                                      style={{
+                                        background: 'rgba(59,130,246,0.12)',
+                                        border: '1px solid rgba(59,130,246,0.4)',
+                                        color: 'var(--primary)',
+                                        padding: '7px 14px',
+                                        borderRadius: 10,
+                                        fontSize: 11,
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        letterSpacing: 0.5,
+                                        width: 'fit-content',
+                                        transition: 'all 0.2s',
+                                      }}
+                                    >
+                                      + LINK PARTNER
+                                    </button>
+                                  </div>
                                 )}
-                              </div>
-                            </td>
-                            <td style={ds.td}>
-                              <button onClick={() => setEditRegistrationTarget(r)} style={{ ...ds.actionBtn, background: '#3B82F6', color: '#FFF', width: '100%' }}>EDIT</button>
-                            </td>
-                          </tr>
-                        ))
+
+                              </td>
+
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <>
+                                    <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[second.tournament?.category]}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {second.tournament?.year}</div>
+                                  </>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <>
+                                    <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${second.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{second.phone}</a></div>
+                                    <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                                      📧 <a
+                                        href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(second.email || '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: 'inherit', textDecoration: 'none' }}
+                                      >
+                                        {second.email}
+                                      </a>
+                                    </div>
+                                    {second.nicNo ? (
+                                      <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {second.nicNo}</div>
+                                    ) : null}
+                                  </>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[second.status] }}>{STATUS_STYLE[second.status].label.toUpperCase()}</span>
+                                ) : null}
+                              </td>
+                              <td style={middleCellBase}>
+                                {second ? (
+                                  <div style={{ display: 'flex', gap: 10 }}>
+                                    {second.status === 'pending' ? (
+                                      <>
+                                        <button onClick={() => handleUpdateStatus(second._id, 'confirmed')} style={{ ...ds.actionBtn, background: '#10B981', color: '#000' }}>APPROVE</button>
+                                        <button onClick={() => handleUpdateStatus(second._id, 'rejected')} style={{ ...ds.actionBtn, background: '#EF4444', color: '#FFF' }}>REJECT</button>
+                                      </>
+                                    ) : (
+                                      <button onClick={() => handleUpdateStatus(second._id, 'pending')} style={ds.revertBtn}>RESET</button>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </td>
+                            </tr>
+                            <tr style={ds.tr}>
+                              <td colSpan={5} style={{ ...footerCell, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, background: 'var(--bg-card)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                                  {pairApproved && (
+                                    <button
+                                      onClick={() => handleResetPair(first._id)}
+                                      style={{
+                                        ...ds.actionBtn,
+                                        background: 'var(--bg-input)',
+                                        border: '1px solid var(--border)',
+                                        color: 'var(--text-muted)',
+                                        fontSize: 11,
+                                        padding: '10px 16px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      RESET PAIR
+                                    </button>
+                                  )}
+                                  <button
+                                    disabled={!pairReady || pairApproved}
+                                    onClick={() => pairReady && !pairApproved && handleApprovePair(first._id)}
+                                    style={{
+                                      ...ds.actionBtn,
+                                      minWidth: 180,
+                                      justifyContent: 'center',
+                                      border: (!pairReady && !pairApproved) ? '1px solid var(--border)' : 'none',
+                                      background: pairApproved
+                                        ? '#16A34A'
+                                        : pairReady
+                                          ? '#2563EB'
+                                          : 'var(--bg-input)',
+                                      color: pairApproved
+                                        ? '#FFF'
+                                        : pairReady
+                                          ? '#FFF'
+                                          : 'var(--text-muted)',
+                                      cursor: (pairReady && !pairApproved) ? 'pointer' : 'not-allowed',
+                                      boxShadow: pairApproved
+                                        ? '0 4px 16px rgba(22,163,74,0.35)'
+                                        : pairReady
+                                          ? '0 4px 16px rgba(37,99,235,0.35)'
+                                          : 'none',
+                                      transition: 'all 0.25s ease',
+                                    }}
+                                  >
+                                    {pairApproved ? '✓ PAIR APPROVED' : 'APPROVE PAIR'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        );
+                      })
+
                     )}
                   </tbody>
                 </table>
@@ -855,6 +1417,216 @@ export default function Dashboard() {
             </div>
           )}
 
+          {activeTab === 'profile' && (
+            <div style={ds.section}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 40 }}>
+                <div>
+                  <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 24 : 36 }}>ADMIN PROFILE</h2>
+                  <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Update your admin profile details and password.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: 24, marginBottom: 32 }}>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 24 }}>
+                    <img
+                      src={profileAvatarUrl || `https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`}
+                      alt="Admin Avatar"
+                      style={{ width: 88, height: 88, borderRadius: 24, objectFit: 'cover', border: '2px solid var(--border)' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 20, fontWeight: 950 }}>{safeAdminName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{admin.username}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18 }}>
+                    <div>
+                      <label style={ds.fieldLabel}>Profile Image URL</label>
+                      <input
+                        type="text"
+                        value={profileAvatarUrl}
+                        onChange={(e) => setProfileAvatarUrl(e.target.value)}
+                        placeholder="https://..."
+                        style={ds.input}
+                      />
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>Full Name</label>
+                      <input
+                        type="text"
+                        value={profileName}
+                        onChange={(e) => setProfileName(e.target.value)}
+                        placeholder="Admin Name"
+                        style={ds.input}
+                      />
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>Username</label>
+                      <input
+                        type="text"
+                        value={profileUsername}
+                        onChange={(e) => setProfileUsername(e.target.value)}
+                        placeholder="Username"
+                        style={ds.input}
+                      />
+                    </div>
+                    {profileMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{profileMessage}</div>}
+                    <button
+                      onClick={async () => {
+                        setSavingProfile(true);
+                        setProfileMessage('');
+                        try {
+                          const apiBase = process.env.REACT_APP_API_URL || '';
+                          const res = await axios.put(`${apiBase}/api/auth/me`, {
+                            username: profileUsername,
+                            name: profileName,
+                            avatarUrl: profileAvatarUrl,
+                          });
+                          setProfileMessage('Profile updated successfully');
+                          if (res.data) {
+                            setAdmin(res.data);
+                          }
+                        } catch (err) {
+                          setProfileMessage(err.response?.data?.message || 'Unable to update profile');
+                        } finally {
+                          setSavingProfile(false);
+                        }
+                      }}
+                      style={{ ...ds.createBtn, width: '100%', padding: '18px 20px', fontSize: 13, borderRadius: 18 }}
+                      disabled={savingProfile}
+                    >
+                      {savingProfile ? 'Saving...' : 'Save Profile'}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Change Password</div>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Keep your account secure by updating your password regularly.</p>
+                  </div>
+                  <div style={{ display: 'grid', gap: 18 }}>
+                    <div>
+                      <label style={ds.fieldLabel}>Current Password</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Current password"
+                        style={ds.input}
+                      />
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>New Password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password"
+                        style={ds.input}
+                      />
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        style={ds.input}
+                      />
+                    </div>
+                    {passwordMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(239, 68, 68, 0.12)', color: '#B91C1C', fontWeight: 700 }}>{passwordMessage}</div>}
+                    <button
+                      onClick={async () => {
+                        setChangingPassword(true);
+                        setPasswordMessage('');
+                        try {
+                          const apiBase = process.env.REACT_APP_API_URL || '';
+                          const res = await axios.put(`${apiBase}/api/auth/me/password`, {
+                            currentPassword,
+                            newPassword,
+                            confirmPassword,
+                          });
+                          setPasswordMessage(res.data?.message || 'Password updated successfully');
+                          setCurrentPassword('');
+                          setNewPassword('');
+                          setConfirmPassword('');
+                        } catch (err) {
+                          setPasswordMessage(err.response?.data?.message || 'Unable to update password');
+                        } finally {
+                          setChangingPassword(false);
+                        }
+                      }}
+                      style={{ ...ds.actionBtn, width: '100%', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '18px 20px', fontSize: 13, borderRadius: 18, fontWeight: 900 }}
+                      disabled={changingPassword}
+                    >
+                      {changingPassword ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'audit-log' && (
+            <div style={ds.section}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: 16, marginBottom: 32 }}>
+                <div>
+                  <h2 style={ds.sectionTitle}>AUDIT LOG</h2>
+                  <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Track important admin actions performed in the system.</p>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={auditDate}
+                    onChange={(e) => {
+                      setAuditDate(e.target.value);
+                      fetchAuditLogs(e.target.value);
+                    }}
+                    style={{ ...ds.input, width: isMobile ? '100%' : 220 }}
+                  />
+                  <button
+                    onClick={handleClearAllAuditLogs}
+                    style={{ ...ds.actionBtn, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '0 20px', height: 44, borderRadius: 16, whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700 }}
+                  >
+                    🗑️ CLEAR ALL
+                  </button>
+                </div>
+              </div>
+              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={ds.thead}>
+                    <tr>
+                      <th style={{ ...ds.th_header, width: '18%' }}>TIME</th>
+                      <th style={{ ...ds.th_header, width: '18%' }}>USER</th>
+                      <th style={{ ...ds.th_header, width: '22%' }}>ACTION</th>
+                      <th style={{ ...ds.th_header, width: '16%' }}>MODULE</th>
+                      <th style={{ ...ds.th_header, width: '26%' }}>DETAILS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.length === 0 ? (
+                      <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No audit entries found for the selected filters.</td></tr>
+                    ) : (
+                      auditLogs.map((log) => (
+                        <tr key={log._id} style={ds.tr}>
+                          <td style={ds.td}>{new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}<br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span></td>
+                          <td style={ds.td}>{log.admin?.name || log.admin?.username || 'System'}</td>
+                          <td style={ds.td}><strong>{formatAuditAction(log.action)}</strong></td>
+                          <td style={ds.td}>{formatAuditModule(log)}</td>
+                          <td style={{ ...ds.td, maxWidth: 320, wordBreak: 'break-word', whiteSpace: 'normal' }}>{formatAuditDetails(log)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'brackets' && (
             <BracketsView admin={admin} color={meta.color} />
           )}
@@ -865,6 +1637,7 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+
       {editRegistrationTarget && (
         <RegisterModal
           tournament={editRegistrationTarget.tournament}
@@ -875,6 +1648,150 @@ export default function Dashboard() {
           }}
         />
       )}
+
+
+      {/* ── Link Partner Modal ── */}
+      {linkTarget && (() => {
+        const tournId = linkTarget.tournament?._id?.toString() || linkTarget.tournament?.toString();
+        const soloOptions = registrations.filter(r => {
+          const rTournId = r.tournament?._id?.toString() || r.tournament?.toString();
+          return (
+            r._id !== linkTarget._id &&
+            rTournId === tournId &&
+            (!r.partnerRollNumber || r.partnerRollNumber.trim() === '') &&
+            r.status !== 'rejected' && r.status !== 'cancelled'
+          );
+        }).filter(r =>
+          !linkSearch ||
+          r.playerName.toLowerCase().includes(linkSearch.toLowerCase()) ||
+          r.rollNumber.toLowerCase().includes(linkSearch.toLowerCase())
+        );
+
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); } }}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.72)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div style={{
+              background: 'var(--bg-card)',
+              borderRadius: 28,
+              border: '1px solid var(--border)',
+              boxShadow: '0 40px 80px rgba(0,0,0,0.4)',
+              padding: '40px',
+              width: 540,
+              maxWidth: '100%',
+              display: 'flex', flexDirection: 'column', gap: 24,
+              animation: 'fadeIn 0.2s ease',
+            }}>
+              {/* Header */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary)', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Manual Partner Link</div>
+                <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.5, marginBottom: 4 }}>
+                  Assign partner for <span style={{ color: 'var(--primary)' }}>{linkTarget.playerName}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  {CAT_LABELS[linkTarget.tournament?.category]} &middot; Year {linkTarget.tournament?.year} &middot; REG: {linkTarget.rollNumber}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search by name or reg number..."
+                  value={linkSearch}
+                  onChange={e => setLinkSearch(e.target.value)}
+                  style={{ ...ds.input, paddingLeft: 46, borderRadius: 14, fontSize: 14 }}
+                />
+              </div>
+
+              {/* Player list */}
+              <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
+                {soloOptions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600 }}>
+                    {linkSearch ? 'No matching solo players found.' : 'No other unpaired players in this category.'}
+                  </div>
+                ) : soloOptions.map(r => {
+                  const isSelected = linkSelected?._id === r._id;
+                  return (
+                    <div
+                      key={r._id}
+                      onClick={() => setLinkSelected(isSelected ? null : r)}
+                      style={{
+                        padding: '14px 18px',
+                        borderRadius: 14,
+                        cursor: 'pointer',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        background: isSelected ? 'rgba(59,130,246,0.1)' : 'var(--bg-input)',
+                        transition: 'all 0.15s',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>{r.playerName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 600 }}>
+                          REG: {r.rollNumber} &middot; {r.department}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%',
+                        border: isSelected ? 'none' : '2px solid var(--border)',
+                        background: isSelected ? 'var(--primary)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, color: '#fff', flexShrink: 0, transition: 'all 0.15s'
+                      }}>
+                        {isSelected ? '✓' : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 4 }}>
+                <button
+                  onClick={() => { setLinkTarget(null); setLinkSelected(null); setLinkSearch(''); }}
+                  style={{ ...ds.revertBtn, padding: '14px 28px', borderRadius: 14 }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  disabled={!linkSelected || linkLoading}
+                  onClick={handleLinkPartner}
+                  style={{
+                    ...ds.actionBtn,
+                    padding: '14px 28px',
+                    borderRadius: 14,
+                    fontSize: 13,
+                    background: linkSelected ? 'var(--primary)' : 'var(--bg-input)',
+                    color: linkSelected ? '#FFF' : 'var(--text-muted)',
+                    border: linkSelected ? 'none' : '1px solid var(--border)',
+                    cursor: (!linkSelected || linkLoading) ? 'not-allowed' : 'pointer',
+                    boxShadow: linkSelected ? '0 8px 24px rgba(59,130,246,0.35)' : 'none',
+                    transition: 'all 0.2s',
+                    minWidth: 160,
+                  }}
+                >
+                  {linkLoading
+                    ? 'Linking...'
+                    : linkSelected
+                      ? `LINK WITH ${linkSelected.playerName.split(' ')[0].toUpperCase()}`
+                      : 'SELECT A PLAYER'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -914,6 +1831,7 @@ const ds = {
   notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 0 },
   notificationItemDescription: { fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 },
   notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: 14, borderRadius: 18, cursor: 'pointer', transition: 'background 0.2s', color: 'var(--text)' },
+  profileMenuItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', color: 'var(--text)', padding: '14px 12px', borderRadius: 14, cursor: 'pointer', fontSize: 13, transition: 'all 0.2s', textAlign: 'left' },
   notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 4 },
   notificationItemDescription: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 },
   title: { fontSize: 56, fontWeight: 950, marginBottom: 8, letterSpacing: -2, textTransform: 'uppercase' },

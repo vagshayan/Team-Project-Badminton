@@ -98,6 +98,25 @@ input, select, textarea {
   outline: none;
   transition: all 0.2s;
 }
+/* Date input: ensure the calendar icon is visible in both dark and light themes */
+input[type="date"] {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  -webkit-appearance: textfield;
+  appearance: textfield;
+}
+/* WebKit/Blink calendar icon: invert in dark mode so it becomes visible */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) contrast(1.2) saturate(1.1);
+  opacity: 0.95;
+}
+/* In light mode keep the native icon appearance */
+body.light-mode input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+/* Hide MS clear button which can overlap in some browsers */
+input[type="date"]::-ms-clear { display: none; }
 input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 select option, select optgroup { background: #0F172A; color: #FFF; }
 body.light-mode select option, body.light-mode select optgroup { background: #FFFFFF; color: #0F172A; }

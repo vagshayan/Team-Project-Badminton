@@ -257,7 +257,7 @@ export default function StudentTournamentPage({ sport }) {
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
           <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
           <button onClick={() => navigate('/admin/login')} style={sh.adminBtn} className="mobile-btn">
-            <span className="admin-full-text">ADMIN LOGIN</span>
+            <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
           </button>
           {/* Mobile hamburger button — last item, far right */}

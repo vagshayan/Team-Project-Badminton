@@ -6,21 +6,12 @@ const auditLogSchema = new mongoose.Schema(
     action: { 
       type: String, 
       required: true,
-      enum: [
-        'CREATE_TOURNAMENT',
-        'UPDATE_TOURNAMENT',
-        'DELETE_TOURNAMENT',
-        'GENERATE_DRAW',
-        'RESET_DRAW',
-        'PUBLISH_DRAW',
-        'FORCE_UNLOCK_DRAW',
-        'UPDATE_MATCH_SCORE'
-      ]
     },
-    targetId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Tournament ID or Match ID
-    targetModel: { type: String, required: true, enum: ['Tournament', 'Match'] },
+    targetId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    targetModel: { type: String, required: true },
     details: { type: mongoose.Schema.Types.Mixed }, // Payload, state changes, or descriptive metadata
-    ipAddress: { type: String }
+    ipAddress: { type: String },
+    sport: { type: String, enum: ['badminton', 'table-tennis', 'carrom'] }
   },
   { timestamps: true }
 );

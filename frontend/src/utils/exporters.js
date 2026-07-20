@@ -6,10 +6,92 @@ const CAT_LABELS = {
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
+const DOUBLES_CATEGORIES = new Set(['doubles-men', 'doubles-women', 'mixed-doubles']);
+
+const formatCsvCell = (value) => {
+  const text = value == null ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+const downloadCsv = (filename, headers, rows) => {
+  const csvContent = headers.join(',') + '\n'
+    + rows.map((row) => row.map(formatCsvCell).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const buildPairRows = (registrations) => {
+  const regByKey = {};
+  registrations.forEach((r) => {
+    const roll = r.rollNumber?.trim().toUpperCase();
+    const tournamentId = r.tournament?._id?.toString() || r.tournament;
+    if (!roll || !tournamentId) return;
+    regByKey[`${tournamentId}|${roll}`] = r;
+  });
+
+  const seenPairs = new Set();
+  const rows = [];
+
+  registrations.forEach((r) => {
+    const category = r.tournament?.category;
+    if (!DOUBLES_CATEGORIES.has(category)) return;
+    const roll = r.rollNumber?.trim().toUpperCase();
+    const partnerRoll = r.partnerRollNumber?.trim().toUpperCase();
+    const tournamentId = r.tournament?._id?.toString() || r.tournament;
+    if (!roll || !partnerRoll || !tournamentId) return;
+    const partner = regByKey[`${tournamentId}|${partnerRoll}`];
+    if (!partner) return;
+
+    const partnerMatches = partner.partnerRollNumber?.trim().toUpperCase() === roll || r.partnerRollNumber?.trim().toUpperCase() === partnerRoll;
+    if (!partnerMatches) return;
+    if (r.status !== 'confirmed' || partner.status !== 'confirmed') return;
+    const pairKey = [roll, partnerRoll].sort().join('|');
+    if (seenPairs.has(pairKey)) return;
+    seenPairs.add(pairKey);
+
+    rows.push([
+      r.playerName,
+      r.rollNumber,
+      r.nicNo || '',
+      r.department || '',
+      r.phone || '',
+      r.email || '',
+      partner.playerName,
+      partner.rollNumber,
+      partner.nicNo || '',
+      partner.department || '',
+      partner.phone || '',
+      partner.email || '',
+      r.tournament?.year || '',
+      'APPROVED',
+    ]);
+  });
+
+  return rows;
+};
+
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // 1. Export Player List (CSV)
 export const exportPlayerListCSV = (tournament, registrations) => {
+  if (DOUBLES_CATEGORIES.has(tournament.category)) {
+    const headers = [
+      'Player 1 Name', 'Player 1 Reg No', 'Player 1 NIC', 'Player 1 Department', 'Player 1 Phone', 'Player 1 Email',
+      'Player 2 Name', 'Player 2 Reg No', 'Player 2 NIC', 'Player 2 Department', 'Player 2 Phone', 'Player 2 Email',
+      'Year', 'Pair Status'
+    ];
+    const rows = buildPairRows(registrations);
+    downloadCsv(`${tournament.year}_${tournament.category}_pairs.csv`, headers, rows);
+    return;
+  }
+
   const headers = ['Player Name', 'Reg No', 'Department', 'Email', 'Phone', 'Partner Name', 'Partner Reg No', 'Status'];
   const rows = registrations.map(r => [
     r.playerName,
@@ -21,20 +103,7 @@ export const exportPlayerListCSV = (tournament, registrations) => {
     r.partnerRollNumber || 'N/A',
     r.status
   ]);
-
-  const csvContent = `${tournament.year} ${CAT_LABELS[tournament.category]} - PLAYER LIST\n`
-    + headers.join(",") + "\n" 
-    + rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `${tournament.year}_${tournament.category}_players.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadCsv(`${tournament.year}_${tournament.category}_players.csv`, headers, rows);
 };
 
 // 2. Export Full Player Master Report (PDF)

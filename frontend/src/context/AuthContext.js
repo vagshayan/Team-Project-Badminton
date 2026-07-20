@@ -9,6 +9,17 @@ export function AuthProvider({ children }) {
   const [loginTimestamp, setLoginTimestamp] = useState(null);
   const [loginHistory, setLoginHistory] = useState([]);
 
+  const clearAuthState = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('loginTimestamp');
+    localStorage.removeItem('loginHistory');
+    localStorage.removeItem('lastActivity');
+    delete axios.defaults.headers.common['Authorization'];
+    setAdmin(null);
+    setLoginTimestamp(null);
+    setLoginHistory([]);
+  };
+
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -29,7 +40,15 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('token');
     const storedLoginTimestamp = localStorage.getItem('loginTimestamp');
     const storedLoginHistory = localStorage.getItem('loginHistory');
-    if (token) {
+
+    const authUrl = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/auth/me` : '/api/auth/me';
+
+    const loadCurrentAdmin = async (attempt = 1) => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       if (storedLoginTimestamp) setLoginTimestamp(storedLoginTimestamp);
       if (storedLoginHistory) {
@@ -46,26 +65,37 @@ export function AuthProvider({ children }) {
         setLoginHistory(initialHistory);
         localStorage.setItem('loginHistory', JSON.stringify(initialHistory));
       }
-      axios.get('/api/auth/me')
-        .then((res) => {
-          if (res.data) {
-            setAdmin(res.data);
-          } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('loginTimestamp');
-            delete axios.defaults.headers.common['Authorization'];
-            setAdmin(null);
-            setLoginTimestamp(null);
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('loginTimestamp');
-          delete axios.defaults.headers.common['Authorization'];
+
+      try {
+        const res = await axios.get(authUrl, { timeout: 3000 });
+        if (res.data) {
+          setAdmin(res.data);
+        } else {
+          clearAuthState();
+        }
+      } catch (error) {
+        const isTransient = !error?.response || error?.code === 'ECONNREFUSED' || error?.code === 'ERR_NETWORK' || error?.message?.includes('Network Error');
+
+        if (isTransient && attempt < 3) {
+          window.setTimeout(() => {
+            loadCurrentAdmin(attempt + 1);
+          }, 500 * attempt);
+          return;
+        }
+
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          clearAuthState();
+        } else {
           setAdmin(null);
           setLoginTimestamp(null);
-        })
-        .finally(() => setLoading(false));
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      loadCurrentAdmin();
     } else {
       setLoading(false);
     }
@@ -164,7 +194,7 @@ export function AuthProvider({ children }) {
   }, [admin]);
 
   return (
-    <AuthContext.Provider value={{ admin, loading, login, logout, loginFromData, loginTimestamp, loginHistory }}>
+    <AuthContext.Provider value={{ admin, loading, login, logout, loginFromData, loginTimestamp, loginHistory, setAdmin }}>
       {children}
     </AuthContext.Provider>
   );

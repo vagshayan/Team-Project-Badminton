@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
@@ -101,6 +101,9 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [partnerLookup, setPartnerLookup] = useState(null);
+  const [partnerLookupError, setPartnerLookupError] = useState('');
+  const [partnerLookupLoading, setPartnerLookupLoading] = useState(false);
 
   const getRequiredMessage = (k) => {
     switch (k) {
@@ -118,6 +121,10 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   };
 
   const setField = (k, v) => {
+    if (k === 'partnerRegNo' || k === 'regNo') {
+      setPartnerLookup(null);
+      setPartnerLookupError('');
+    }
     setForm((p) => ({ ...p, [k]: v }));
     setErrors((p) => ({ ...p, [k]: '' }));
   };
@@ -125,11 +132,22 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   const handleBlur = (k) => {
     const value = String(form[k]).trim();
     if (!value) {
+      if (k === 'partnerName' || k === 'partnerRegNo') {
+        if (!form.partnerName.trim() && !form.partnerRegNo.trim()) {
+          setErrors((p) => ({ ...p, [k]: '' }));
+          return;
+        }
+      }
       setErrors((p) => ({ ...p, [k]: getRequiredMessage(k) }));
       return;
     }
+
     const error = validateField(k, value);
     setErrors((p) => ({ ...p, [k]: error }));
+
+    if (k === 'partnerRegNo' && validateRegNo(value) && value !== form.regNo.trim()) {
+      fetchPartnerDetails(value);
+    }
   };
 
   const validate = () => {
@@ -163,23 +181,77 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
 
     if (!form.faculty) newErrors.faculty = 'Faculty is required';
 
-    if (isDoubles) {
-      if (!partnerName) newErrors.partnerName = 'Partner name is required';
-      else if (!validateName(partnerName)) newErrors.partnerName = 'Partner name may only contain letters, dots and single spaces';
-
-      if (!partnerRegNo) newErrors.partnerRegNo = 'Partner registration number is required';
-      else if (!validateRegNo(partnerRegNo)) newErrors.partnerRegNo = 'Use 20XX/XX/XXX or 20XX/XXX/XXX';
+    if (isDoubles && partnerRegNo) {
+      if (!validateRegNo(partnerRegNo)) newErrors.partnerRegNo = 'Use 20XX/XX/XXX or 20XX/XXX/XXX';
       else if (partnerRegNo === regNo) newErrors.partnerRegNo = 'Partner registration number must differ from yours';
+      else if (partnerLookupError) newErrors.partnerRegNo = partnerLookupError;
+      else if (partnerLookup && partnerLookup.partnerRollNumber?.trim()) newErrors.partnerRegNo = 'This player already has a partner assigned.';
     }
 
     return newErrors;
   };
+
+  const fetchPartnerDetails = async (lookupRegNo) => {
+    if (!lookupRegNo) return null;
+    setPartnerLookupLoading(true);
+    setPartnerLookupError('');
+    try {
+      const res = await axios.get(`/api/registrations/lookup/${encodeURIComponent(lookupRegNo)}`, {
+        params: { tournament: tournament._id }
+      });
+      const lookup = res.data.registration;
+      setPartnerLookup(lookup);
+      if (!form.partnerName.trim()) {
+        setForm((prev) => ({ ...prev, partnerName: lookup.playerName }));
+      }
+      return lookup;
+    } catch (err) {
+      const message = err.response?.data?.message || 'No registration found with this number.';
+      setPartnerLookup(null);
+      setPartnerLookupError(message);
+      return null;
+    } finally {
+      setPartnerLookupLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDoubles) return;
+    const lookupValue = form.partnerRegNo.trim();
+    if (!lookupValue || !validateRegNo(lookupValue) || lookupValue === form.regNo.trim()) {
+      setPartnerLookup(null);
+      setPartnerLookupError('');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchPartnerDetails(lookupValue);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [form.partnerRegNo, form.regNo, isDoubles, tournament._id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError('');
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return; }
+
+    if (isDoubles && form.partnerRegNo.trim()) {
+      const lookupValue = form.partnerRegNo.trim();
+      if (!partnerLookup || partnerLookup.rollNumber?.trim().toUpperCase() !== lookupValue.toUpperCase()) {
+        await fetchPartnerDetails(lookupValue);
+      }
+      if (partnerLookupError) {
+        setErrors((prev) => ({ ...prev, partnerRegNo: partnerLookupError }));
+        return;
+      }
+      if (partnerLookup && partnerLookup.partnerRollNumber?.trim()) {
+        setErrors((prev) => ({ ...prev, partnerRegNo: 'This player already has a partner assigned.' }));
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       if (initialData) {
@@ -378,8 +450,23 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                     style={sh.input}
                   />
                   {errors.partnerRegNo && <span style={sh.errMsg}>{errors.partnerRegNo}</span>}
+                  {partnerLookupLoading && !errors.partnerRegNo && <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Checking partner registration...</span>}
+                  {partnerLookupError && !errors.partnerRegNo && <span style={sh.errMsg}>{partnerLookupError}</span>}
                 </div>
               </div>
+              {partnerLookup && (
+                <div style={sh.partnerLookupCard}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--primary)', marginBottom: 8 }}>PARTNER LOOKUP</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                    <div><strong>Name:</strong> {partnerLookup.playerName}</div>
+                    <div><strong>Reg No:</strong> {partnerLookup.rollNumber}</div>
+                    <div><strong>Faculty:</strong> {partnerLookup.department || 'N/A'}</div>
+                    <div><strong>Phone:</strong> {partnerLookup.phone || 'N/A'}</div>
+                    <div><strong>Email:</strong> {partnerLookup.email || 'N/A'}</div>
+                    <div><strong>Status:</strong> {partnerLookup.status ? partnerLookup.status.toUpperCase() : 'N/A'}</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -406,6 +493,7 @@ const sh = {
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
   doublesSection: { borderTop: '1px solid var(--border)', paddingTop: 24, marginTop: 12 },
+  partnerLookupCard: { marginTop: 16, padding: 18, borderRadius: 16, background: 'var(--bg-input)', border: '1px solid var(--border)' },
   errMsg: { fontSize: 10, color: '#EF4444', fontWeight: 700, marginTop: 4 },
   cancelBtn: { flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
   submitBtn: { flex: 2, border: 'none', color: '#000', padding: '16px', borderRadius: 14, fontWeight: 950, fontSize: 14, cursor: 'pointer', letterSpacing: 0.5 }

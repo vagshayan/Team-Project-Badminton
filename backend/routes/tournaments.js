@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Admin = require('../models/Admin');
+const AuditLog = require('../models/AuditLog');
 const { getModelsForSport } = require('../models/SportModels');
 const Match = require('../models/Match');
 const { protect } = require('../middleware/auth');
@@ -212,6 +213,55 @@ router.get('/admin', protect, async (req, res) => {
   }
 });
 
+// ─── ADMIN — audit logs for current admin ─────────────────────
+router.get('/audit-logs', protect, async (req, res) => {
+  try {
+    const { search, from, to, action } = req.query;
+    const query = {};
+
+    if (action && action !== 'all') query.action = action;
+
+    if (search) {
+      const q = new RegExp(search, 'i');
+      query.$or = [
+        { action: q },
+        { targetModel: q },
+        { details: q },
+        { 'admin.name': q }
+      ];
+    }
+
+    const createdAtQuery = {};
+    if (from) {
+      const start = new Date(from);
+      if (!Number.isNaN(start.getTime())) {
+        createdAtQuery.$gte = start;
+      }
+    }
+    if (to) {
+      const end = new Date(to);
+      if (!Number.isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        createdAtQuery.$lte = end;
+      }
+    }
+    if (Object.keys(createdAtQuery).length > 0) {
+      query.createdAt = createdAtQuery;
+    }
+
+    query.sport = req.admin.sport;
+
+    const logs = await AuditLog.find(query)
+      .populate('admin', 'name username sport')
+      .sort({ createdAt: -1 })
+      .limit(500);
+
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ─── CREATE ───────────────────────────────────────────────
 router.post('/', protect, async (req, res) => {
   const { year, date, time, venue, category, registrationDeadline } = req.body;
@@ -250,11 +300,12 @@ router.post('/', protect, async (req, res) => {
 // ─── UPDATE — password required ──────────────────────────
 router.put('/:id', protect, async (req, res) => {
   const { password, year, date, time, venue, category, registrationDeadline } = req.body;
-  if (!password) return res.status(400).json({ message: 'Password is required to update' });
   try {
-    const admin = await Admin.findById(req.admin._id);
-    const isMatch = await admin.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
+    if (password) {
+      const admin = await Admin.findById(req.admin._id);
+      const isMatch = await admin.comparePassword(password);
+      if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
+    }
     const currentYear = new Date().getFullYear();
     if (year < currentYear) return res.status(400).json({ message: 'Year cannot be in the past' });
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -268,22 +319,33 @@ router.put('/:id', protect, async (req, res) => {
     const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category, createdBy: req.admin._id });
     if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
 
+    const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+
+    const beforeValues = {
+      year: tournament.year,
+      date: tournament.date,
+      time: tournament.time,
+      venue: tournament.venue,
+      category: tournament.category,
+      registrationDeadline: tournament.registrationDeadline,
+    };
+
     const updateFields = { year, date, time, venue, category };
     if (registrationDeadline) updateFields.registrationDeadline = new Date(registrationDeadline);
 
-    const tournament = await Tournament.findOneAndUpdate(
-      { _id: req.params.id, createdBy: req.admin._id },
-      updateFields,
-      { new: true }
-    );
-    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
-    // Log Audit action
+    Object.assign(tournament, updateFields);
+    await tournament.save();
+
     await logAdminAction({
       adminId: req.admin._id,
       action: 'UPDATE_TOURNAMENT',
       targetId: tournament._id,
       targetModel: 'Tournament',
-      details: { updatedFields },
+      details: {
+        before: beforeValues,
+        after: updateFields,
+      },
       req
     });
     res.json(tournament);
@@ -614,5 +676,17 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
   }
 });
 
+// ─── CLEAR ALL AUDIT LOGS ────────────────────────────────
+router.delete('/audit-logs/clear-all', protect, async (req, res) => {
+  try {
+    const result = await AuditLog.deleteMany({ sport: req.admin.sport });
+    res.json({ 
+      message: `Cleared ${result.deletedCount} audit logs for ${req.admin.sport}`,
+      deletedCount: result.deletedCount 
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles — Men',
+  'singles-women': 'Singles — Women',
+  'doubles-men': 'Doubles — Men',
+  'doubles-women': 'Doubles — Women',
+  'mixed-doubles': 'Mixed Doubles',
 };
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
 
@@ -25,6 +28,24 @@ export default function RegistrationsModal({ tournament, onClose }) {
       .then((res) => setRegistrations(res.data))
       .catch(() => setError('Failed to load registered players'))
       .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const res = await axios.get(`/api/registrations/tournament/${tournament._id}`);
+        if (!cancelled) setRegistrations(Array.isArray(res.data) ? res.data : []);
+      } catch (e) {
+        if (!cancelled) setError('Failed to load registered players');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
   }, [tournament._id]);
 
   return (
@@ -38,42 +59,43 @@ export default function RegistrationsModal({ tournament, onClose }) {
         margin: isMobile ? '12px auto' : undefined,
       }}>
         <div style={sh.header}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-               <div>
-                  <div style={sh.badge}>DOMAIN: {tournament.sport.toUpperCase()}</div>
-                  <h2 style={sh.title}>REGISTERED PLAYERS</h2>
-                  <p style={sh.subtitle}>Full list of participants for {CAT_LABELS[tournament.category]}.</p>
-               </div>
-               <button onClick={onClose} style={sh.closeBtn}>✕</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={sh.badge}>DOMAIN: {tournament.sport.toUpperCase()}</div>
+              <h2 style={sh.title}>REGISTERED PLAYERS</h2>
+              <p style={sh.subtitle}>Full list of participants for {CAT_LABELS[tournament.category]}.</p>
             </div>
-            
+
             <div style={{
               ...sh.infoBar,
               flexDirection: isMobile ? 'column' : 'row',
               gap: isMobile ? 14 : 24,
               alignItems: isMobile ? 'flex-start' : 'center',
             }}>
-               <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ fontWeight: 950, fontSize: isMobile ? 20 : 24, color: 'var(--primary)' }}>{tournament.year}</div>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
-                     <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
-                     <span>📍 {tournament.venue}</span>
-                  </div>
-               </div>
+              <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 950, fontSize: isMobile ? 20 : 24, color: 'var(--primary)' }}>{tournament.year}</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
+                  <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
+                  <span>📍 {tournament.venue}</span>
+                </div>
+              </div>
+
+              <button onClick={onClose} style={sh.closeBtn}>✕</button>
             </div>
+          </div>
         </div>
 
         {loading ? (
           <div style={sh.status}>
-             <div className="spinner" style={{ width: 40, height: 40, borderTopColor: 'var(--primary)' }} />
-             <p style={{ marginTop: 20 }}>Syncing player data...</p>
+            <div className="spinner" style={{ width: 40, height: 40, borderTopColor: 'var(--primary)' }} />
+            <p style={{ marginTop: 20 }}>Syncing player data...</p>
           </div>
         ) : error ? (
           <div style={sh.errorBox}>⚠ {error}</div>
         ) : registrations.length === 0 ? (
           <div style={sh.status}>
-             <div style={{ fontSize: 50, marginBottom: 15 }}>📋</div>
-             <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
+            <div style={{ fontSize: 50, marginBottom: 15 }}>📋</div>
+            <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
           </div>
         ) : (
           <div style={{ ...sh.tableBox, overflowX: 'auto' }}>
@@ -96,14 +118,14 @@ export default function RegistrationsModal({ tournament, onClose }) {
                     <td style={{ ...sh.td, fontWeight: 800, color: 'var(--primary)', letterSpacing: 0.5 }}>{r.rollNumber}</td>
                     <td style={{ ...sh.td, fontSize: 13, fontWeight: 700 }}>{r.department}</td>
                     <td style={sh.td}>
-                       <div style={{ fontSize: 13, fontWeight: 700 }}>📞 {r.phone}</div>
-                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{r.email}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>📞 {r.phone}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{r.email}</div>
                     </td>
                     {isDoubles && (
-                       <td style={sh.td}>
-                          <div style={{ fontWeight: 800, fontSize: 13 }}>{r.partnerName || '—'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.partnerRollNumber || '—'}</div>
-                       </td>
+                      <td style={sh.td}>
+                        <div style={{ fontWeight: 800, fontSize: 13 }}>{r.partnerName || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.partnerRollNumber || '—'}</div>
+                      </td>
                     )}
                   </tr>
                 ))}
@@ -113,15 +135,15 @@ export default function RegistrationsModal({ tournament, onClose }) {
         )}
 
         <div style={{ ...sh.footer, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 16 : 0 }}>
-           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)' }}>
-              TOTAL ENROLLED: <span style={{ color: 'var(--text)', fontWeight: 950 }}>{registrations.length} PLAYERS</span>
-           </div>
-           <button onClick={onClose} style={{ ...sh.closeBtnAction, width: isMobile ? '100%' : 'auto' }}>CLOSE VIEW</button>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)' }}>
+            TOTAL ENROLLED: <span style={{ color: 'var(--text)', fontWeight: 950 }}>{registrations.length} PLAYERS</span>
+          </div>
+          <button onClick={onClose} style={{ ...sh.closeBtnAction, width: isMobile ? '100%' : 'auto' }}>CLOSE VIEW</button>
         </div>
       </div>
       <style>{`
-         .spinner { border: 4px solid var(--border); border-radius: 50%; animation: spin 0.8s linear infinite; }
-         @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { border: 4px solid var(--border); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
@@ -143,7 +165,8 @@ const sh = {
   thead: { background: 'var(--bg-input)', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 1.5 },
   th: { padding: '20px 30px' },
   tr: { borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)' },
-  td: { padding: '24px 30px' },
+  td: { padding: '24px 30px', verticalAlign: 'top' },
+  muted: { color: 'var(--text-muted)', fontSize: 12, marginTop: 4 },
   footer: { marginTop: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 24, borderTop: '1px solid var(--border)' },
   closeBtnAction: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 30px', borderRadius: 16, fontWeight: 900, cursor: 'pointer', fontSize: 13 }
 };
