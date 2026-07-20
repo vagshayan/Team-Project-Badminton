@@ -1,0 +1,28 @@
+﻿
+> tournament-frontend@0.1.0 build
+> react-scripts build
+
+Creating an optimized production build...
+Compiled successfully.
+
+File sizes after gzip:
+
+  243.77 kB  build\static\js\main.c1e743c6.js
+  46.36 kB   build\static\js\239.c30724eb.chunk.js
+  33.56 kB   build\static\js\732.0596a720.chunk.js
+  10.47 kB   build\static\js\977.3eb6eee8.chunk.js
+  2.31 kB    build\static\css\main.2ed6305d.css
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  npm install -g serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+

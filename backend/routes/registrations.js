@@ -554,7 +554,7 @@ router.post('/', async (req, res) => {
       rollNumber: cleanedRoll,
       department,
       year: year || 'N/A',
-      partnerName: cleanedPartnerName || '',
+      partnerName: partnerRecord ? partnerRecord.playerName : (cleanedPartnerName || ''),
       partnerRollNumber: cleanedPartnerRoll || '',
     });
 
