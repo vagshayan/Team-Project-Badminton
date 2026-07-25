@@ -26,6 +26,10 @@ function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
 }
 
+function isMatchWinner(match, player) {
+  return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
 export default function StudentTournamentPage({ sport }) {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -383,27 +387,27 @@ export default function StudentTournamentPage({ sport }) {
                         >
                           <div style={bh.pRow}>
                             <span style={{
-                              fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
+                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
                               color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
                               {m.player1?.playerName || 'TBD'}
                             </span>
-                            <span style={{ ...bh.score, color: m.winner?._id === m.player1?._id ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
-                              {m.isCompleted && m.winner?._id === m.player1?._id ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
+                            <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
+                              {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
                             </span>
                           </div>
                           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                           <div style={bh.pRow}>
                             <span style={{
-                              fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
+                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
                               color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
                               {m.player2?.playerName || 'TBD'}
                             </span>
-                            <span style={{ ...bh.score, color: m.winner?._id === m.player2?._id ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
-                              {m.isCompleted && m.winner?._id === m.player2?._id ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
+                            <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
+                              {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
                             </span>
                           </div>
                         </div>

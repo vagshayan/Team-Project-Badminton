@@ -21,6 +21,10 @@ function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
 }
 
+function isMatchWinner(match, player) {
+  return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
 export default function BracketsView({ admin, color }) {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
@@ -558,7 +562,7 @@ export default function BracketsView({ admin, color }) {
                       >
                         <div style={s.playerRow}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {m.winner?._id === m.player1?._id && (
+                            {isMatchWinner(m, m.player1) && (
                               <span style={{ ...s.winnerBadge, background: color }}>W</span>
                             )}
                             {m.isCompleted && m.winner?._id !== m.player1?._id && m.player1 && (
@@ -566,8 +570,8 @@ export default function BracketsView({ admin, color }) {
                             )}
                             <span style={{
                               fontSize: 13,
-                              fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
-                              color: m.winner?._id === m.player1?._id ? 'var(--text)' : 'var(--text-muted)',
+                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
+                              color: isMatchWinner(m, m.player1) ? 'var(--text)' : 'var(--text-muted)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
                               {m.player1 ? getDisplayName(m.player1) : <i style={{ color: '#555' }}>TBD</i>}
@@ -579,7 +583,7 @@ export default function BracketsView({ admin, color }) {
 
                         <div style={s.playerRow}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {m.winner?._id === m.player2?._id && (
+                            {isMatchWinner(m, m.player2) && (
                               <span style={{ ...s.winnerBadge, background: color }}>W</span>
                             )}
                             {m.isCompleted && m.winner?._id !== m.player2?._id && m.player2 && (
@@ -587,8 +591,8 @@ export default function BracketsView({ admin, color }) {
                             )}
                             <span style={{
                               fontSize: 13,
-                              fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
-                              color: m.winner?._id === m.player2?._id ? 'var(--text)' : 'var(--text-muted)',
+                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
+                              color: isMatchWinner(m, m.player2) ? 'var(--text)' : 'var(--text-muted)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
                               {m.player2 ? getDisplayName(m.player2) : <i style={{ color: '#555' }}>TBD</i>}

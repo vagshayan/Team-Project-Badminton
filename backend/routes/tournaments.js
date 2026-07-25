@@ -22,6 +22,30 @@ function shuffle(arr) {
   return a;
 }
 
+function buildDoublesByeOrder(teams, bracketSize) {
+  const shuffledTeams = shuffle(teams);
+  const byeCount = bracketSize - shuffledTeams.length;
+  const teamsPlayingFirstRound = shuffledTeams.length - byeCount;
+  const matchSlots = [];
+
+  for (let i = 0; i < teamsPlayingFirstRound; i += 2) {
+    matchSlots.push([shuffledTeams[i], shuffledTeams[i + 1]]);
+  }
+
+  for (let i = teamsPlayingFirstRound; i < shuffledTeams.length; i++) {
+    matchSlots.push([shuffledTeams[i], null]);
+  }
+
+  if (
+    matchSlots.length !== bracketSize / 2 ||
+    matchSlots.some(([team1, team2]) => !team1 && !team2)
+  ) {
+    throw new Error('Unable to create a valid doubles bracket without empty matches.');
+  }
+
+  return shuffle(matchSlots).flat();
+}
+
 function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
   const seeded1 = players.find(p => p._id.toString() === String(championId));
   let seeded2 = players.find(p => p._id.toString() === String(runnerUpId));
@@ -499,7 +523,7 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
       bracketSize    = nextPowerOf2(pairs.length);
       rounds         = Math.log2(bracketSize);
-      orderedPlayers = shuffle(pairs);
+      orderedPlayers = buildDoublesByeOrder(pairs, bracketSize);
 
     } else {
       // ── SINGLES: seeded/random logic unchanged ──
