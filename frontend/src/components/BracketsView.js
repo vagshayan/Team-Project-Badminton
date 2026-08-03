@@ -21,6 +21,10 @@ function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
 }
 
+function isMatchWinner(match, player) {
+  return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
 export default function BracketsView({ admin, color }) {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
@@ -287,7 +291,7 @@ export default function BracketsView({ admin, color }) {
       alert(err.response?.data?.message || 'Force unlock failed.');
     } finally { setLoading(false); }
   };
-
+  
   const handlePublishDraw = async () => {
     if (!window.confirm('Publish draw? Students will see the bracket. Cannot be undone!')) return;
     setLoading(true);
@@ -313,7 +317,15 @@ export default function BracketsView({ admin, color }) {
       alert(err.response?.data?.message || 'Failed to update result');
     }
   };
-
+  // ── Display name: shows "Name & Partner" for doubles ───
+  const getDisplayName = (player) => {
+    if (!player) return '';
+    const isDoubles = selectedTournament && !SINGLES.includes(selectedTournament.category);
+    if (isDoubles && player.partnerName) {
+      return `${player.playerName} & ${player.partnerName}`;
+    }
+    return player.playerName;
+  };
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
@@ -550,7 +562,7 @@ export default function BracketsView({ admin, color }) {
                       >
                         <div style={s.playerRow}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {m.winner?._id === m.player1?._id && (
+                            {isMatchWinner(m, m.player1) && (
                               <span style={{ ...s.winnerBadge, background: color }}>W</span>
                             )}
                             {m.isCompleted && m.winner?._id !== m.player1?._id && m.player1 && (
@@ -558,11 +570,11 @@ export default function BracketsView({ admin, color }) {
                             )}
                             <span style={{
                               fontSize: 13,
-                              fontWeight: m.winner?._id === m.player1?._id ? 900 : 400,
-                              color: m.winner?._id === m.player1?._id ? 'var(--text)' : 'var(--text-muted)',
+                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
+                              color: isMatchWinner(m, m.player1) ? 'var(--text)' : 'var(--text-muted)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
-                              {m.player1?.playerName || <i style={{ color: '#555' }}>TBD</i>}
+                              {m.player1 ? getDisplayName(m.player1) : <i style={{ color: '#555' }}>TBD</i>}
                             </span>
                           </div>
                         </div>
@@ -571,7 +583,7 @@ export default function BracketsView({ admin, color }) {
 
                         <div style={s.playerRow}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {m.winner?._id === m.player2?._id && (
+                            {isMatchWinner(m, m.player2) && (
                               <span style={{ ...s.winnerBadge, background: color }}>W</span>
                             )}
                             {m.isCompleted && m.winner?._id !== m.player2?._id && m.player2 && (
@@ -579,11 +591,11 @@ export default function BracketsView({ admin, color }) {
                             )}
                             <span style={{
                               fontSize: 13,
-                              fontWeight: m.winner?._id === m.player2?._id ? 900 : 400,
-                              color: m.winner?._id === m.player2?._id ? 'var(--text)' : 'var(--text-muted)',
+                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
+                              color: isMatchWinner(m, m.player2) ? 'var(--text)' : 'var(--text-muted)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
-                              {m.player2?.playerName || <i style={{ color: '#555' }}>TBD</i>}
+                              {m.player2 ? getDisplayName(m.player2) : <i style={{ color: '#555' }}>TBD</i>}
                             </span>
                           </div>
                         </div>
@@ -660,23 +672,23 @@ export default function BracketsView({ admin, color }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <button
                 onClick={() => {
-                  if (window.confirm(`Confirm ${resultModal.player1?.playerName} as winner? This cannot be undone.`)) {
+                  if (window.confirm(`Confirm ${getDisplayName(resultModal.player1)} as winner? This cannot be undone.`)) {
                     handleMarkWinner(resultModal.player1._id);
                   }
                 }}
                 style={modalS.winnerOption}
               >
-                🏆 {resultModal.player1?.playerName} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                🏆 {getDisplayName(resultModal.player1)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
               </button>
               <button
                 onClick={() => {
-                  if (window.confirm(`Confirm ${resultModal.player2?.playerName} as winner? This cannot be undone.`)) {
+                  if (window.confirm(`Confirm ${getDisplayName(resultModal.player2)} as winner? This cannot be undone.`)) {
                     handleMarkWinner(resultModal.player2._id);
                   }
                 }}
                 style={modalS.winnerOption}
               >
-                🏆 {resultModal.player2?.playerName} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                🏆 {getDisplayName(resultModal.player2)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
               </button>
             </div>
             <div style={modalS.actions}>

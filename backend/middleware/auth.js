@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 
+const JWT_SECRET = process.env.JWT_SECRET;
+
 const protect = async (req, res, next) => {
   let token;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -8,7 +10,7 @@ const protect = async (req, res, next) => {
   }
   if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.admin = await Admin.findById(decoded.id).select('-password');
     if (!req.admin) return res.status(401).json({ message: 'Admin not found' });
     next();

@@ -24,6 +24,75 @@ function shuffle(arr) {
   return a;
 }
 
+function buildDoublesByeOrder(teams, bracketSize) {
+  const shuffledTeams = shuffle(teams);
+  const byeCount = bracketSize - shuffledTeams.length;
+  const teamsPlayingFirstRound = shuffledTeams.length - byeCount;
+  const matchSlots = [];
+
+  for (let i = 0; i < teamsPlayingFirstRound; i += 2) {
+    matchSlots.push([shuffledTeams[i], shuffledTeams[i + 1]]);
+  }
+
+  for (let i = teamsPlayingFirstRound; i < shuffledTeams.length; i++) {
+    matchSlots.push([shuffledTeams[i], null]);
+  }
+
+  if (
+    matchSlots.length !== bracketSize / 2 ||
+    matchSlots.some(([team1, team2]) => !team1 && !team2)
+  ) {
+    throw new Error('Unable to create a valid doubles bracket without empty matches.');
+  }
+
+  return shuffle(matchSlots).flat();
+}
+
+function buildDoublesPairEntries(approvedRegs) {
+  const used = new Set();
+  const pairs = [];
+  const unresolved = [];
+
+  const addPair = (leader, partner) => {
+    if (!leader || !partner) return;
+    const leaderId = leader._id.toString();
+    const partnerId = partner._id.toString();
+    if (leaderId === partnerId || used.has(leaderId) || used.has(partnerId)) return;
+
+    used.add(leaderId);
+    used.add(partnerId);
+    pairs.push(leader);
+  };
+
+  approvedRegs.forEach((reg) => {
+    if (used.has(reg._id.toString())) return;
+
+    const partnerByPairId = approvedRegs.find((candidate) => {
+      if (candidate._id.toString() === reg._id.toString()) return false;
+      return candidate.pairId && reg.pairId && candidate.pairId.toString() === reg.pairId.toString();
+    });
+
+    if (partnerByPairId) {
+      addPair(reg, partnerByPairId);
+      return;
+    }
+
+    const partnerByRoll = approvedRegs.find((candidate) => {
+      if (candidate._id.toString() === reg._id.toString()) return false;
+      return candidate.rollNumber && reg.partnerRollNumber && candidate.rollNumber.trim().toLowerCase() === reg.partnerRollNumber.trim().toLowerCase();
+    });
+
+    if (partnerByRoll) {
+      addPair(reg, partnerByRoll);
+      return;
+    }
+
+    unresolved.push(reg);
+  });
+
+  return { pairs, unresolved };
+}
+
 function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
   const seeded1 = players.find(p => p._id.toString() === String(championId));
   let seeded2 = players.find(p => p._id.toString() === String(runnerUpId));
@@ -459,6 +528,7 @@ router.get('/:id/matches', protect, async (req, res) => {
 });
 
 // ─── GENERATE DRAWS ───────────────────────────────────────
+/*
 router.post('/:id/generate-draws', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -468,16 +538,7 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
 
     const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
     if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
-    /*
-     const n = confirmedRegs.length;
-     const bracketSize = nextPowerOf2(n);
-         // Expand bracket if seeds need bye slots but bracket is already full
-     if (SINGLES.includes(tournament.category) && (req.body.championId || req.body.runnerUpId)) {
-       const seedsCount = (req.body.championId ? 1 : 0) + (req.body.runnerUpId ? 1 : 0);
-       if (bracketSize === n) bracketSize = bracketSize * 2;
-     }
-     const rounds = Math.log2(bracketSize);
-     */
+    
     const n = confirmedRegs.length;
     let bracketSize = nextPowerOf2(n);
     const rounds = Math.log2(bracketSize);
@@ -564,6 +625,117 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
       },
       req
     });
+
+    res.json({ message: 'Draws generated successfully', rounds: matchesByRound.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+});*/
+// ─── GENERATE DRAWS ───────────────────────────────────────
+// ─── GENERATE DRAWS ───────────────────────────────────────
+router.post('/:id/generate-draws', protect, async (req, res) => {
+  try {
+    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    if (tournament.isLocked) return res.status(400).json({ message: 'Draws already generated' });
+
+    const confirmedRegs = await Registration.find({ tournament: req.params.id, status: 'confirmed' });
+    if (confirmedRegs.length < 2) return res.status(400).json({ message: 'At least 2 confirmed players required' });
+
+    const n = confirmedRegs.length;
+    let bracketSize, rounds, orderedPlayers;
+
+    if (!SINGLES.includes(tournament.category)) {
+      // ── DOUBLES / MIXED: only use approved pairs ──
+      const approvedRegs = confirmedRegs.filter(r => r.pairStatus === 'approved');
+
+      if (approvedRegs.length < 2) {
+        return res.status(400).json({
+          message: 'At least 2 players in approved pairs required. Make sure pairs are approved before generating draw.'
+        });
+      }
+
+      const { pairs, unresolved } = buildDoublesPairEntries(approvedRegs);
+
+      if (pairs.length < 2) {
+        const message = unresolved.length > 0
+          ? 'Some approved registrations are missing a complete partner link. Please link or approve pairs before generating the draw.'
+          : 'Only 1 complete approved pair was found. Need at least 2 pairs to generate draw.';
+
+        return res.status(400).json({ message });
+      }
+
+      bracketSize    = nextPowerOf2(pairs.length);
+      rounds         = Math.log2(bracketSize);
+      orderedPlayers = buildDoublesByeOrder(pairs, bracketSize);
+
+    } else {
+      // ── SINGLES: seeded/random logic unchanged ──
+      bracketSize    = nextPowerOf2(n);
+      rounds         = Math.log2(bracketSize);
+      const { championId, runnerUpId } = req.body;
+      orderedPlayers = buildSeededOrder(confirmedRegs, championId, runnerUpId, bracketSize);
+    }
+
+    await Match.deleteMany({ tournament: req.params.id });
+    tournament.isLocked = true;
+    await tournament.save();
+
+    const matchesByRound = [];
+    for (let round = 1; round <= rounds; round++) {
+      const matchCount = bracketSize / Math.pow(2, round);
+      const roundMatches = [];
+      for (let m = 0; m < matchCount; m++) {
+        const match = new Match({
+          tournament: tournament._id,
+          round,
+          matchNumber: m + 1,
+        });
+        roundMatches.push(match);
+      }
+      matchesByRound.push(roundMatches);
+    }
+
+    for (let round = 0; round < matchesByRound.length - 1; round++) {
+      const currentRoundMatches = matchesByRound[round];
+      const nextRoundMatches    = matchesByRound[round + 1];
+      currentRoundMatches.forEach((match, idx) => {
+        const nextMatch = nextRoundMatches[Math.floor(idx / 2)];
+        match.nextMatchId         = nextMatch._id;
+        match.positionInNextMatch = (idx % 2) === 0 ? 1 : 2;
+      });
+    }
+
+    await Promise.all(matchesByRound.flat().map(match => match.save()));
+
+    const round1Matches = matchesByRound[0];
+    for (let i = 0; i < bracketSize / 2; i++) {
+      const p1    = orderedPlayers[i * 2];
+      const p2    = orderedPlayers[i * 2 + 1];
+      const match = round1Matches[i];
+      match.player1 = p1 ? p1._id : null;
+      match.player2 = p2 ? p2._id : null;
+
+      if (p1 && !p2) {
+        match.winner      = p1._id;
+        match.isCompleted = true;
+        match.score1      = 1;
+        match.score2      = 0;
+        await match.save();
+        await advanceWinner(match);
+      } else if (!p1 && p2) {
+        match.winner      = p2._id;
+        match.isCompleted = true;
+        match.score1      = 0;
+        match.score2      = 1;
+        await match.save();
+        await advanceWinner(match);
+      } else {
+        await match.save();
+      }
+    }
 
     res.json({ message: 'Draws generated successfully', rounds: matchesByRound.length });
   } catch (err) {
@@ -690,3 +862,4 @@ router.delete('/audit-logs/clear-all', protect, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.buildDoublesPairEntries = buildDoublesPairEntries;

@@ -14,24 +14,39 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+const getRequiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+};
+
+const PORT = process.env.PORT || 5000;
+const MONGODB_URI = getRequiredEnv('MONGODB_URI');
+const JWT_SECRET = getRequiredEnv('JWT_SECRET');
+
 const app = express();
 
 const { securitySanitizer, securityHeaders } = require('./middleware/security');
 const jwt = require('jsonwebtoken');
-let dbConnected = false;
+
 
 // Apply security headers globally
 app.use(securityHeaders);
 
 // Restrict CORS options
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin:
+    process.env.CLIENT_ORIGIN ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 };
-app.use(cors(corsOptions));
 
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const uploadsPath = path.join(__dirname, 'uploads');
@@ -64,7 +79,7 @@ app.get('/api/auth/me', (req, res) => {
       token = req.headers.authorization.split(' ')[1];
     }
     if (!token) return res.json(null);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
+    const decoded = jwt.verify(token, JWT_SECRET);
     return res.json({ id: decoded.id });
   } catch (err) {
     console.error('Auth /me fallback error:', err && err.stack ? err.stack : err);
@@ -95,9 +110,6 @@ app.use((err, req, res, next) => {
     details: process.env.NODE_ENV === 'development' ? err.message : 'Check server logs'
   });
 });
-
-const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI;
 
 const startServer = async () => {
   try {

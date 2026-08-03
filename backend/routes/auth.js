@@ -27,8 +27,10 @@ const upload = multer({
   },
 });
 
+const JWT_SECRET = process.env.JWT_SECRET;
+
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024', { expiresIn: '7d' });
+  jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
 
 // Register
 router.post('/register', async (req, res) => {
@@ -47,8 +49,7 @@ router.post('/register', async (req, res) => {
       admin: { id: admin._id, username: admin.username, name: admin.name, sport: admin.sport, avatarUrl: admin.avatarUrl },
     });
   } catch (err) {
-    const errorMsg = err.message || 'Registration failed';
-    res.status(400).json({ message: errorMsg });
+    res.status(400).json({ message: 'Registration failed' });
   }
 });
 
@@ -68,7 +69,7 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login Error:', err);
-    res.status(500).json({ message: 'Authentication Service Unavailable', details: err.message });
+    res.status(500).json({ message: 'Authentication Service Unavailable' });
   }
 });
 
@@ -80,7 +81,7 @@ router.get('/me', async (req, res) => {
   }
   if (!token) return res.json(null);
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
+    const decoded = jwt.verify(token, JWT_SECRET);
     const admin = await Admin.findById(decoded.id).select('-password');
     return res.json(admin || null);
   } catch (err) {
@@ -211,7 +212,7 @@ router.post('/create-admin', protect, async (req, res) => {
     const admin = await Admin.create({ username, password, sport, name, securityQuestion, securityAnswer });
     res.status(201).json({ id: admin._id, username: admin.username, name: admin.name, sport: admin.sport });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(400).json({ message: 'Failed to create admin' });
   }
 });
 
@@ -244,8 +245,7 @@ router.post('/reset-password', protect, async (req, res) => {
 
     res.json({ message: `Password reset successful for ${targetAdmin.username}` });
   } catch (err) {
-    const errorMsg = err.message || 'Password reset failed';
-    res.status(400).json({ message: errorMsg });
+    res.status(400).json({ message: 'Password reset failed' });
   }
 });
 
@@ -258,7 +258,7 @@ router.post('/forgot-password', async (req, res) => {
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     res.json({ securityQuestion: admin.securityQuestion });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Unable to retrieve security question' });
   }
 });
 
@@ -279,8 +279,7 @@ router.post('/reset-forgot-password', async (req, res) => {
     await admin.save(); // pre-save hook will bcrypt the new password
     res.json({ message: 'Password reset successful. You can now log in.' });
   } catch (err) {
-    const errorMsg = err.message || 'Password reset failed';
-    res.status(400).json({ message: errorMsg });
+    res.status(400).json({ message: 'Password reset failed' });
   }
 });
 
@@ -298,7 +297,7 @@ router.post('/update-security-question', protect, async (req, res) => {
     await admin.save();
     res.json({ message: 'Security question updated successfully' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Unable to update security question' });
   }
 });
 
