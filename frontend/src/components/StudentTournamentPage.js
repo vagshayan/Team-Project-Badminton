@@ -56,6 +56,24 @@ export default function StudentTournamentPage({ sport }) {
       .finally(() => setLoading(false));
   }, [sport]);
 
+  // If URL contains ?view=<tournamentId>, open that bracket automatically after tournaments load
+  useEffect(() => {
+    if (!tournaments || tournaments.length === 0) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const viewId = params.get('view');
+      if (!viewId) return;
+      const found = tournaments.find(t => String(t._id) === String(viewId));
+      if (found) {
+        // push state to remove the query param to avoid repeated opens
+        const url = new URL(window.location.href);
+        url.searchParams.delete('view');
+        window.history.replaceState({}, '', url.toString());
+        loadBrackets(found);
+      }
+    } catch (err) { /* ignore */ }
+  }, [tournaments]);
+
   const fetchBracketMatches = async (t) => {
     try {
       const res = await axios.get(`/api/tournaments/public/${t._id}/matches?sport=${sport}`);
@@ -256,7 +274,7 @@ export default function StudentTournamentPage({ sport }) {
 
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
           <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
-          <button onClick={() => navigate('/admin/login')} style={sh.adminBtn} className="mobile-btn">
+          <button onClick={() => navigate(`/admin/login?sport=${encodeURIComponent(sport)}`)} style={sh.adminBtn} className="mobile-btn">
             <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
           </button>
@@ -366,8 +384,8 @@ export default function StudentTournamentPage({ sport }) {
       {registerFor && <RegisterModal tournament={registerFor} onClose={() => setRegisterFor(null)} />}
 
       {viewBracketsFor && (
-        <div style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
-          <div style={bh.card}>
+        <div className="modal-overlay" style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
+          <div className="modal-card" style={bh.card}>
             <div style={bh.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <h2 style={{ margin: 0 }}>{viewBracketsFor.year} {CAT_LABELS[viewBracketsFor.category]} BRACKET</h2>

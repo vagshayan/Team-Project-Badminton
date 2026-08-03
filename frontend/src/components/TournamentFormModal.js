@@ -56,8 +56,8 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
   };
 
   return (
-    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{
+    <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card" style={{
         ...sh.card,
         padding: isMobile ? '30px 20px' : 48,
         borderRadius: isMobile ? 24 : 40,

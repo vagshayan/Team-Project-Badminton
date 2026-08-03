@@ -9,6 +9,7 @@ import Dashboard from './pages/admin/Dashboard';
 import BadmintonPage from './pages/student/BadmintonPage';
 import TableTennisPage from './pages/student/TableTennisPage';
 import CarromPage from './pages/student/CarromPage';
+import BracketsPage from './pages/student/BracketsPage';
 
 import LandingPage from './pages/student/LandingPage';
 
@@ -36,6 +37,7 @@ function App() {
             <Route path="/badminton" element={<BadmintonPage />} />
             <Route path="/table-tennis" element={<TableTennisPage />} />
             <Route path="/carrom" element={<CarromPage />} />
+            <Route path="/brackets" element={<BracketsPage />} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

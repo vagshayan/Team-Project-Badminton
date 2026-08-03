@@ -49,8 +49,8 @@ export default function RegistrationsModal({ tournament, onClose }) {
   }, [tournament._id]);
 
   return (
-    <div style={{ ...sh.overlay, padding: isMobile ? 16 : 40, alignItems: isMobile ? 'flex-start' : 'center' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{
+    <div className="modal-overlay" style={{ ...sh.overlay, padding: isMobile ? 16 : 40, alignItems: isMobile ? 'flex-start' : 'center' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card" style={{
         ...sh.card,
         padding: isMobile ? 24 : 50,
         borderRadius: isMobile ? 28 : 44,
@@ -98,8 +98,8 @@ export default function RegistrationsModal({ tournament, onClose }) {
             <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
           </div>
         ) : (
-          <div style={{ ...sh.tableBox, overflowX: 'auto' }}>
-            <table style={{ ...sh.table, minWidth: isMobile ? 620 : 960 }}>
+          <div className="responsive-table-wrap" style={{ ...sh.tableBox, overflowX: 'auto' }}>
+            <table className="responsive-table" style={{ ...sh.table, minWidth: isMobile ? 620 : 960 }}>
               <thead style={sh.thead}>
                 <tr>
                   <th style={sh.th}>#</th>

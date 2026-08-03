@@ -1,12 +1,24 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 const app = express();
 
 const { securitySanitizer, securityHeaders } = require('./middleware/security');
 const jwt = require('jsonwebtoken');
+let dbConnected = false;
 
 // Apply security headers globally
 app.use(securityHeaders);
@@ -22,30 +34,16 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+const uploadsPath = path.join(__dirname, 'uploads');
+fs.mkdirSync(uploadsPath, { recursive: true });
+app.use('/uploads', express.static(uploadsPath));
+
 // Apply XSS and NoSQL injection sanitizer
 app.use(securitySanitizer);
 
 // Welcome route
 app.get('/', (req, res) => {
   res.json({ message: '🏆 Tournament API Server is running', version: '1.0.0' });
-});
-
-// Lightweight auth/me fallback: respond safely without touching DB
-// This prevents front-end 500 responses while the DB or models may be initializing.
-app.get('/api/auth/me', (req, res) => {
-  try {
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
-    if (!token) return res.json(null);
-    // verify token but avoid DB lookup here — return minimal payload
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
-    return res.json({ id: decoded.id });
-  } catch (err) {
-    console.error('Auth /me fallback error:', err && err.stack ? err.stack : err);
-    return res.json(null);
-  }
 });
 
 // Routes
@@ -56,6 +54,23 @@ const registrationRoutes = require('./routes/registrations');
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
+
+// Lightweight auth/me fallback: respond safely without touching DB
+// This prevents front-end 500 responses while the DB or models may be initializing.
+app.get('/api/auth/me', (req, res) => {
+  try {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (!token) return res.json(null);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024');
+    return res.json({ id: decoded.id });
+  } catch (err) {
+    console.error('Auth /me fallback error:', err && err.stack ? err.stack : err);
+    return res.json(null);
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -127,8 +142,17 @@ const startServer = async () => {
     console.log('⚠️ Starting backend in degraded mode without MongoDB. Auth/me and static routes will still work.');
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`✅ Server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use. Please stop the running process or set a different PORT in your environment.`);
+    } else {
+      console.error('❌ Server error:', error);
+    }
+    process.exit(1);
   });
 };
 

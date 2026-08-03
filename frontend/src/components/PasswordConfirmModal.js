@@ -15,8 +15,8 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
   };
 
   return (
-    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={sh.card}>
+    <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card" style={sh.card}>
         <div style={sh.badge}>{danger ? 'DANGER ZONE 🛡️' : 'VERIFICATION 🔑'}</div>
         <h2 style={{ ...sh.title, color: danger ? '#EF4444' : 'var(--primary)' }}>{title}</h2>
         <p style={sh.subtitle}>{message}</p>

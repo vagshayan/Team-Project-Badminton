@@ -1,9 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { Admin, validatePasswordRequirements } = require('../models/Admin');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+
+const uploadDir = path.join(__dirname, '..', 'uploads');
+fs.mkdirSync(uploadDir, { recursive: true });
+const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (allowedMimeTypes.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG, and WEBP images are allowed'));
+  },
+});
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET || 'SuperSecret_TournamentApp_2024', { expiresIn: '7d' });
@@ -67,6 +89,49 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// Upload current admin avatar
+router.post('/me/avatar', protect, upload.single('avatar'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No avatar file uploaded' });
+  }
+
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+
+    admin.avatarUrl = `/uploads/${req.file.filename}`;
+    await admin.save();
+
+    res.json({ avatarUrl: admin.avatarUrl });
+  } catch (err) {
+    console.error('Upload avatar error:', err);
+    res.status(500).json({ message: 'Unable to upload avatar' });
+  }
+});
+
+// Remove current admin avatar
+router.delete('/me/avatar', protect, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+
+    if (admin.avatarUrl && admin.avatarUrl.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '..', admin.avatarUrl.replace(/^\//, ''));
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    admin.avatarUrl = '';
+    await admin.save();
+
+    res.json({ avatarUrl: '' });
+  } catch (err) {
+    console.error('Remove avatar error:', err);
+    res.status(500).json({ message: 'Unable to remove avatar' });
+  }
+});
+
 // Update current admin profile
 router.put('/me', protect, async (req, res) => {
   const { username, name, avatarUrl } = req.body;
@@ -90,7 +155,7 @@ router.put('/me', protect, async (req, res) => {
   } catch (err) {
     console.error('Update admin profile error:', err);
     res.status(500).json({ message: 'Unable to update profile' });
-  }cls
+  }
 });
 
 // Change current admin password
@@ -100,11 +165,18 @@ router.put('/me/password', protect, async (req, res) => {
     return res.status(400).json({ message: 'Current password, new password, and confirmation are required' });
   }
   if (newPassword !== confirmPassword) {
-    return res.status(400).json({ message: 'New passwords do not match' });
+    return res.status(400).json({ message: 'New password and confirmation do not match.' });
+  }
+  if (!validatePasswordRequirements(newPassword)) {
+    return res.status(400).json({ message: 'New password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.' });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'New password must be different from the current password.' });
   }
 
   try {
     const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
     const isMatch = await admin.comparePassword(currentPassword);
     if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
 

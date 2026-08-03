@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Cropper from 'react-easy-crop';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import TournamentFormModal from '../../components/TournamentFormModal';
@@ -60,9 +62,31 @@ const AUDIT_MODULE_LABELS = {
   Admin: 'Admins',
 };
 
+const VALID_ADMIN_TABS = new Set([
+  'dashboard',
+  'player-approvals',
+  'tournament-setup',
+  'brackets',
+  'audit-log',
+  'profile',
+  'confirmed-summary',
+  'pending-approvals'
+]);
+const DEFAULT_ADMIN_TAB = 'dashboard';
+
 const formatAuditAction = (action) => AUDIT_ACTION_LABELS[action] || action || 'Unknown Action';
 
 const formatAuditModule = (log) => AUDIT_MODULE_LABELS[log.targetModel] || log.targetModel || 'Unknown';
+
+const getTabFromSearch = (search) => {
+  try {
+    const params = new URLSearchParams(search || window.location.search);
+    const tab = params.get('tab') || DEFAULT_ADMIN_TAB;
+    return VALID_ADMIN_TABS.has(tab) ? tab : DEFAULT_ADMIN_TAB;
+  } catch {
+    return DEFAULT_ADMIN_TAB;
+  }
+};
 
 const formatAuditDetails = (log) => {
   if (!log?.details) return '—';
@@ -180,9 +204,11 @@ const FILTER_CATEGORIES = [
 ];
 
 export default function Dashboard() {
-  const { admin, logout, loginHistory } = useAuth();
+  const { admin, logout, loginHistory, setAdmin } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(getTabFromSearch(location.search));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -211,22 +237,198 @@ export default function Dashboard() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordFocus, setPasswordFocus] = useState(false);
+  const [confirmFocus, setConfirmFocus] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropSource, setCropSource] = useState('');
+  const [cropImage, setCropImage] = useState('');
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [aspect, setAspect] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [cropReadyFile, setCropReadyFile] = useState(null);
   const [lastSeenLoginTimestamp, setLastSeenLoginTimestamp] = useState(localStorage.getItem('lastSeenLoginTimestamp') || '');
   // Audit Log states
   const [auditLogs, setAuditLogs] = useState([]);
+
+  useEffect(() => {
+    const nextTab = getTabFromSearch(location.search);
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!location.search.includes('tab=')) {
+      navigate(`?tab=${activeTab}`, { replace: true });
+    }
+  }, [location.search, activeTab, navigate]);
+
+  const changeTab = (tabId) => {
+    const normalizedTab = VALID_ADMIN_TABS.has(tabId) ? tabId : DEFAULT_ADMIN_TAB;
+    navigate(`?tab=${normalizedTab}`, { replace: false });
+    if (isMobile) setMobileSidebarOpen(false);
+  };
   const [auditDate, setAuditDate] = useState('');
   const filterRef = useRef(null);
   const notificationsRef = useRef(null);
   const sidebarProfileMenuRef = useRef(null);
   const headerProfileMenuRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const handleAvatarUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const openCropModal = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImage(reader.result);
+      setCropSource(file.name);
+      setZoom(1);
+      setCrop({ x: 0, y: 0 });
+      setCroppedAreaPixels(null);
+      setCropReadyFile(null);
+      setCropModalOpen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const createCroppedAvatar = async () => {
+    if (!cropImage || !croppedAreaPixels) return null;
+    const file = await getCroppedImg(cropImage, croppedAreaPixels);
+    return file;
+  };
+
+  const handleCropConfirm = async () => {
+    const croppedFile = await createCroppedAvatar();
+    if (!croppedFile) {
+      setProfileMessage('Unable to crop the selected image.');
+      return;
+    }
+    setCropReadyFile(croppedFile);
+    setCropModalOpen(false);
+    await uploadAvatarFile(croppedFile);
+  };
 
   // Link Partner modal state
   const [linkTarget, setLinkTarget] = useState(null);
   const [linkSearch, setLinkSearch] = useState('');
   const [linkSelected, setLinkSelected] = useState(null);
   const [linkLoading, setLinkLoading] = useState(false);
+
+  const validatePassword = (value) => ({
+    length: value.length >= 8,
+    uppercase: /[A-Z]/.test(value),
+    lowercase: /[a-z]/.test(value),
+    number: /[0-9]/.test(value),
+    special: /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/.test(value),
+  });
+
+  const passwordChecks = validatePassword(newPassword);
+  const passwordValid = Object.values(passwordChecks).every(Boolean);
+  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
+  const showPasswordRequirements = passwordFocus && newPassword.length > 0;
+  const showPasswordMatchMessage = confirmFocus && confirmPassword.length > 0;
+
+  const getApiBase = () => {
+    if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.startsWith('http')) {
+      return process.env.REACT_APP_API_URL;
+    }
+    if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      return 'http://localhost:5000';
+    }
+    return '';
+  };
+
+  const uploadAvatarFile = async (file) => {
+    setProfileMessage('');
+    setUploadingAvatar(true);
+    try {
+      const apiBase = getApiBase();
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const res = await axios.post(`${apiBase}/api/auth/me/avatar`, formData);
+      if (res?.status >= 200 && res?.status < 300 && res?.data) {
+        const avatarUrl = res.data.avatarUrl || '';
+        setProfileAvatarUrl(avatarUrl);
+        setAdmin((prev) => prev ? { ...prev, avatarUrl } : prev);
+        setProfileMessage('Profile photo updated successfully.');
+      } else {
+        throw new Error(res?.data?.message || 'Unable to upload avatar');
+      }
+    } catch (err) {
+      setProfileMessage(err.response?.data?.message || err.message || 'Unable to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!profileAvatarUrl) return;
+    setProfileMessage('');
+    setUploadingAvatar(true);
+    try {
+      const apiBase = getApiBase();
+      const res = await axios.delete(`${apiBase}/api/auth/me/avatar`);
+      if (res?.status >= 200 && res?.status < 300) {
+        setProfileAvatarUrl('');
+        setAdmin((prev) => prev ? { ...prev, avatarUrl: '' } : prev);
+        setProfileMessage('Profile photo removed.');
+      } else {
+        throw new Error(res?.data?.message || 'Unable to remove avatar');
+      }
+    } catch (err) {
+      setProfileMessage(err.response?.data?.message || err.message || 'Unable to remove avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setProfileMessage('Only JPG, PNG, or WEBP files are allowed.');
+      e.target.value = null;
+      return;
+    }
+    openCropModal(file);
+    e.target.value = null;
+  };
+
+  const renderPasswordToggle = (label, visible, onToggle) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()} password`}
+      style={{
+        position: 'absolute',
+        right: 12,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        color: 'var(--text-muted)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        fontSize: 18,
+      }}
+    >
+      {visible ? '👁️' : '🔒'}
+    </button>
+  );
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -269,7 +471,9 @@ export default function Dashboard() {
     setProfileAvatarUrl(admin?.avatarUrl || '');
   }, [admin]);
 
-  const meta = admin?.sport ? SPORT_META[admin.sport] : SPORT_META['badminton'];
+  const normalizedSport = admin?.sport ? String(admin.sport).trim().toLowerCase() : '';
+  const meta = SPORT_META[normalizedSport] || { label: admin?.sport ? String(admin.sport).trim().toUpperCase() : 'ADMIN', icon: '🏆', color: '#2563EB' };
+  const safeMetaLabel = meta.label || 'ADMIN';
 
   const loginTimeFormatted = new Date(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now()).toLocaleString('en-IN', { hour12: true });
 
@@ -529,7 +733,7 @@ export default function Dashboard() {
 
   const safeAdminName = admin.name || admin.username || 'ADMIN';
   const safeAdminFirstName = (safeAdminName.split(' ')[0] || admin.username || 'ADMIN').toUpperCase();
-  const safeMetaLabel = meta.label || 'ADMIN';
+  const avatarSrc = profileAvatarUrl || admin?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeAdminName)}&background=random&size=128`;
   const desktopSidebarW = sidebarCollapsed ? 72 : 340;
 
   return (
@@ -573,7 +777,12 @@ export default function Dashboard() {
         {(isMobile || !sidebarCollapsed) && (
           <div style={ds.profileCard}>
             <div style={ds.avatarBox}>
-              <img src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`} alt="Admin" style={ds.avatar} />
+              <img
+                src={avatarSrc}
+                alt="Admin"
+                title={safeAdminName}
+                style={ds.avatar}
+              />
               <div style={ds.statusDot} />
             </div>
             <div style={{ textAlign: 'center' }}>
@@ -587,7 +796,7 @@ export default function Dashboard() {
         {!isMobile && sidebarCollapsed && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ position: 'relative', width: 42, height: 42 }}>
-              <img src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
+              <img src={avatarSrc} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
               <div style={{ position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, background: '#10B981', border: '2px solid var(--bg-card)', borderRadius: '50%' }} />
             </div>
           </div>
@@ -603,7 +812,7 @@ export default function Dashboard() {
             ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); if (isMobile) setMobileSidebarOpen(false); }}
+              onClick={() => changeTab(tab.id)}
               title={(!isMobile && sidebarCollapsed) ? tab.label : ''}
               style={{
                 ...ds.navBtn,
@@ -643,7 +852,7 @@ export default function Dashboard() {
               }}
             >
               <img
-                src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=64`}
+                src={avatarSrc}
                 alt="Profile"
                 style={{ width: 34, height: 34, borderRadius: 14, objectFit: 'cover' }}
               />
@@ -676,7 +885,7 @@ export default function Dashboard() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
                   <img
-                    src={`https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=64`}
+                    src={avatarSrc}
                     alt="Profile"
                     style={{ width: 40, height: 40, borderRadius: 14, objectFit: 'cover' }}
                   />
@@ -687,9 +896,8 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => {
-                    setActiveTab('profile');
+                    changeTab('profile');
                     setProfileMenuOpen(false);
-                    if (isMobile) setMobileSidebarOpen(false);
                   }}
                   style={ds.profileMenuItem}
                 >
@@ -838,7 +1046,7 @@ export default function Dashboard() {
                   <button
                     key={s.label}
                     type="button"
-                    onClick={() => { setActiveTab(s.target); if (isMobile) setMobileSidebarOpen(false); }}
+                    onClick={() => changeTab(s.target)}
                     style={{ ...ds.statCard, padding: isMobile ? '24px 20px' : '48px 32px', borderRadius: isMobile ? 24 : 40, cursor: 'pointer', textAlign: 'left' }}
                     className="mobile-card"
                   >
@@ -859,9 +1067,9 @@ export default function Dashboard() {
                   <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Details by category for registered and approved players.</p>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 18, marginBottom: 30 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18, marginBottom: 30, justifyItems: 'stretch' }}>
                 {approvalSummary.map((summary) => (
-                  <div key={summary.id} style={{ ...ds.summaryCard, padding: 22, borderRadius: 24, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                  <div key={summary.id} style={{ ...ds.summaryCard, padding: 22, borderRadius: 24, border: '1px solid var(--border)', background: 'var(--bg-card)', minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: 1.2 }}>{summary.label.toUpperCase()}</div>
@@ -902,7 +1110,7 @@ export default function Dashboard() {
                       <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', userSelect: 'none' }}>Edit Mode</span>
                     </label>
                   </div>
-                  <button onClick={() => setActiveTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
+                  <button onClick={() => changeTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
                     ← BACK TO DASHBOARD
                   </button>
                 </div>
@@ -912,8 +1120,8 @@ export default function Dashboard() {
                   Click a registration entry to open edit mode.
                 </div>
               )}
-              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div className="responsive-table-wrap" style={{ ...ds.tableBox, overflowX: 'auto' }}>
+                <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
                     <tr>
                       <th style={{ ...ds.th_header, width: '25%' }}>PARTICIPANT</th>
@@ -1125,8 +1333,8 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
-              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div className="responsive-table-wrap" style={{ ...ds.tableBox, overflowX: 'auto' }}>
+                <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
                     <tr>
                       <th style={{ ...ds.th_header, width: '25%' }}>PARTICIPANT</th>
@@ -1429,48 +1637,134 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: 24, marginBottom: 32 }}>
                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 24 }}>
-                    <img
-                      src={profileAvatarUrl || `https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`}
-                      alt="Admin Avatar"
-                      style={{ width: 88, height: 88, borderRadius: 24, objectFit: 'cover', border: '2px solid var(--border)' }}
-                    />
+                    <div style={{ position: 'relative', width: 88, height: 88 }}>
+                      <img
+                        src={profileAvatarUrl || `https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`}
+                        alt="Admin Avatar"
+                        style={{ width: '100%', height: '100%', borderRadius: 24, objectFit: 'cover', border: '2px solid var(--border)' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAvatarUploadClick}
+                        style={ds.avatarUploadBtn}
+                        title="Upload profile photo"
+                      >
+                        📷
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleAvatarFileChange}
+                        disabled={uploadingAvatar}
+                        style={ds.hiddenFileInput}
+                      />
+                    </div>
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 950 }}>{safeAdminName}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{admin.username}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
+                      <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: 12, letterSpacing: 0.5 }}>Upload Profile Photo</div>
+                      {profileAvatarUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveAvatar}
+                          disabled={uploadingAvatar}
+                          style={ds.removeAvatarBtn}
+                        >
+                          Remove Photo
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18 }}>
-                    <div>
-                      <label style={ds.fieldLabel}>Profile Image URL</label>
-                      <input
-                        type="text"
-                        value={profileAvatarUrl}
-                        onChange={(e) => setProfileAvatarUrl(e.target.value)}
-                        placeholder="https://..."
-                        style={ds.input}
-                      />
+                {cropModalOpen && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400, padding: 24 }}>
+                    <div style={{ width: 'min(92vw, 920px)', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', padding: 18, boxShadow: 'var(--shadow)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 18, fontWeight: 900 }}>Crop your profile photo</div>
+                          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>Drag the crop box, pinch/scroll to zoom, then save.</div>
+                        </div>
+                        <button type="button" onClick={() => setCropModalOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 520px', height: 420, position: 'relative', background: 'rgba(0,0,0,0.04)', borderRadius: 8, overflow: 'hidden' }}>
+                          {cropImage && (
+                            <Cropper
+                              image={cropImage}
+                              crop={crop}
+                              zoom={zoom}
+                              aspect={aspect}
+                              onCropChange={setCrop}
+                              onZoomChange={setZoom}
+                              onCropComplete={(croppedArea, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
+                            />
+                          )}
+                        </div>
+
+                        <div style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div>
+                            <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>Zoom</label>
+                            <input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={{ width: '100%', marginTop: 8 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>Aspect</label>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                              <button type="button" onClick={() => setAspect(1)} style={aspect === 1 ? ds.createBtn : ds.revertBtn}>1:1</button>
+                              <button type="button" onClick={() => setAspect(3 / 2)} style={aspect === 3 / 2 ? ds.createBtn : ds.revertBtn}>3:2</button>
+                              <button type="button" onClick={() => setAspect(4 / 3)} style={aspect === 4 / 3 ? ds.createBtn : ds.revertBtn}>4:3</button>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
+                            <button type="button" onClick={() => setCropModalOpen(false)} style={{ ...ds.revertBtn, padding: '10px 16px' }}>Cancel</button>
+                            <button type="button" onClick={handleCropConfirm} style={{ ...ds.createBtn, padding: '10px 16px' }} disabled={uploadingAvatar}>Save Crop</button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
+                  </div>
+                )}
+
+              <div style={{ display: 'grid', gap: 18 }}>
+                    <div style={{ position: 'relative' }}>
                       <label style={ds.fieldLabel}>Full Name</label>
-                      <input
-                        type="text"
-                        value={profileName}
-                        onChange={(e) => setProfileName(e.target.value)}
-                        placeholder="Admin Name"
-                        style={ds.input}
-                      />
+                      <div style={ds.inputIconWrapper}>
+                        <span style={ds.inputIcon}>👤</span>
+                        <input
+                          type="text"
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          placeholder="Badminton Admin"
+                          style={{ ...ds.input, paddingLeft: 48 }}
+                        />
+                      </div>
                     </div>
-                    <div>
+                    <div style={{ position: 'relative' }}>
                       <label style={ds.fieldLabel}>Username</label>
-                      <input
-                        type="text"
-                        value={profileUsername}
-                        onChange={(e) => setProfileUsername(e.target.value)}
-                        placeholder="Username"
-                        style={ds.input}
-                      />
+                      <div style={ds.inputIconWrapper}>
+                        <span style={ds.inputIcon}>@</span>
+                        <input
+                          type="text"
+                          value={profileUsername}
+                          onChange={(e) => setProfileUsername(e.target.value)}
+                          placeholder="badminton@gmail.com"
+                          style={{ ...ds.input, paddingLeft: 48 }}
+                        />
+                      </div>
+                    </div>
+                    <div style={ds.fileUploadBox} onClick={handleAvatarUploadClick}>
+                      <div style={ds.fileUploadInfo}>
+                        <div style={ds.uploadIconCircle}>☁️</div>
+                        <div>
+                          <div style={ds.uploadTextPrimary}>Choose a file or drag & drop</div>
+                          <div style={ds.uploadTextSecondary}>JPG, PNG or WEBP. Max size 2MB.</div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleAvatarUploadClick} style={ds.uploadButton} disabled={uploadingAvatar}>
+                        {uploadingAvatar ? 'Uploading...' : 'Choose File'}
+                      </button>
                     </div>
                     {profileMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{profileMessage}</div>}
                     <button
@@ -1478,18 +1772,24 @@ export default function Dashboard() {
                         setSavingProfile(true);
                         setProfileMessage('');
                         try {
-                          const apiBase = process.env.REACT_APP_API_URL || '';
+                          const apiBase = getApiBase();
                           const res = await axios.put(`${apiBase}/api/auth/me`, {
                             username: profileUsername,
                             name: profileName,
                             avatarUrl: profileAvatarUrl,
                           });
-                          setProfileMessage('Profile updated successfully');
-                          if (res.data) {
+
+                          if (res?.status >= 200 && res?.status < 300 && res?.data) {
+                            setProfileMessage('Profile updated successfully.');
                             setAdmin(res.data);
+                            setProfileName(res.data.name || '');
+                            setProfileUsername(res.data.username || '');
+                            setProfileAvatarUrl(res.data.avatarUrl || '');
+                          } else {
+                            throw new Error(res?.data?.message || 'Unable to update profile');
                           }
                         } catch (err) {
-                          setProfileMessage(err.response?.data?.message || 'Unable to update profile');
+                          setProfileMessage(err.response?.data?.message || err.message || 'Unable to update profile');
                         } finally {
                           setSavingProfile(false);
                         }
@@ -1499,6 +1799,10 @@ export default function Dashboard() {
                     >
                       {savingProfile ? 'Saving...' : 'Save Profile'}
                     </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12 }}>
+                      <span style={{ fontSize: 14 }}>🔒</span>
+                      <span>Your information is secure and only visible to administrators.</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1510,41 +1814,94 @@ export default function Dashboard() {
                   <div style={{ display: 'grid', gap: 18 }}>
                     <div>
                       <label style={ds.fieldLabel}>Current Password</label>
-                      <input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Current password"
-                        style={ds.input}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Current password"
+                          style={{ ...ds.input, paddingRight: 46 }}
+                        />
+                        {renderPasswordToggle('Current', showCurrentPassword, () => setShowCurrentPassword((v) => !v))}
+                      </div>
                     </div>
                     <div>
                       <label style={ds.fieldLabel}>New Password</label>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="New password"
-                        style={ds.input}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          onFocus={() => setPasswordFocus(true)}
+                          onBlur={() => setPasswordFocus(false)}
+                          placeholder="New password"
+                          style={{ ...ds.input, paddingRight: 46 }}
+                        />
+                        {renderPasswordToggle('New', showNewPassword, () => setShowNewPassword((v) => !v))}
+                      </div>
+                      {showPasswordRequirements && (
+                        <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 16, background: 'rgba(15, 23, 42, 0.06)' }}>
+                          <div style={{ marginBottom: 8, fontWeight: 700 }}>Password must include:</div>
+                          <div style={{ color: passwordChecks.length ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.length ? '✓' : '✗'}</span><span>At least 8 characters</span></div>
+                          <div style={{ color: passwordChecks.uppercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.uppercase ? '✓' : '✗'}</span><span>One uppercase letter (A-Z)</span></div>
+                          <div style={{ color: passwordChecks.lowercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.lowercase ? '✓' : '✗'}</span><span>One lowercase letter (a-z)</span></div>
+                          <div style={{ color: passwordChecks.number ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.number ? '✓' : '✗'}</span><span>One number (0-9)</span></div>
+                          <div style={{ color: passwordChecks.special ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.special ? '✓' : '✗'}</span><span>One special character</span></div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label style={ds.fieldLabel}>Confirm New Password</label>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                        style={ds.input}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onFocus={() => setConfirmFocus(true)}
+                          onBlur={() => setConfirmFocus(false)}
+                          placeholder="Confirm new password"
+                          style={{ ...ds.input, paddingRight: 46 }}
+                        />
+                        {renderPasswordToggle('Confirm', showConfirmPassword, () => setShowConfirmPassword((v) => !v))}
+                      </div>
+                      {showPasswordMatchMessage && (
+                        <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>
+                          {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match.'}
+                        </div>
+                      )}
                     </div>
                     {passwordMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(239, 68, 68, 0.12)', color: '#B91C1C', fontWeight: 700 }}>{passwordMessage}</div>}
                     <button
                       onClick={async () => {
                         setChangingPassword(true);
                         setPasswordMessage('');
+                        if (!currentPassword) {
+                          setPasswordMessage('Current password is required to change your password.');
+                          setChangingPassword(false);
+                          return;
+                        }
+                        if (!passwordValid) {
+                          setPasswordMessage('New password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
+                          setChangingPassword(false);
+                          return;
+                        }
+                        if (currentPassword === newPassword) {
+                          setPasswordMessage('New password must be different from the current password.');
+                          setChangingPassword(false);
+                          return;
+                        }
+                        if (!confirmPassword) {
+                          setPasswordMessage('Please confirm your new password.');
+                          setChangingPassword(false);
+                          return;
+                        }
+                        if (!passwordsMatch) {
+                          setPasswordMessage('New password and confirmation do not match.');
+                          setChangingPassword(false);
+                          return;
+                        }
                         try {
-                          const apiBase = process.env.REACT_APP_API_URL || '';
+                          const apiBase = getApiBase();
                           const res = await axios.put(`${apiBase}/api/auth/me/password`, {
                             currentPassword,
                             newPassword,
@@ -1596,8 +1953,8 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-              <div style={{ ...ds.tableBox, overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div className="responsive-table-wrap" style={{ ...ds.tableBox, overflowX: 'auto' }}>
+                <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
                     <tr>
                       <th style={{ ...ds.th_header, width: '18%' }}>TIME</th>
@@ -1807,10 +2164,10 @@ const ds = {
   // avatar: { width: '100%', height: '100%', borderRadius: 32, objectFit: 'cover', border: '3px solid var(--border)' },
   // statusDot: { position: 'absolute', bottom: -5, right: -5, width: 22, height: 22, background: '#10B981', border: '4px solid var(--bg-card)', borderRadius: '50%' },
   logoBox: { width: 48, height: 48, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 22px rgba(59, 130, 246, 0.18)' },
-  profileCard: { padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', borderRadius: '0 0 24px 24px' },
-  avatarBox: { position: 'relative', width: 84, height: 84 },
-  avatar: { width: '100%', height: '100%', borderRadius: 32, objectFit: 'cover', border: '3px solid var(--border)' },
-  statusDot: { position: 'absolute', bottom: -6, right: -6, width: 18, height: 18, background: '#10B981', border: '3px solid var(--bg-card)', borderRadius: '50%' },
+  profileCard: { padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', borderRadius: '0 0 24px 24px', background: 'var(--bg-panel)' },
+  avatarBox: { position: 'relative', width: 96, height: 96 },
+  avatar: { width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '4px solid var(--border)' },
+  statusDot: { position: 'absolute', bottom: -6, right: -6, width: 18, height: 18, background: '#10B981', border: '3px solid var(--bg-panel)', borderRadius: '50%' },
   
   pName: { fontSize: 16, fontWeight: 950, letterSpacing: 0.5 },
   pRole: { fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1.5, marginTop: 4 },
@@ -1825,15 +2182,12 @@ const ds = {
   logoutBtn: { color: '#EF4444', fontWeight: 950, border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, letterSpacing: 1 },
   notificationBtn: { position: 'relative', border: 'none', background: 'var(--bg-input)', color: 'var(--text)', width: 48, height: 48, borderRadius: 16, fontSize: 18, cursor: 'pointer', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'grid', placeItems: 'center' },
   notificationBadge: { position: 'absolute', top: 8, right: 8, minWidth: 18, height: 18, borderRadius: 999, background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' },
-  notificationMenu: { position: 'absolute', right: 0, top: 'calc(100% + 12px)', width: 320, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, boxShadow: '0 30px 70px rgba(0,0,0,0.12)', padding: 16, zIndex: 1000 },
+  notificationMenu: { position: 'absolute', right: 0, top: 'calc(100% + 12px)', width: 320, background: 'var(--bg-panel)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, boxShadow: '0 30px 70px rgba(0,0,0,0.22)', padding: 16, zIndex: 1100 },
   notificationTitle: { fontSize: 14, fontWeight: 900, color: 'var(--text)', marginBottom: 8 },
-  notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: 14, borderRadius: 16, cursor: 'pointer', transition: 'background 0.2s', color: 'var(--text)', display: 'grid', gap: 8, marginBottom: 6 },
-  notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 0 },
-  notificationItemDescription: { fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 },
-  notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: 14, borderRadius: 18, cursor: 'pointer', transition: 'background 0.2s', color: 'var(--text)' },
-  profileMenuItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', color: 'var(--text)', padding: '14px 12px', borderRadius: 14, cursor: 'pointer', fontSize: 13, transition: 'all 0.2s', textAlign: 'left' },
+  notificationItem: { width: '100%', textAlign: 'left', border: 'none', background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 18, cursor: 'pointer', transition: 'background 0.2s ease, transform 0.2s ease', color: 'var(--text)', display: 'grid', gap: 8, marginBottom: 6 },
   notificationItemTitle: { fontSize: 14, fontWeight: 900, marginBottom: 4 },
-  notificationItemDescription: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 },
+  notificationItemDescription: { fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 },
+  profileMenuItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', color: 'var(--text)', padding: '14px 12px', borderRadius: 14, cursor: 'pointer', fontSize: 13, transition: 'all 0.2s', textAlign: 'left' },
   title: { fontSize: 56, fontWeight: 950, marginBottom: 8, letterSpacing: -2, textTransform: 'uppercase' },
   subtitle: { color: 'var(--text-muted)', marginBottom: 60, fontSize: 18, fontWeight: 500 },
   statCard: { background: 'var(--bg-card)', padding: '48px 32px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', position: 'relative' },
@@ -1844,7 +2198,19 @@ const ds = {
   thead: { background: 'var(--bg-input)', borderBottom: '2px solid var(--border)' },
   th_header: { padding: '24px 32px', fontSize: 13, textTransform: 'uppercase', color: 'var(--text)', letterSpacing: 1.5, fontWeight: 950 },
   tr: { borderTop: '1px solid var(--border)', transition: 'background 0.2s' },
-  input: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 18px', borderRadius: 12, fontSize: 16, outline: 'none', transition: 'all 0.2s' },
+  input: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 18px', borderRadius: 16, fontSize: 16, outline: 'none', transition: 'all 0.2s' },
+  hiddenFileInput: { display: 'none' },
+  inputIconWrapper: { position: 'relative' },
+  inputIcon: { position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-muted)' },
+  fileUploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, padding: '20px', borderRadius: 20, border: '1px dashed rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.2s', minHeight: 100 },
+  fileUploadBoxHover: { borderColor: 'rgba(59, 130, 246, 0.6)', background: 'rgba(59, 130, 246, 0.08)' },
+  fileUploadInfo: { display: 'flex', alignItems: 'center', gap: 14 },
+  uploadIconCircle: { width: 44, height: 44, borderRadius: 16, background: 'rgba(59, 130, 246, 0.16)', display: 'grid', placeItems: 'center', fontSize: 20, color: 'var(--primary)' },
+  uploadTextPrimary: { fontSize: 15, fontWeight: 900, color: 'var(--text)' },
+  uploadTextSecondary: { fontSize: 13, color: 'var(--text-muted)', marginTop: 4 },
+  uploadButton: { background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 14, fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
+  removeAvatarBtn: { marginTop: 12, border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: 'var(--text)', padding: '10px 16px', borderRadius: 14, cursor: 'pointer', fontWeight: 700 },
+  avatarUploadBtn: { position: 'absolute', bottom: 0, right: 0, width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 10px 20px rgba(0,0,0,0.15)' },
   td: { padding: '20px 16px', whiteSpace: 'nowrap' },
   actionBtn: { border: 'none', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer', letterSpacing: 0.5 },
   revertBtn: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '12px 20px', borderRadius: 12, fontWeight: 950, fontSize: 12, cursor: 'pointer' },
@@ -1855,3 +2221,39 @@ const ds = {
   createBtn: { background: 'var(--primary)', color: '#FFF', border: 'none', padding: '18px 40px', borderRadius: 20, fontWeight: 950, fontSize: 15, cursor: 'pointer', boxShadow: '0 15px 30px -5px rgba(59, 130, 246, 0.4)' },
   filterSelect: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '12px 20px', borderRadius: 16, fontSize: 13, fontWeight: 800, cursor: 'pointer', outline: 'none' }
 };
+
+// Helper: create a cropped image blob from an image source and pixel crop
+async function getCroppedImg(imageSrc, pixelCrop) {
+  const image = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.setAttribute('crossOrigin', 'anonymous');
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = imageSrc;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  const ctx = canvas.getContext('2d');
+
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
+  );
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return resolve(null);
+      const file = new File([blob], 'avatar.jpg', { type: blob.type });
+      resolve(file);
+    }, 'image/jpeg', 0.9);
+  });
+}

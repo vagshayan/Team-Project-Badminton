@@ -8,7 +8,7 @@ const validatePasswordRequirements = (password) => {
     uppercase: /[A-Z]/.test(password),
     lowercase: /[a-z]/.test(password),
     number: /[0-9]/.test(password),
-    special: /[!@#$%^&*]/.test(password),
+    special: /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/.test(password),
   };
   return Object.values(checks).every(check => check);
 };
@@ -47,4 +47,8 @@ adminSchema.methods.compareSecurityAnswer = async function (candidateAnswer) {
   return bcrypt.compare(candidateAnswer, this.securityAnswer);
 };
 
-module.exports = mongoose.model('Admin', adminSchema);
+const Admin = mongoose.model('Admin', adminSchema);
+
+module.exports = Admin;
+module.exports.Admin = Admin;
+module.exports.validatePasswordRequirements = validatePasswordRequirements;
