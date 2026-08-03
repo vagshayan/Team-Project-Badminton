@@ -3,6 +3,7 @@ const router = express.Router();
 const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
+const { logAdminAction } = require('../utils/auditLogger');
 
 // Admin — view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -34,6 +35,8 @@ router.patch('/:id/status', protect, async (req, res) => {
 
     if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
       return res.status(401).json({ message: 'Unauthorized' });
+
+    const originalStatus = reg.status;
 
     // If rejecting, just update status (don't delete)
     if (status === 'rejected') {
@@ -74,6 +77,15 @@ router.patch('/:id/status', protect, async (req, res) => {
         );
       }
 
+      await logAdminAction({
+        adminId: req.admin._id,
+        action: 'REJECT_REGISTRATION',
+        targetId: reg._id,
+        targetModel: 'Registration',
+        details: { tournament: reg.tournament._id, rollNumber: reg.rollNumber, previousStatus: reg.status, newStatus: 'rejected' },
+        req
+      });
+
       return res.json({ message: 'Registration marked as rejected.' });
     }
 
@@ -103,6 +115,15 @@ router.patch('/:id/status', protect, async (req, res) => {
     }
 
     await reg.save();
+
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: `${status.toUpperCase()}_REGISTRATION`,
+      targetId: reg._id,
+      targetModel: 'Registration',
+      details: { tournament: reg.tournament._id, rollNumber: reg.rollNumber, previousStatus: originalStatus, newStatus: status },
+      req
+    });
 
     if (status === 'confirmed') {
       await Player.findOneAndUpdate(
@@ -156,6 +177,114 @@ router.patch('/:id/status', protect, async (req, res) => {
   }
 });
 
+
+// Admin — update registration details
+router.put('/:id', protect, async (req, res) => {
+  const {
+    playerName, nicNo, address, email, phone,
+    rollNumber, department, partnerName, partnerRollNumber,
+  } = req.body;
+
+  const normalize = (value = '') => String(value).trim();
+  const cleanedRoll = normalize(rollNumber).toUpperCase();
+  const cleanedPartnerRoll = normalize(partnerRollNumber).toUpperCase();
+  const cleanedName = normalize(playerName);
+  const cleanedPartnerName = normalize(partnerName);
+  const cleanedNic = normalize(nicNo).replace(/V/g, 'v');
+  const cleanedAddress = normalize(address);
+  const cleanedEmail = normalize(email);
+  const cleanedPhone = normalize(phone);
+
+  if (!cleanedName || !cleanedNic || !cleanedAddress || !cleanedEmail || !cleanedPhone || !cleanedRoll || !department)
+    return res.status(400).json({ message: 'All required fields must be filled' });
+
+  const REG_NO_REGEX = /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/;
+  const OLD_NIC_REGEX = /^9\d{8}v$/;
+  const NEW_NIC_REGEX = /^20\d{10}$/;
+  const PHONE_REGEX = /^07\d{8}$/;
+  const NAME_REGEX = /^(?!.* {2})[A-Za-z.]+(?: [A-Za-z.]+)*$/;
+  const ADDRESS_REGEX = /^(?!.* {2})[A-Za-z0-9.,/ \-]+$/;
+  const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+
+  if (!NAME_REGEX.test(cleanedName)) return res.status(400).json({ message: 'Full name must contain only letters, dots and single spaces.' });
+  if (!REG_NO_REGEX.test(cleanedRoll)) return res.status(400).json({ message: 'Registration number must match 20XX/XX/XXX or 20XX/XXX/XXX format.' });
+  if (!OLD_NIC_REGEX.test(cleanedNic) && !NEW_NIC_REGEX.test(cleanedNic)) return res.status(400).json({ message: 'NIC must be old format 991234567v or new format 200012345678.' });
+  if (!ADDRESS_REGEX.test(cleanedAddress)) return res.status(400).json({ message: 'Address contains invalid characters.' });
+  if (!EMAIL_REGEX.test(cleanedEmail)) return res.status(400).json({ message: 'Email must be valid.' });
+  if (!PHONE_REGEX.test(cleanedPhone)) return res.status(400).json({ message: 'Phone must begin with 07 and be 10 digits.' });
+
+  if (cleanedPartnerName || cleanedPartnerRoll) {
+    if (!cleanedPartnerName) return res.status(400).json({ message: 'Partner name is required.' });
+    if (!cleanedPartnerRoll) return res.status(400).json({ message: 'Partner registration number is required.' });
+    if (!NAME_REGEX.test(cleanedPartnerName)) return res.status(400).json({ message: 'Partner name must contain only letters, dots and single spaces.' });
+    if (!REG_NO_REGEX.test(cleanedPartnerRoll)) return res.status(400).json({ message: 'Partner registration number must match 20XX/XX/XXX or 20XX/XXX/XXX format.' });
+    if (cleanedPartnerRoll === cleanedRoll) return res.status(400).json({ message: 'Partner registration number must be different from yours.' });
+  }
+
+//   try {
+//     const { Tournament, Registration, Player } = getModelsForSport(req.admin.sport);
+//   }
+// });
+try {
+  const { Tournament, Registration, Player } = getModelsForSport(req.admin.sport);
+  const reg = await Registration.findById(req.params.id).populate('tournament');
+  if (!reg) return res.status(404).json({ message: 'Registration not found' });
+  if (reg.tournament.createdBy.toString() !== req.admin._id.toString()) return res.status(401).json({ message: 'Unauthorized' });
+
+  const updatedFields = {};
+  if (reg.playerName !== cleanedName) updatedFields.playerName = cleanedName;
+  if (reg.nicNo !== cleanedNic) updatedFields.nicNo = cleanedNic;
+  if (reg.address !== cleanedAddress) updatedFields.address = cleanedAddress;
+  if (reg.email !== cleanedEmail) updatedFields.email = cleanedEmail;
+  if (reg.phone !== cleanedPhone) updatedFields.phone = cleanedPhone;
+  if (reg.rollNumber !== cleanedRoll) updatedFields.rollNumber = cleanedRoll;
+  if (reg.department !== department) updatedFields.department = department;
+  if (reg.partnerName !== cleanedPartnerName) updatedFields.partnerName = cleanedPartnerName;
+  if (reg.partnerRollNumber !== cleanedPartnerRoll) updatedFields.partnerRollNumber = cleanedPartnerRoll;
+
+  reg.playerName = cleanedName;
+  reg.nicNo = cleanedNic;
+  reg.address = cleanedAddress;
+  reg.email = cleanedEmail;
+  reg.phone = cleanedPhone;
+  reg.rollNumber = cleanedRoll;
+  reg.department = department;
+  reg.partnerName = cleanedPartnerName;
+  reg.partnerRollNumber = cleanedPartnerRoll;
+
+  await reg.save();
+
+  if (reg.status === 'confirmed') {
+    await Player.findOneAndUpdate(
+      { rollNumber: cleanedRoll },
+      {
+        name: cleanedName,
+        nicNo: cleanedNic,
+        email: cleanedEmail,
+        phone: cleanedPhone,
+        department,
+        $addToSet: { tournamentHistory: reg.tournament._id }
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  await logAdminAction({
+    adminId: req.admin._id,
+    action: 'UPDATED_REGISTRATION',
+    targetId: reg._id,
+    targetModel: 'Registration',
+    details: { tournament: reg.tournament._id, rollNumber: cleanedRoll, updatedFields },
+    req
+  });
+
+  res.json(reg);
+} catch (err) {
+  res.status(500).json({ message: err.message });
+}
+});
+
+
 // Admin — approve a pair (sets pairStatus: 'approved' on both players)
 router.patch('/:id/approve-pair', protect, async (req, res) => {
   try {
@@ -166,17 +295,25 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
     if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
       return res.status(401).json({ message: 'Unauthorized' });
 
-    if (!reg.partnerRollNumber)
-      return res.status(400).json({ message: 'No partner linked to this registration.' });
+    if (!reg.partnerRollNumber) return res.status(400).json({ message: 'No partner linked to this registration.' });
 
-    // Set pairStatus to 'approved' on both players
     reg.pairStatus = 'approved';
     await reg.save();
 
-    await Registration.findOneAndUpdate(
+    const partner = await Registration.findOneAndUpdate(
       { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
-      { pairStatus: 'approved' }
+      { pairStatus: 'approved' },
+      { new: true }
     );
+
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'APPROVE_PAIR',
+      targetId: reg._id,
+      targetModel: 'Registration',
+      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner?._id || null, partnerRollNumber: reg.partnerRollNumber },
+      req
+    });
 
     res.json({ message: 'Pair approved successfully.' });
   } catch (err) {
@@ -203,6 +340,15 @@ router.patch('/:id/reset-pair', protect, async (req, res) => {
         { pairStatus: 'complete' }
       );
     }
+
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'RESET_PAIR',
+      targetId: reg._id,
+      targetModel: 'Registration',
+      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerRollNumber: reg.partnerRollNumber || null },
+      req
+    });
 
     res.json({ message: 'Pair reset to pending approval.' });
   } catch (err) {
@@ -246,12 +392,24 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
     partner.partnerName = reg.playerName;
     await partner.save();
 
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'LINK_PARTNER',
+      targetId: reg._id,
+      targetModel: 'Registration',
+      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner._id, partnerRollNumber: partner.rollNumber },
+      req
+    });
+
     res.json({ message: 'Players linked as partners successfully.' });
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
+
+// Admin — view registrations for a tournament
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
@@ -348,6 +506,9 @@ router.post('/', async (req, res) => {
 
     if (!targetSport) return res.status(404).json({ message: 'Tournament not found' });
     if (tournamentDoc.isLocked) return res.status(400).json({ message: 'Registrations are closed for this tournament.' });
+    if (tournamentDoc.registrationDeadline && new Date() > new Date(tournamentDoc.registrationDeadline)) {
+      return res.status(400).json({ message: 'Registration deadline has passed for this tournament.' });
+    }
 
     const { Registration } = getModelsForSport(targetSport);
 

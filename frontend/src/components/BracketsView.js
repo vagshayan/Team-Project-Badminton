@@ -663,8 +663,8 @@ export default function BracketsView({ admin, color }) {
 
       {/* W/L Result Modal — replaces numeric score modal */}
       {resultModal && (
-        <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setResultModal(null)}>
-          <div style={modalS.content}>
+        <div className="modal-overlay" style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setResultModal(null)}>
+          <div className="modal-card" style={modalS.content}>
             <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 900 }}>Mark Match Result</h3>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
               Select the player who won this match.

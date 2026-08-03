@@ -82,11 +82,21 @@ const validateField = (field, value) => {
   }
 };
 
-export default function RegisterModal({ tournament, onClose }) {
+export default function RegisterModal({ tournament, onClose, initialData = null }) {
   const isDoubles = DOUBLES.includes(tournament.category);
   const sportColor = tournament.sport === 'badminton' ? '#C8A84B' : (tournament.sport === 'table-tennis' ? '#8B5CF6' : '#EC4899');
 
-  const [form, setForm] = useState({ playerName: '', regNo: '', nicNo: '', address: '', email: '', phone: '', faculty: '', partnerName: '', partnerRegNo: '' });
+  const [form, setForm] = useState({
+    playerName: initialData ? initialData.playerName : '',
+    regNo: initialData ? initialData.rollNumber : '',
+    nicNo: initialData ? initialData.nicNo : '',
+    address: initialData ? initialData.address : '',
+    email: initialData ? initialData.email : '',
+    phone: initialData ? initialData.phone : '',
+    faculty: initialData ? (initialData.department || '') : '',
+    partnerName: initialData ? (initialData.partnerName || '') : '',
+    partnerRegNo: initialData ? (initialData.partnerRollNumber || '') : ''
+  });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -244,18 +254,32 @@ export default function RegisterModal({ tournament, onClose }) {
 
     setLoading(true);
     try {
-      await axios.post('/api/registrations', {
-        tournament: tournament._id,
-        playerName: form.playerName.trim(),
-        rollNumber: form.regNo.trim(),
-        nicNo: form.nicNo.trim(),
-        address: form.address.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        department: form.faculty,
-        partnerName: form.partnerName.trim(),
-        partnerRollNumber: form.partnerRegNo.trim(),
-      });
+      if (initialData) {
+        await axios.put(`/api/registrations/${initialData._id}`, {
+          playerName: form.playerName.trim(),
+          rollNumber: form.regNo.trim(),
+          nicNo: form.nicNo.trim(),
+          address: form.address.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          department: form.faculty,
+          partnerName: form.partnerName.trim(),
+          partnerRollNumber: form.partnerRegNo.trim(),
+        });
+      } else {
+        await axios.post('/api/registrations', {
+          tournament: tournament._id,
+          playerName: form.playerName.trim(),
+          rollNumber: form.regNo.trim(),
+          nicNo: form.nicNo.trim(),
+          address: form.address.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          department: form.faculty,
+          partnerName: form.partnerName.trim(),
+          partnerRollNumber: form.partnerRegNo.trim(),
+        });
+      }
       setSuccess(true);
     } catch (err) {
       setSubmitError(err.response?.data?.message || 'Registration failed');
@@ -268,10 +292,14 @@ export default function RegisterModal({ tournament, onClose }) {
     <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 450, padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>✅</div>
-          <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>VERIFIED!</h2>
+          <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>{initialData ? 'UPDATED!' : 'VERIFIED!'}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.6, marginBottom: 32 }}>
-             You have successfully registered for:<br/>
-             <strong style={{ color: 'var(--text)' }}>{CAT_LABELS[tournament.category]}</strong>
+             {initialData ? 'Player details have been updated successfully.' : (
+               <>
+                 You have successfully registered for:<br/>
+                 <strong style={{ color: 'var(--text)' }}>{CAT_LABELS[tournament.category]}</strong>
+               </>
+             )}
           </p>
           <button onClick={onClose} style={{ ...sh.submitBtn, background: '#10B981', color: '#FFF', width: '100%', borderRadius: 16 }}>DONE</button>
       </div>
@@ -293,19 +321,19 @@ export default function RegisterModal({ tournament, onClose }) {
   );
 
   return (
-    <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 650 }}>
         <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: sportColor, letterSpacing: -0.5 }}>REGISTER FOR TOURNAMENT</h2>
+          <h2 className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: sportColor, letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</h2>
           <button className="modal-close-btn" onClick={onClose} style={sh.closeBtn}>✕</button>
         </div>
 
         <div className="modal-info-bar" style={sh.infoBar}>
-           <div className="info-bar-content" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
-              <span className="info-bar-divider" style={{ fontSize: 13, color: 'var(--border)' }}>|</span>
-              <span className="info-bar-details" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>📍 {tournament.venue} · 🕐 {tournament.time}</span>
-           </div>
+          <div className="info-bar-content" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
+            <span className="info-bar-divider" style={{ fontSize: 13, color: 'var(--border)' }}>|</span>
+            <span className="info-bar-details" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>📍 {tournament.venue} · 🕐 {tournament.time}</span>
+          </div>
         </div>
 
         {submitError && <div style={sh.errorBox}>⚠ {submitError}</div>}
@@ -454,10 +482,10 @@ export default function RegisterModal({ tournament, onClose }) {
             )}
           </div>
 
-          <div className="modal-actions" style={{ display: 'flex', gap: 16, paddingTop: 16 }}>
+          <div className="modal-actions" style={{ display: 'flex', gap: 16, marginTop: 12 }}>
             <button className="modal-cancel-btn" type="button" onClick={onClose} style={sh.cancelBtn}>CANCEL</button>
-            <button className="modal-submit-btn" type="submit" disabled={loading} style={{ ...sh.submitBtn, background: sportColor }}>
-              {loading ? 'SYNCING...' : 'REGISTER NOW'}
+            <button className="modal-submit-btn" type="submit" disabled={loading} style={{ ...sh.submitBtn, background: sportColor, color: '#FFF' }}>
+              {loading ? 'SYNCING...' : (initialData ? 'SAVE CHANGES' : 'REGISTER NOW')}
             </button>
           </div>
         </form>

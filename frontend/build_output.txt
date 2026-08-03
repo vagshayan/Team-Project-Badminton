@@ -1,3 +1,9 @@
+
+
+> tournament-frontend@0.1.0 build
+> react-scripts build
+
+
 ﻿node.exe : (node:20728) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
 At line:1 char:1
 + & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
@@ -6,11 +12,12 @@ At line:1 char:1
     + FullyQualifiedErrorId : NativeCommandError
  
 (Use `node --trace-deprecation ...` to show where the warning was created)
+>>>>>>> dc1527abb2eee6251bcdcd8f610e7d959e60d7c4
 Creating an optimized production build...
 Compiled successfully.
 
 File sizes after gzip:
-
+  234.39 kB  build\static\js\main.24e1ccbe.js
   235.55 kB  build\static\js\main.072bcb36.js
   46.36 kB   build\static\js\239.c30724eb.chunk.js
   33.56 kB   build\static\js\732.0596a720.chunk.js

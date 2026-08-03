@@ -1,117 +1,84 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import './LandingPage.css';
 
 const SPORTS = [
-  { id: 'badminton', label: 'BADMINTON', icon: '🏸', color: '#C8A84B', path: '/badminton' },
-  { id: 'table-tennis', label: 'TABLE TENNIS', icon: '🏓', color: '#4B9CC8', path: '/table-tennis' },
-  { id: 'carrom', label: 'CARROM', icon: '🎯', color: '#C84B8A', path: '/carrom' },
+  { id: 'badminton', label: 'Badminton', icon: '🏸', accent: '#f5c542', path: '/badminton' },
+  { id: 'carrom', label: 'Carrom', icon: '🎯', accent: '#ef5da8', path: '/carrom' },
+  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', accent: '#4fc7ea', path: '/table-tennis' },
 ];
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: '#0A0A0A', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      padding: '40px 20px',
-      fontFamily: 'var(--font-d)'
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: 60 }}>
-        <div style={{ fontSize: 60, marginBottom: 10 }}>🏆</div>
-        <h1 className="title-text">SPORTS</h1>
-        <p className="subtitle-text">TOURNAMENT MANAGER</p>
-      </div>
-
-      <div style={{ 
-        width: '100%', 
-        maxWidth: 480, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: 16 
-      }}>
-        {SPORTS.map((sport) => (
-          <button
-            key={sport.id}
-            onClick={() => navigate(sport.path)}
-            className="sport-card"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '24px 28px',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderLeft: `4px solid ${sport.color}`,
-              borderRadius: 4,
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              textAlign: 'left',
-              width: '100%',
-              gap: 24,
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            <div style={{ fontSize: 28 }}>{sport.icon}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 3, color: sport.color }}>{sport.label}</div>
-              <div style={{ fontSize: 11, color: '#666', marginTop: 4, letterSpacing: 1 }}>View Tournaments →</div>
+    <div className="landing-hero-page">
+      <div className="landing-inner">
+        <header className="landing-header">
+          <div className="brand-block">
+            <div className="brand-mark">ST</div>
+            <div>
+              <div className="brand-title">Sports Tournament Manager</div>
+              <div className="brand-subtitle">University Tournaments</div>
             </div>
-            <div className="hover-glow" style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              background: `linear-gradient(90deg, ${sport.color}00, ${sport.color}05)`,
-              opacity: 0,
-              transition: 'opacity 0.3s'
-            }} />
+          </div>
+
+          <button className="admin-login-btn" onClick={() => navigate('/admin/login')}>
+            Admin login
           </button>
-        ))}
-      </div>
+        </header>
 
-      <div style={{ marginTop: 80, textAlign: 'center' }}>
-        <p style={{ color: '#444', fontSize: 12, maxWidth: 300 }}>
-          Student? Use the links above to view & register for tournaments.
-        </p>
-      </div>
+        <main className="landing-main">
+          <section className="hero-grid">
+            <div className="hero-copy">
+              <div className="hero-badge">University Tournaments</div>
+              <h1 className="hero-title">Manage every<br />match day.</h1>
+              <p className="hero-desc">
+                Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> — all in one clean tournament hub.
+              </p>
 
-      <style>{`
-        .title-text {
-          font-size: 56px;
-          font-weight: 900;
-          letter-spacing: 18px;
-          color: #FFFFFF;
-          margin: 0;
-        }
-        .subtitle-text {
-          font-size: 14px;
-          color: #777;
-          letter-spacing: 8px;
-          margin-top: 10px;
-          font-weight: 500;
-        }
-        @media (max-width: 480px) {
-          .title-text {
-            font-size: 40px;
-            letter-spacing: 12px;
-          }
-          .subtitle-text {
-            font-size: 11px;
-            letter-spacing: 5px;
-          }
-        }
-        .sport-card:hover {
-          background: rgba(255, 255, 255, 0.05) !important;
-          transform: translateX(8px);
-          border-color: rgba(255, 255, 255, 0.1) !important;
-        }
-        .sport-card:hover .hover-glow {
-          opacity: 1 !important;
-        }
-      `}</style>
+              <div className="hero-actions">
+                <button className="button-primary" onClick={() => navigate('/brackets')}>
+                  View live brackets →
+                </button>
+              </div>
+            </div>
+
+            <aside className="hero-visual">
+              <div className="visual-graphic">
+                <div className="visual-circle-large" />
+                <div className="visual-circle-small" />
+              </div>
+            </aside>
+          </section>
+
+          <section className="open-tournaments">
+            <div className="open-tournaments-label">Open tournaments</div>
+            <div className="tournaments-grid">
+              {SPORTS.map((sport) => (
+                <button
+                  key={sport.id}
+                  className="tournament-card"
+                  style={{ borderTopColor: sport.accent }}
+                  onClick={() => navigate(sport.path)}
+                >
+                  <div className="tournament-icon">{sport.icon}</div>
+                  <div className="tournament-card-body">
+                    <div className="tournament-title">{sport.label}</div>
+                    <div className="tournament-link" style={{ color: sport.accent }}>
+                      View tournaments →
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </main>
+
+        <footer className="landing-footer">
+          © 2026 Sports Tournament Manager · University Tournaments
+        </footer>
+      </div>
     </div>
   );
 }
