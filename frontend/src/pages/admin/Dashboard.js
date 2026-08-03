@@ -775,7 +775,15 @@ export default function Dashboard() {
 
         {/* Manager Profile Card */}
         {(isMobile || !sidebarCollapsed) && (
-          <div style={ds.profileCard}>
+          <div
+            style={{
+              ...ds.profileCard,
+              background: isDarkMode ? 'var(--bg-panel)' : '#ffffff',
+              border: isDarkMode ? '1px solid var(--border)' : '1px solid #e5e7eb',
+              boxShadow: isDarkMode ? 'none' : '0 4px 12px rgba(0,0,0,0.08)',
+              transition: 'all 0.3s ease',
+            }}
+          >
             <div style={ds.avatarBox}>
               <img
                 src={avatarSrc}
@@ -786,8 +794,8 @@ export default function Dashboard() {
               <div style={ds.statusDot} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={ds.pName}>{safeAdminName.toUpperCase()}</div>
-              <div style={ds.pRole}>{safeMetaLabel.toUpperCase()} MANAGER</div>
+              <div style={{ ...ds.pName, color: isDarkMode ? 'var(--text)' : '#111827' }}>{safeAdminName.toUpperCase()}</div>
+              <div style={{ ...ds.pRole, color: isDarkMode ? 'var(--text-muted)' : '#6b7280' }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
             </div>
           </div>
         )}
