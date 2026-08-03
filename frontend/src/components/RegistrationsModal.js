@@ -14,9 +14,20 @@ export default function RegistrationsModal({ tournament, onClose }) {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const isDoubles = DOUBLES.includes(tournament.category);
 
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    axios.get(`/api/registrations/tournament/${tournament._id}`)
+      .then((res) => setRegistrations(res.data))
+      .catch(() => setError('Failed to load registered players'))
+      .finally(() => setLoading(false));
     let cancelled = false;
 
     const load = async () => {
@@ -38,8 +49,15 @@ export default function RegistrationsModal({ tournament, onClose }) {
   }, [tournament._id]);
 
   return (
-    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={sh.card}>
+    <div className="modal-overlay" style={{ ...sh.overlay, padding: isMobile ? 16 : 40, alignItems: isMobile ? 'flex-start' : 'center' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card" style={{
+        ...sh.card,
+        padding: isMobile ? 24 : 50,
+        borderRadius: isMobile ? 28 : 44,
+        maxWidth: isMobile ? 420 : 1100,
+        maxHeight: isMobile ? '100vh' : '90vh',
+        margin: isMobile ? '12px auto' : undefined,
+      }}>
         <div style={sh.header}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -47,16 +65,22 @@ export default function RegistrationsModal({ tournament, onClose }) {
               <h2 style={sh.title}>REGISTERED PLAYERS</h2>
               <p style={sh.subtitle}>Full list of participants for {CAT_LABELS[tournament.category]}.</p>
             </div>
-            <button onClick={onClose} style={sh.closeBtn}>✕</button>
-          </div>
 
-          <div style={sh.infoBar}>
-            <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-              <div style={{ fontWeight: 950, fontSize: 24, color: 'var(--primary)' }}>{tournament.year}</div>
-              <div style={{ display: 'flex', gap: 15, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
-                <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
-                <span>📍 {tournament.venue}</span>
+            <div style={{
+              ...sh.infoBar,
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: isMobile ? 14 : 24,
+              alignItems: isMobile ? 'flex-start' : 'center',
+            }}>
+              <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 950, fontSize: isMobile ? 20 : 24, color: 'var(--primary)' }}>{tournament.year}</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
+                  <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
+                  <span>📍 {tournament.venue}</span>
+                </div>
               </div>
+
+              <button onClick={onClose} style={sh.closeBtn}>✕</button>
             </div>
           </div>
         </div>
@@ -74,8 +98,8 @@ export default function RegistrationsModal({ tournament, onClose }) {
             <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
           </div>
         ) : (
-          <div style={sh.tableBox}>
-            <table style={sh.table}>
+          <div className="responsive-table-wrap" style={{ ...sh.tableBox, overflowX: 'auto' }}>
+            <table className="responsive-table" style={{ ...sh.table, minWidth: isMobile ? 620 : 960 }}>
               <thead style={sh.thead}>
                 <tr>
                   <th style={sh.th}>#</th>
@@ -110,11 +134,11 @@ export default function RegistrationsModal({ tournament, onClose }) {
           </div>
         )}
 
-        <div style={sh.footer}>
+        <div style={{ ...sh.footer, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 16 : 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)' }}>
             TOTAL ENROLLED: <span style={{ color: 'var(--text)', fontWeight: 950 }}>{registrations.length} PLAYERS</span>
           </div>
-          <button onClick={onClose} style={sh.closeBtnAction}>CLOSE VIEW</button>
+          <button onClick={onClose} style={{ ...sh.closeBtnAction, width: isMobile ? '100%' : 'auto' }}>CLOSE VIEW</button>
         </div>
       </div>
       <style>{`

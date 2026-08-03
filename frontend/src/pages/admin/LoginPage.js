@@ -1,24 +1,34 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
 const SPORTS = [
-  { id: 'badminton', label: 'Badminton', icon: '🏸', color: '#3B82F6', desc: 'Unleash your smash on the court.', path: '/badminton' },
-  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', color: '#8B5CF6', desc: 'Precision and speed in every serve.', path: '/table-tennis' },
-  { id: 'carrom', label: 'Carrom', icon: '🎯', color: '#EC4899', desc: 'Master the pockets with strategy.', path: '/carrom' },
+  { id: 'badminton', label: 'Badminton', icon: '🏸', color: '#3B82F6' },
+  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
+  { id: 'carrom', label: 'Carrom', icon: '🎯', color: '#EC4899' },
 ];
+
+const SPORT_META = {
+  badminton: { label: 'Badminton', color: '#3B82F6' },
+  'table-tennis': { label: 'Table Tennis', color: '#8B5CF6' },
+  carrom: { label: 'Carrom', color: '#EC4899' },
+};
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const { login, admin } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const sportParam = new URLSearchParams(location.search).get('sport');
+  const sportMeta = SPORT_META[sportParam] || null;
+  const pageTitle = sportMeta ? `${sportMeta.label} Admin Login` : 'Admin Login';
 
   React.useEffect(() => {
     if (admin) {
@@ -44,11 +54,9 @@ export default function LoginPage() {
 
   return (
     <div style={sh.container}>
-      {/* Background blobs for depth */}
       <div style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
       <div style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
 
-      {/* Top Navbar */}
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} className="mobile-brand">
           <div style={sh.logoCircle} className="mobile-logo">🏆</div>
@@ -59,75 +67,54 @@ export default function LoginPage() {
         </div>
         <div style={{ display: 'flex', gap: 15, alignItems: 'center' }} className="mobile-controls">
           <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
-          <button onClick={() => setShowLogin(!showLogin)} style={sh.adminToggleBtn} className="mobile-btn">{showLogin ? '← PUBLIC HUB' : 'ADMIN ACCESS'}</button>
+          <Link to={sportMeta ? `/${sportParam}` : '/'} style={{ ...sh.backLink, color: isDarkMode ? '#FFFFFF' : 'var(--primary)' }}>PUBLIC HUB</Link>
         </div>
       </nav>
 
-      {/* Main Experience */}
       <main style={sh.mainContent}>
-        {!showLogin ? (
-          <div style={sh.heroWrapper} className="mobile-padding-x">
-            <div style={{ textAlign: 'center', marginBottom: 80 }}>
-              <h1 style={sh.heroTitle} className="mobile-title">SELECT YOUR <span style={sh.gradientText}>ZONE</span></h1>
-              <p style={sh.heroSub}>Choose your sport and explore the latest tournaments and live result updates.</p>
-            </div>
-
-            <div className="responsive-grid-3" style={{ marginTop: 60 }}>
-              {SPORTS.map((s) => (
-                <div key={s.id} onClick={() => navigate(s.path)} className="sport-card mobile-card" style={{ ...sh.card, '--accent': s.color }}>
-                  <div style={sh.cardInner}>
-                    <div style={sh.cardIcon}>{s.icon}</div>
-                    <h3 style={sh.cardTitle}>{s.label}</h3>
-                    <p style={sh.cardDesc}>{s.desc}</p>
-                    <div style={{ ...sh.cardBtn, color: s.color }}>GO TO BOARD <span>→</span></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div style={sh.loginContainer} className="mobile-padding-x">
-             <div style={sh.loginPane} className="mobile-card">
-                <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                  <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 12, color: 'var(--text)' }}>Log in</h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>Enter your tournament manager credentials</p>
-                </div>
-                {error && <div style={sh.errorBox}>⚠ {error}</div>}
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                   <div style={sh.fieldGroup}>
-                      <label style={sh.fieldLabel}>USERNAME</label>
-                      <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" style={sh.fieldInput} required />
-                   </div>
-                   <div style={sh.fieldGroup}>
-                      <label style={sh.fieldLabel}>PASSWORD</label>
-                      <div style={{ position: 'relative' }}>
-                        <input 
-                          type={showPass ? "text" : "password"} 
-                          value={password} 
-                          onChange={(e) => setPassword(e.target.value)} 
-                          placeholder="••••••••" 
-                          style={sh.fieldInput} 
-                          required 
-                        />
-                        <button 
-                          type="button" 
-                          onClick={() => setShowPass(!showPass)} 
-                          style={{ position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
-                        >
-                          {showPass ? '👁️' : '🔒'}
-                        </button>
-                      </div>
-                   </div>
-                   <button type="submit" style={sh.submitBtn} disabled={loading}>{loading ? 'Authenticating...' : 'Sign in to Dashboard'}</button>
-                </form>
-                <div style={sh.loginFooter}>
-                  <Link to="/admin/forgot-password" style={sh.footerLink}>Forgot password?</Link>
-                  <span style={{ margin: '0 10px' }}>•</span>
-                  New admin? <Link to="/admin/register" style={sh.footerLink}>Register now</Link>
-                </div>
-             </div>
-          </div>
-        )}
+        <div style={sh.loginContainer} className="mobile-padding-x">
+           <div style={sh.loginPane} className="mobile-card">
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 12, color: 'var(--text)' }}>{pageTitle}</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>
+                  {sportMeta ? `Sign in to manage ${sportMeta.label} tournaments.` : 'Enter your tournament manager credentials.'}
+                </p>
+              </div>
+              {error && <div style={sh.errorBox}>⚠ {error}</div>}
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                 <div style={sh.fieldGroup}>
+                    <label style={sh.fieldLabel}>USERNAME</label>
+                    <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" style={sh.fieldInput} required />
+                 </div>
+                 <div style={sh.fieldGroup}>
+                    <label style={sh.fieldLabel}>PASSWORD</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type={showPass ? 'text' : 'password'} 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                        style={sh.fieldInput} 
+                        required 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPass(!showPass)} 
+                        style={{ position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
+                      >
+                        {showPass ? '👁️' : '🔒'}
+                      </button>
+                    </div>
+                 </div>
+                 <button type="submit" style={sh.submitBtn} disabled={loading}>{loading ? 'Authenticating...' : 'Sign in to Dashboard'}</button>
+              </form>
+              <div style={sh.loginFooter}>
+                <Link to="/admin/forgot-password" style={sh.footerLink}>Forgot password?</Link>
+                <span style={{ margin: '0 10px' }}>•</span>
+                New admin? <Link to="/admin/register" style={sh.footerLink}>Register now</Link>
+              </div>
+           </div>
+        </div>
       </main>
 
       <footer style={sh.footer}>University of Jaffna © 2026 Admin Portal</footer>
@@ -150,6 +137,7 @@ const sh = {
   brand: { display: 'flex', alignItems: 'center', gap: 20 },
   logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
   themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
+  backLink: { color: 'var(--primary)', fontWeight: 900, textDecoration: 'none', padding: '10px 18px', borderRadius: '999px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.24)' },
   adminToggleBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 24px', borderRadius: '40px', fontSize: 12, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer' },
   mainContent: { minHeight: 'calc(100vh - 100px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', position: 'relative', zIndex: 10 },
   heroWrapper: { width: '100%', maxWidth: 1200 },
