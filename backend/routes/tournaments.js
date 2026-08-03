@@ -46,6 +46,51 @@ function buildDoublesByeOrder(teams, bracketSize) {
   return shuffle(matchSlots).flat();
 }
 
+function buildDoublesPairEntries(approvedRegs) {
+  const used = new Set();
+  const pairs = [];
+  const unresolved = [];
+
+  const addPair = (leader, partner) => {
+    if (!leader || !partner) return;
+    const leaderId = leader._id.toString();
+    const partnerId = partner._id.toString();
+    if (leaderId === partnerId || used.has(leaderId) || used.has(partnerId)) return;
+
+    used.add(leaderId);
+    used.add(partnerId);
+    pairs.push(leader);
+  };
+
+  approvedRegs.forEach((reg) => {
+    if (used.has(reg._id.toString())) return;
+
+    const partnerByPairId = approvedRegs.find((candidate) => {
+      if (candidate._id.toString() === reg._id.toString()) return false;
+      return candidate.pairId && reg.pairId && candidate.pairId.toString() === reg.pairId.toString();
+    });
+
+    if (partnerByPairId) {
+      addPair(reg, partnerByPairId);
+      return;
+    }
+
+    const partnerByRoll = approvedRegs.find((candidate) => {
+      if (candidate._id.toString() === reg._id.toString()) return false;
+      return candidate.rollNumber && reg.partnerRollNumber && candidate.rollNumber.trim().toLowerCase() === reg.partnerRollNumber.trim().toLowerCase();
+    });
+
+    if (partnerByRoll) {
+      addPair(reg, partnerByRoll);
+      return;
+    }
+
+    unresolved.push(reg);
+  });
+
+  return { pairs, unresolved };
+}
+
 function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
   const seeded1 = players.find(p => p._id.toString() === String(championId));
   let seeded2 = players.find(p => p._id.toString() === String(runnerUpId));
@@ -472,54 +517,15 @@ router.post('/:id/generate-draws', protect, async (req, res) => {
         });
       }
 
-      const used = new Set();
-      const pairs = [];
-
-      // Pass 1 — group by pairId
-      approvedRegs.forEach(r => {
-        if (r.pairId && !used.has(r._id.toString())) {
-          const partner = approvedRegs.find(
-            p => p.pairId?.toString() === r.pairId.toString()
-                 && p._id.toString() !== r._id.toString()
-          );
-          if (partner) {
-            const rep = r.createdAt <= partner.createdAt ? r : partner;
-            pairs.push(rep);
-            used.add(r._id.toString());
-            used.add(partner._id.toString());
-          }
-        }
-      });
-
-      // Pass 2 — group by partnerRollNumber
-      approvedRegs.forEach(r => {
-        if (used.has(r._id.toString())) return;
-        if (r.partnerRollNumber && r.partnerRollNumber.trim()) {
-          const partner = approvedRegs.find(
-            p => p.rollNumber === r.partnerRollNumber.trim()
-                 && !used.has(p._id.toString())
-          );
-          if (partner) {
-            pairs.push(r);
-            used.add(r._id.toString());
-            used.add(partner._id.toString());
-          }
-        }
-      });
-
-      // ── NO Pass 3 — solo players excluded from doubles draw ──
+      const { pairs, unresolved } = buildDoublesPairEntries(approvedRegs);
 
       if (pairs.length < 2) {
-        return res.status(400).json({
-          message: `Only ${pairs.length} approved pair(s) found. Need at least 2 pairs to generate draw.`
-        });
+        const message = unresolved.length > 0
+          ? 'Some approved registrations are missing a complete partner link. Please link or approve pairs before generating the draw.'
+          : 'Only 1 complete approved pair was found. Need at least 2 pairs to generate draw.';
+
+        return res.status(400).json({ message });
       }
-      
-      // ── DEBUG — remove after testing ──
-      console.log('DEBUG pairs count:', pairs.length);
-      console.log('DEBUG pairs:', pairs.map(p => `${p.playerName} & ${p.partnerName}`));
-      console.log('DEBUG bracketSize:', nextPowerOf2(pairs.length));
-      // ── END DEBUG ──
 
       bracketSize    = nextPowerOf2(pairs.length);
       rounds         = Math.log2(bracketSize);
@@ -678,3 +684,4 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
 
 
 module.exports = router;
+module.exports.buildDoublesPairEntries = buildDoublesPairEntries;
