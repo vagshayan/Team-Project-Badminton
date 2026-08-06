@@ -84,6 +84,7 @@ const validateField = (field, value) => {
 
 export default function RegisterModal({ tournament, onClose, initialData = null }) {
   const isDoubles = DOUBLES.includes(tournament.category);
+  const isMixedDoubles = tournament.category === 'mixed-doubles';
   const sportColor = tournament.sport === 'badminton' ? '#C8A84B' : (tournament.sport === 'table-tennis' ? '#8B5CF6' : '#EC4899');
 
   const [form, setForm] = useState({
@@ -94,6 +95,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
     email: initialData ? initialData.email : '',
     phone: initialData ? initialData.phone : '',
     faculty: initialData ? (initialData.department || '') : '',
+    gender: initialData ? (initialData.gender || '') : '',
     partnerName: initialData ? (initialData.partnerName || '') : '',
     partnerRegNo: initialData ? (initialData.partnerRollNumber || '') : ''
   });
@@ -115,7 +117,8 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
       case 'phone': return 'Phone number is required';
       case 'faculty': return 'Faculty is required';
       case 'partnerName': return 'Partner name is required';
-      case 'partnerRegNo': return 'Partner registration number is required';
+    case 'gender': return 'Gender is required';
+    case 'partnerRegNo': return 'Partner registration number is required';
       default: return 'Required';
     }
   };
@@ -179,6 +182,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
     if (!phone) newErrors.phone = 'Phone number is required';
     else if (!validatePhone(phone)) newErrors.phone = 'Phone must start with 07 and be 10 digits';
 
+    if (isMixedDoubles && !form.gender) newErrors.gender = 'Gender is required';
     if (!form.faculty) newErrors.faculty = 'Faculty is required';
 
     if (isDoubles && partnerRegNo) {
@@ -186,6 +190,20 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
       else if (partnerRegNo === regNo) newErrors.partnerRegNo = 'Partner registration number must differ from yours';
       else if (partnerLookupError) newErrors.partnerRegNo = partnerLookupError;
       else if (partnerLookup && partnerLookup.partnerRollNumber?.trim()) newErrors.partnerRegNo = 'This player already has a partner assigned.';
+      else if (partnerLookup && partnerLookup.gender && form.gender) {
+        const category = tournament.category;
+        const partnerGender = partnerLookup.gender;
+        const playerGender = form.gender;
+        if (category === 'mixed-doubles') {
+          if (!(playerGender === 'Male' && partnerGender === 'Female') && !(playerGender === 'Female' && partnerGender === 'Male')) {
+            newErrors.partnerRegNo = 'Mixed Doubles requires one male and one female player. This partner cannot be paired for Mixed Doubles.';
+          }
+        } else if (category === 'doubles-men' && (playerGender !== 'Male' || partnerGender !== 'Male')) {
+          newErrors.partnerRegNo = 'Doubles Men requires two male players. This partner cannot be paired for Doubles Men.';
+        } else if (category === 'doubles-women' && (playerGender !== 'Female' || partnerGender !== 'Female')) {
+          newErrors.partnerRegNo = 'Doubles Women requires two female players. This partner cannot be paired for Doubles Women.';
+        }
+      }
     }
 
     return newErrors;
@@ -254,30 +272,25 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
 
     setLoading(true);
     try {
+      const requestPayload = {
+        playerName: form.playerName.trim(),
+        rollNumber: form.regNo.trim(),
+        nicNo: form.nicNo.trim(),
+        address: form.address.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        department: form.faculty,
+        partnerName: form.partnerName.trim(),
+        partnerRollNumber: form.partnerRegNo.trim(),
+      };
+      if (isMixedDoubles) requestPayload.gender = form.gender;
+
       if (initialData) {
-        await axios.put(`/api/registrations/${initialData._id}`, {
-          playerName: form.playerName.trim(),
-          rollNumber: form.regNo.trim(),
-          nicNo: form.nicNo.trim(),
-          address: form.address.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-          department: form.faculty,
-          partnerName: form.partnerName.trim(),
-          partnerRollNumber: form.partnerRegNo.trim(),
-        });
+        await axios.put(`/api/registrations/${initialData._id}`, requestPayload);
       } else {
         await axios.post('/api/registrations', {
           tournament: tournament._id,
-          playerName: form.playerName.trim(),
-          rollNumber: form.regNo.trim(),
-          nicNo: form.nicNo.trim(),
-          address: form.address.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-          department: form.faculty,
-          partnerName: form.partnerName.trim(),
-          partnerRollNumber: form.partnerRegNo.trim(),
+          ...requestPayload,
         });
       }
       setSuccess(true);
@@ -408,19 +421,51 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
               </div>
             </div>
 
-            <div style={sh.field}>
-              <label style={sh.label}>FACULTY / DEPARTMENT</label>
-              <select
-                value={form.faculty}
-                onChange={(e) => setField('faculty', e.target.value)}
-                onBlur={() => handleBlur('faculty')}
-                style={sh.input}
-              >
-                <option value="">Select your faculty</option>
-                {FACULTIES.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-              {errors.faculty && <span style={sh.errMsg}>{errors.faculty}</span>}
-            </div>
+            {isMixedDoubles ? (
+              <div className="modal-grid" style={sh.grid}>
+                <div style={sh.field}>
+                  <label style={sh.label}>GENDER</label>
+                  <select
+                    value={form.gender}
+                    onChange={(e) => setField('gender', e.target.value)}
+                    onBlur={() => handleBlur('gender')}
+                    style={sh.input}
+                  >
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                  {errors.gender && <span style={sh.errMsg}>{errors.gender}</span>}
+                </div>
+                <div style={sh.field}>
+                  <label style={sh.label}>FACULTY / DEPARTMENT</label>
+                  <select
+                    value={form.faculty}
+                    onChange={(e) => setField('faculty', e.target.value)}
+                    onBlur={() => handleBlur('faculty')}
+                    style={sh.input}
+                  >
+                    <option value="">Select your faculty</option>
+                    {FACULTIES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  {errors.faculty && <span style={sh.errMsg}>{errors.faculty}</span>}
+                </div>
+              </div>
+            ) : (
+              <div style={sh.field}>
+                <label style={sh.label}>FACULTY / DEPARTMENT</label>
+                <select
+                  value={form.faculty}
+                  onChange={(e) => setField('faculty', e.target.value)}
+                  onBlur={() => handleBlur('faculty')}
+                  style={sh.input}
+                >
+                  <option value="">Select your faculty</option>
+                  {FACULTIES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+                {errors.faculty && <span style={sh.errMsg}>{errors.faculty}</span>}
+              </div>
+            )}
 
             <div style={sh.field}>
               <label style={sh.label}>HOME ADDRESS</label>
@@ -474,6 +519,9 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                       <div style={{ wordBreak: 'break-word' }}><strong>Faculty:</strong> {partnerLookup.department || 'N/A'}</div>
                       <div style={{ wordBreak: 'break-word' }}><strong>Phone:</strong> {partnerLookup.phone || 'N/A'}</div>
                       <div style={{ wordBreak: 'break-word' }}><strong>Email:</strong> {partnerLookup.email || 'N/A'}</div>
+                      {isMixedDoubles && partnerLookup.gender ? (
+                        <div style={{ wordBreak: 'break-word' }}><strong>Gender:</strong> {partnerLookup.gender}</div>
+                      ) : null}
                       <div style={{ wordBreak: 'break-word' }}><strong>Status:</strong> {partnerLookup.status ? partnerLookup.status.toUpperCase() : 'N/A'}</div>
                     </div>
                   </div>

@@ -222,8 +222,11 @@ export default function Dashboard() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
   const [editRegistrationTarget, setEditRegistrationTarget] = useState(null);
+  const [removePairTarget, setRemovePairTarget] = useState(null);
+  const [removePairLoading, setRemovePairLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const removePairModalRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverCategory, setHoverCategory] = useState(null);
@@ -582,6 +585,19 @@ export default function Dashboard() {
 
   useEffect(() => { if (admin) fetchData(); }, [admin, fetchData]);
   useEffect(() => { if (admin && activeTab === 'audit-log') fetchAuditLogs(); }, [admin, activeTab, fetchAuditLogs]);
+  useEffect(() => {
+    if (!removePairTarget) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setRemovePairTarget(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [removePairTarget]);
+  useEffect(() => {
+    if (removePairTarget) {
+      removePairModalRef.current?.focus();
+    }
+  }, [removePairTarget]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
@@ -602,6 +618,25 @@ export default function Dashboard() {
       showToast('🔄 Pair reset to pending');
     } catch (err) {
       alert(err.response?.data?.message || 'Pair reset failed');
+    }
+  };
+
+  const handleRemovePair = (leadId) => {
+    setRemovePairTarget({ _id: leadId });
+  };
+
+  const handleConfirmRemovePair = async () => {
+    if (!removePairTarget || !removePairTarget._id) return;
+    setRemovePairLoading(true);
+    try {
+      await axios.patch(`/api/registrations/${removePairTarget._id}/remove-pair`);
+      setRemovePairTarget(null);
+      fetchData();
+      showToast('🗑️ Pair removed and both players are now unlinked');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Pair removal failed');
+    } finally {
+      setRemovePairLoading(false);
     }
   };
 
@@ -1420,7 +1455,14 @@ export default function Dashboard() {
                           <React.Fragment key={`${first._id}-${second ? second._id : 'solo'}`}>
                             <tr style={ds.tr}>
                               <td style={{ ...topCellBase, borderTopLeftRadius: 24 }}>
-                                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{first.playerName}</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                  <div style={{ fontWeight: 900, fontSize: 18 }}>{first.playerName}</div>
+                                  {first.tournament?.category === 'mixed-doubles' && first.gender ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, background: first.gender === 'Male' ? 'rgba(59,130,246,0.12)' : 'rgba(192,132,252,0.12)', color: first.gender === 'Male' ? '#2563EB' : '#7C3AED' }}>
+                                      {first.gender === 'Male' ? '♂' : '♀'} {first.gender}
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {first.rollNumber}</div>
                                 <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{first.department}</div>
                               </td>
@@ -1464,7 +1506,14 @@ export default function Dashboard() {
                               <td style={middleCellBase}>
                                 {second ? (
                                   <>
-                                    <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{second.playerName}</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                      <div style={{ fontWeight: 900, fontSize: 18 }}>{second.playerName}</div>
+                                      {second.tournament?.category === 'mixed-doubles' && second.gender ? (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, background: second.gender === 'Male' ? 'rgba(59,130,246,0.12)' : 'rgba(192,132,252,0.12)', color: second.gender === 'Male' ? '#2563EB' : '#7C3AED' }}>
+                                          {second.gender === 'Male' ? '♂' : '♀'} {second.gender}
+                                        </span>
+                                      ) : null}
+                                    </div>
                                     <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {second.rollNumber}</div>
                                     <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{second.department}</div>
                                   </>
@@ -1545,7 +1594,23 @@ export default function Dashboard() {
                             <tr style={ds.tr}>
                               <td colSpan={5} style={{ ...footerCell, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, background: 'var(--bg-card)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
-                                  {pairApproved && (
+                                  {second && (
+                                  <button
+                                    onClick={() => handleRemovePair(first._id)}
+                                    style={{
+                                      ...ds.actionBtn,
+                                      background: 'rgba(239, 68, 68, 0.08)',
+                                      border: '1px solid #EF4444',
+                                      color: '#EF4444',
+                                      fontSize: 11,
+                                      padding: '10px 16px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    REMOVE PAIR
+                                  </button>
+                                )}
+                                {pairApproved && (
                                     <button
                                       onClick={() => handleResetPair(first._id)}
                                       style={{
@@ -2003,6 +2068,81 @@ export default function Dashboard() {
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
 
+      {removePairTarget && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setRemovePairTarget(null); }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 610,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-pair-modal-title"
+            aria-describedby="remove-pair-modal-desc"
+            tabIndex={-1}
+            onKeyDown={e => {
+              if (e.key === 'Escape') setRemovePairTarget(null);
+            }}
+            style={{
+              width: 520,
+              maxWidth: '100%',
+              background: 'var(--bg-card)',
+              borderRadius: 28,
+              border: '1px solid var(--border)',
+              boxShadow: '0 40px 90px rgba(0,0,0,0.32)',
+              padding: 32,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 18,
+              outline: 'none',
+            }}
+          >
+            <div>
+              <div id="remove-pair-modal-title" style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary)', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Remove Pair</div>
+              <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.5, marginBottom: 8 }}>Confirm pair removal</div>
+              <div id="remove-pair-modal-desc" style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.75 }}>
+                Are you sure you want to remove this pair? Both players will be unlinked and marked as 'No partner yet', and will need to register a new partner to continue.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setRemovePairTarget(null)}
+                style={{ ...ds.revertBtn, padding: '12px 20px', borderRadius: 14, minWidth: 120 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRemovePair}
+                disabled={removePairLoading}
+                style={{
+                  ...ds.actionBtn,
+                  background: '#EF4444',
+                  color: '#FFF',
+                  border: '1px solid #EF4444',
+                  padding: '12px 20px',
+                  borderRadius: 14,
+                  minWidth: 140,
+                  cursor: removePairLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {removePairLoading ? 'Removing...' : 'Remove Pair'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editRegistrationTarget && (
         <RegisterModal
           tournament={editRegistrationTarget.tournament}
@@ -2017,14 +2157,35 @@ export default function Dashboard() {
 
       {/* ── Link Partner Modal ── */}
       {linkTarget && (() => {
-        const tournId = linkTarget.tournament?._id?.toString() || linkTarget.tournament?.toString();
         const soloOptions = registrations.filter(r => {
-          const rTournId = r.tournament?._id?.toString() || r.tournament?.toString();
+          const isSameCategoryYear =
+            r.tournament?.category === linkTarget.tournament?.category &&
+            r.tournament?.year === linkTarget.tournament?.year;
+          const hasNoPartner = !r.partnerRollNumber || r.partnerRollNumber.trim() === '';
+          const isConfirmed = r.status === 'confirmed';
+          const isNotSelf = String(r._id) !== String(linkTarget._id);
+
+          const category = linkTarget.tournament?.category;
+          const isGenderCompatible = (() => {
+            if (!category) return false;
+            if (category === 'mixed-doubles') {
+              return linkTarget.gender && r.gender && linkTarget.gender !== r.gender;
+            }
+            if (category === 'doubles-men') {
+              return linkTarget.gender === 'Male' && r.gender === 'Male';
+            }
+            if (category === 'doubles-women') {
+              return linkTarget.gender === 'Female' && r.gender === 'Female';
+            }
+            return false;
+          })();
+
           return (
-            r._id !== linkTarget._id &&
-            rTournId === tournId &&
-            (!r.partnerRollNumber || r.partnerRollNumber.trim() === '') &&
-            r.status !== 'rejected' && r.status !== 'cancelled'
+            isNotSelf &&
+            isSameCategoryYear &&
+            hasNoPartner &&
+            isConfirmed &&
+            isGenderCompatible
           );
         }).filter(r =>
           !linkSearch ||
