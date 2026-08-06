@@ -4,6 +4,7 @@ const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
 
 // Admin — view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -447,21 +448,12 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
       return res.status(400).json({ message: 'The selected player already has a partner assigned.' });
 
     const category = reg.tournament.category;
-    if (category === 'mixed-doubles') {
-      if (!reg.gender || !partner.gender) {
-        return res.status(400).json({ message: 'Both players must have gender set for Mixed Doubles.' });
-      }
-      if (reg.gender === partner.gender) {
-        return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
-      }
-    } else if (category === 'doubles-men') {
-      if (reg.gender !== 'Male' || partner.gender !== 'Male') {
-        return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-      }
-    } else if (category === 'doubles-women') {
-      if (reg.gender !== 'Female' || partner.gender !== 'Female') {
-        return res.status(400).json({ message: 'Doubles Women requires two female players.' });
-      }
+    const compatibilityError = getPartnerCompatibilityError(category, reg.gender, partner.gender);
+
+    if (!compatibilityError) {
+      // proceed
+    } else if (category === 'mixed-doubles' || category === 'doubles-men' || category === 'doubles-women') {
+      return res.status(400).json({ message: compatibilityError });
     } else {
       return res.status(400).json({ message: 'Manual partner linking is only allowed for doubles categories.' });
     }
@@ -645,28 +637,13 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ message: 'This player already has a partner assigned.' });
       }
 
-      if (tournamentDoc.category === 'mixed-doubles') {
-        if (!cleanedGender) {
-          return res.status(400).json({ message: 'Gender is required for Mixed Doubles.' });
-        }
-        if (!partnerRecord.gender) {
-          return res.status(400).json({ message: 'Partner registration is missing required gender information.' });
-        }
-      }
-
       const playerGender = cleanedGender;
       const partnerGender = partnerRecord.gender;
-      if (tournamentDoc.category === 'mixed-doubles') {
-        if (!((playerGender === 'Male' && partnerGender === 'Female') || (playerGender === 'Female' && partnerGender === 'Male'))) {
-          return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
-        }
-      } else if (tournamentDoc.category === 'doubles-men') {
-        if (playerGender && partnerGender && (playerGender !== 'Male' || partnerGender !== 'Male')) {
-          return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-        }
-      } else if (tournamentDoc.category === 'doubles-women') {
-        if (playerGender && partnerGender && (playerGender !== 'Female' || partnerGender !== 'Female')) {
-          return res.status(400).json({ message: 'Doubles Women requires two female players.' });
+      const category = tournamentDoc.category;
+      const compatibilityError = getPartnerCompatibilityError(category, playerGender, partnerGender);
+      if (category === 'mixed-doubles' || category === 'doubles-men' || category === 'doubles-women') {
+        if (compatibilityError) {
+          return res.status(400).json({ message: compatibilityError });
         }
       }
       let updated = await Registration.findOneAndUpdate(
@@ -857,13 +834,9 @@ router.post('/partner-requests/:id/accept', async (req, res) => {
     if (!tournamentDoc) return res.status(404).json({ message: 'Tournament not found for this request.' });
 
     const category = (tournamentDoc.category || '').toLowerCase();
-    if (category.includes('doubles-men')) {
-      if (requester.gender !== 'Male' || target.gender !== 'Male') return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-    } else if (category.includes('doubles-women')) {
-      if (requester.gender !== 'Female' || target.gender !== 'Female') return res.status(400).json({ message: 'Doubles Women requires two female players.' });
-    } else if (category.includes('mixed')) {
-      const genders = [requester.gender, target.gender];
-      if (!(genders.includes('Male') && genders.includes('Female'))) return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
+    const compatibilityError = getPartnerCompatibilityError(category, requester.gender, target.gender);
+    if (compatibilityError) {
+      return res.status(400).json({ message: compatibilityError });
     }
 
     // Create pair

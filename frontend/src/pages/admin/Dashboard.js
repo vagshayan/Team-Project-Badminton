@@ -2168,14 +2168,17 @@ export default function Dashboard() {
           const category = linkTarget.tournament?.category;
           const isGenderCompatible = (() => {
             if (!category) return false;
+            const targetGender = String(linkTarget.gender || '').trim().toLowerCase();
+            const candidateGender = String(r.gender || '').trim().toLowerCase();
+
             if (category === 'mixed-doubles') {
-              return linkTarget.gender && r.gender && linkTarget.gender !== r.gender;
+              return (targetGender === 'male' && candidateGender === 'female') || (targetGender === 'female' && candidateGender === 'male');
             }
             if (category === 'doubles-men') {
-              return linkTarget.gender === 'Male' && r.gender === 'Male';
+              return (!targetGender || targetGender === 'male') && (!candidateGender || candidateGender === 'male');
             }
             if (category === 'doubles-women') {
-              return linkTarget.gender === 'Female' && r.gender === 'Female';
+              return (!targetGender || targetGender === 'female') && (!candidateGender || candidateGender === 'female');
             }
             return false;
           })();
