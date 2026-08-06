@@ -182,7 +182,7 @@ router.patch('/:id/status', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
   const {
     playerName, nicNo, address, email, phone,
-    rollNumber, department, partnerName, partnerRollNumber,
+    rollNumber, department, gender, partnerName, partnerRollNumber,
   } = req.body;
 
   const normalize = (value = '') => String(value).trim();
@@ -194,9 +194,11 @@ router.put('/:id', protect, async (req, res) => {
   const cleanedAddress = normalize(address);
   const cleanedEmail = normalize(email);
   const cleanedPhone = normalize(phone);
+  const cleanedGender = normalize(gender);
 
   if (!cleanedName || !cleanedNic || !cleanedAddress || !cleanedEmail || !cleanedPhone || !cleanedRoll || !department)
     return res.status(400).json({ message: 'All required fields must be filled' });
+  if (cleanedGender && !['Male', 'Female'].includes(cleanedGender)) return res.status(400).json({ message: 'Gender must be Male or Female.' });
 
   const REG_NO_REGEX = /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/;
   const OLD_NIC_REGEX = /^9\d{8}v$/;
@@ -239,6 +241,7 @@ try {
   if (reg.phone !== cleanedPhone) updatedFields.phone = cleanedPhone;
   if (reg.rollNumber !== cleanedRoll) updatedFields.rollNumber = cleanedRoll;
   if (reg.department !== department) updatedFields.department = department;
+  if (cleanedGender && reg.gender !== cleanedGender) updatedFields.gender = cleanedGender;
   if (reg.partnerName !== cleanedPartnerName) updatedFields.partnerName = cleanedPartnerName;
   if (reg.partnerRollNumber !== cleanedPartnerRoll) updatedFields.partnerRollNumber = cleanedPartnerRoll;
 
@@ -249,6 +252,7 @@ try {
   reg.phone = cleanedPhone;
   reg.rollNumber = cleanedRoll;
   reg.department = department;
+  if (cleanedGender) reg.gender = cleanedGender;
   reg.partnerName = cleanedPartnerName;
   reg.partnerRollNumber = cleanedPartnerRoll;
 
@@ -356,6 +360,65 @@ router.patch('/:id/reset-pair', protect, async (req, res) => {
   }
 });
 
+// Admin — remove a paired registration link completely
+router.patch('/:id/remove-pair', protect, async (req, res) => {
+  try {
+    const { Registration, Pair } = getModelsForSport(req.admin.sport);
+    const reg = await Registration.findById(req.params.id).populate('tournament');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
+      return res.status(401).json({ message: 'Unauthorized' });
+
+    if (!reg.partnerRollNumber) return res.status(400).json({ message: 'This registration has no partner to remove.' });
+
+    const partner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber });
+    const removedPartnerRoll = reg.partnerRollNumber;
+    const removedPartnerName = reg.partnerName || null;
+    const removedPairId = reg.pairId || partner?.pairId || null;
+
+    reg.partnerRollNumber = '';
+    reg.partnerName = '';
+    reg.partnerStatus = 'looking';
+    reg.pairStatus = 'incomplete';
+    reg.pairId = null;
+    await reg.save();
+
+    if (partner) {
+      partner.partnerRollNumber = '';
+      partner.partnerName = '';
+      partner.partnerStatus = 'looking';
+      partner.pairStatus = 'incomplete';
+      partner.pairId = null;
+      await partner.save();
+    }
+
+    if (removedPairId) {
+      await Pair.findByIdAndDelete(removedPairId);
+    }
+
+    await logAdminAction({
+      adminId: req.admin._id,
+      action: 'REMOVE_PAIR',
+      targetId: reg._id,
+      targetModel: 'Registration',
+      details: {
+        tournament: reg.tournament._id,
+        registrationId: reg._id,
+        partnerId: partner?._id || null,
+        partnerRollNumber: removedPartnerRoll,
+        partnerName: removedPartnerName,
+        pairId: removedPairId,
+      },
+      req,
+    });
+
+    res.json({ message: 'Pair removed and both players are now unlinked.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Admin — manually link two solo registrations as partners (bidirectional)
 router.patch('/:id/link-partner', protect, async (req, res) => {
   try {
@@ -382,6 +445,26 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
       return res.status(400).json({ message: 'This player already has a partner assigned.' });
     if (partner.partnerRollNumber && partner.partnerRollNumber.trim())
       return res.status(400).json({ message: 'The selected player already has a partner assigned.' });
+
+    const category = reg.tournament.category;
+    if (category === 'mixed-doubles') {
+      if (!reg.gender || !partner.gender) {
+        return res.status(400).json({ message: 'Both players must have gender set for Mixed Doubles.' });
+      }
+      if (reg.gender === partner.gender) {
+        return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
+      }
+    } else if (category === 'doubles-men') {
+      if (reg.gender !== 'Male' || partner.gender !== 'Male') {
+        return res.status(400).json({ message: 'Doubles Men requires two male players.' });
+      }
+    } else if (category === 'doubles-women') {
+      if (reg.gender !== 'Female' || partner.gender !== 'Female') {
+        return res.status(400).json({ message: 'Doubles Women requires two female players.' });
+      }
+    } else {
+      return res.status(400).json({ message: 'Manual partner linking is only allowed for doubles categories.' });
+    }
 
     // Link bidirectionally
     reg.partnerRollNumber = partner.rollNumber;
@@ -452,7 +535,7 @@ router.get('/lookup/:regNo?', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     tournament, playerName, nicNo, address, email, phone,
-    rollNumber, department, year, partnerName, partnerRollNumber,
+    rollNumber, department, year, gender, partnerName, partnerRollNumber,
   } = req.body;
 
   const normalize = (value = '') => String(value).trim();
@@ -464,9 +547,11 @@ router.post('/', async (req, res) => {
   const cleanedAddress = normalize(address);
   const cleanedEmail = normalize(email);
   const cleanedPhone = normalize(phone);
+  const cleanedGender = normalize(gender);
 
   if (!tournament || !cleanedName || !cleanedNic || !cleanedAddress || !cleanedEmail || !cleanedPhone || !cleanedRoll || !department)
     return res.status(400).json({ message: 'All required fields must be filled' });
+  if (cleanedGender && !['Male', 'Female'].includes(cleanedGender)) return res.status(400).json({ message: 'Gender must be Male or Female.' });
 
   const REG_NO_REGEX = /^20\d{2}\/[A-Z]{2,3}\/\d{3}$/;
   const OLD_NIC_REGEX = /^9\d{8}v$/;
@@ -517,6 +602,26 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: `This registration number is already registered for this tournament: ${cleanedRoll}` });
     }
 
+    const existingNic = await Registration.findOne({ tournament, nicNo: cleanedNic });
+    if (existingNic) {
+      return res.status(400).json({ message: `This NIC number is already registered for this tournament: ${cleanedNic}` });
+    }
+
+    let reg = await Registration.create({
+      tournament,
+      playerName: cleanedName,
+      rollNumber: cleanedRoll,
+      nicNo: cleanedNic,
+      address: cleanedAddress,
+      email: cleanedEmail,
+      phone: cleanedPhone,
+      department,
+      year: year || 'N/A',
+      partnerName: cleanedPartnerName,
+      partnerRollNumber: cleanedPartnerRoll,
+      ...(cleanedGender ? { gender: cleanedGender } : {}),
+    });
+
     let partnerRecord = null;
     if (cleanedPartnerRoll) {
       partnerRecord = await Registration.findOne({ tournament, rollNumber: cleanedPartnerRoll });
@@ -539,27 +644,31 @@ router.post('/', async (req, res) => {
       if (partnerAlreadyPaired || partnerAlreadyUsed || selfAlreadyAssignedAsPartner) {
         return res.status(400).json({ message: 'This player already has a partner assigned.' });
       }
-    }
 
-    const nicExists = await Registration.findOne({ tournament, nicNo: cleanedNic });
-    if (nicExists) return res.status(400).json({ message: `Duplicate registration: NIC ${cleanedNic} is already registered.` });
+      if (tournamentDoc.category === 'mixed-doubles') {
+        if (!cleanedGender) {
+          return res.status(400).json({ message: 'Gender is required for Mixed Doubles.' });
+        }
+        if (!partnerRecord.gender) {
+          return res.status(400).json({ message: 'Partner registration is missing required gender information.' });
+        }
+      }
 
-    const reg = await Registration.create({
-      tournament,
-      playerName: cleanedName,
-      nicNo: cleanedNic,
-      address: cleanedAddress,
-      email: cleanedEmail,
-      phone: cleanedPhone,
-      rollNumber: cleanedRoll,
-      department,
-      year: year || 'N/A',
-      partnerName: partnerRecord ? partnerRecord.playerName : (cleanedPartnerName || ''),
-      partnerRollNumber: cleanedPartnerRoll || '',
-    });
-
-    if (cleanedPartnerRoll) {
-      // Try a direct match first
+      const playerGender = cleanedGender;
+      const partnerGender = partnerRecord.gender;
+      if (tournamentDoc.category === 'mixed-doubles') {
+        if (!((playerGender === 'Male' && partnerGender === 'Female') || (playerGender === 'Female' && partnerGender === 'Male'))) {
+          return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
+        }
+      } else if (tournamentDoc.category === 'doubles-men') {
+        if (playerGender && partnerGender && (playerGender !== 'Male' || partnerGender !== 'Male')) {
+          return res.status(400).json({ message: 'Doubles Men requires two male players.' });
+        }
+      } else if (tournamentDoc.category === 'doubles-women') {
+        if (playerGender && partnerGender && (playerGender !== 'Female' || partnerGender !== 'Female')) {
+          return res.status(400).json({ message: 'Doubles Women requires two female players.' });
+        }
+      }
       let updated = await Registration.findOneAndUpdate(
         { tournament, rollNumber: cleanedPartnerRoll },
         { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
@@ -584,6 +693,16 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(reg);
   } catch (err) {
+    if (err.code === 11000) {
+      const dupKey = Object.keys(err.keyValue || {})[0];
+      if (dupKey === 'nicNo') {
+        return res.status(400).json({ message: `This NIC number is already registered for this tournament: ${err.keyValue[dupKey]}` });
+      }
+      if (dupKey === 'rollNumber') {
+        return res.status(400).json({ message: `This registration number is already registered for this tournament: ${err.keyValue[dupKey]}` });
+      }
+      return res.status(400).json({ message: `Duplicate field detected for this tournament.` });
+    }
     res.status(400).json({ message: err.message });
   }
 });

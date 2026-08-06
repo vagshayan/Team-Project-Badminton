@@ -28,7 +28,7 @@ const registrationSchema = new mongoose.Schema({
   year: { type: String, default: 'N/A' },
   partnerName: { type: String, default: '' },
   partnerRollNumber: { type: String, default: '' },
-  gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
+  gender: { type: String, enum: ['Male', 'Female', 'Other'], default: undefined },
   partnerStatus: { type: String, enum: ['none', 'looking', 'requested', 'paired'], default: 'none' },
   pairStatus: { type: String, enum: ['none', 'incomplete', 'complete', 'approved'], default: 'none' },
   pairId: { type: mongoose.Schema.Types.ObjectId, default: null },
