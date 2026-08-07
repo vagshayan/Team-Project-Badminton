@@ -370,11 +370,12 @@ router.post('/', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
   const { password, year, date, time, venue, category, registrationDeadline } = req.body;
   try {
-    if (password) {
-      const admin = await Admin.findById(req.admin._id);
-      const isMatch = await admin.comparePassword(password);
-      if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
-    }
+    if (!password) return res.status(400).json({ message: 'Password is required to update' });
+
+    const admin = await Admin.findById(req.admin._id);
+    const isMatch = await admin.comparePassword(password);
+    if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
+
     const currentYear = new Date().getFullYear();
     if (year < currentYear) return res.status(400).json({ message: 'Year cannot be in the past' });
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -487,11 +488,50 @@ router.delete('/:id', protect, async (req, res) => {
     const admin = await Admin.findById(req.admin._id);
     const isMatch = await admin.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
-    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const { Tournament, Registration, Player, Pair, PartnerRequest } = getModelsForSport(req.admin.sport);
     const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
-    await Registration.updateMany({ tournament: req.params.id }, { status: 'cancelled' });
+
+    const registrations = await Registration.find({ tournament: req.params.id });
+    const regRollNumbers = registrations.map((reg) => String(reg.rollNumber || '').trim().toUpperCase()).filter(Boolean);
+
+    for (const reg of registrations) {
+      const partnerRoll = String(reg.partnerRollNumber || '').trim().toUpperCase();
+      if (partnerRoll) {
+        await Registration.findOneAndUpdate(
+          { tournament: req.params.id, rollNumber: partnerRoll },
+          {
+            partnerRollNumber: '',
+            partnerName: '',
+            partnerStatus: 'looking',
+            pairStatus: 'incomplete',
+            pairId: null,
+          }
+        );
+      }
+    }
+
+    await Player.updateMany(
+      { rollNumber: { $in: regRollNumbers } },
+      { $pull: { tournamentHistory: req.params.id } }
+    );
+
+    for (const rollNumber of regRollNumbers) {
+      const player = await Player.findOne({ rollNumber });
+      if (player && player.tournamentHistory.length === 0) {
+        await Player.deleteOne({ rollNumber });
+      }
+    }
+
+    const pairIds = registrations.map((reg) => reg.pairId).filter(Boolean).map((id) => id.toString());
+    await Pair.deleteMany({ tournament: req.params.id });
+    if (pairIds.length > 0) {
+      await Pair.deleteMany({ _id: { $in: pairIds } });
+    }
+
+    await PartnerRequest.deleteMany({ tournament: req.params.id });
     await Match.deleteMany({ tournament: req.params.id });
+    await Registration.deleteMany({ tournament: req.params.id });
     await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id });
     // Log Audit action
     await logAdminAction({
