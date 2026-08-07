@@ -2158,9 +2158,9 @@ export default function Dashboard() {
       {/* ── Link Partner Modal ── */}
       {linkTarget && (() => {
         const soloOptions = registrations.filter(r => {
-          const isSameCategoryYear =
-            r.tournament?.category === linkTarget.tournament?.category &&
-            r.tournament?.year === linkTarget.tournament?.year;
+          const targetTournamentId = String(linkTarget.tournament?._id || linkTarget.tournament || '');
+          const candidateTournamentId = String(r.tournament?._id || r.tournament || '');
+          const isSameTournament = targetTournamentId && candidateTournamentId && targetTournamentId === candidateTournamentId;
           const hasNoPartner = !r.partnerRollNumber || r.partnerRollNumber.trim() === '';
           const isConfirmed = r.status === 'confirmed';
           const isNotSelf = String(r._id) !== String(linkTarget._id);
@@ -2185,7 +2185,7 @@ export default function Dashboard() {
 
           return (
             isNotSelf &&
-            isSameCategoryYear &&
+            isSameTournament &&
             hasNoPartner &&
             isConfirmed &&
             isGenderCompatible

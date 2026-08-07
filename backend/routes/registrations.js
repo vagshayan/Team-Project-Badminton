@@ -234,6 +234,19 @@ try {
   if (!reg) return res.status(404).json({ message: 'Registration not found' });
   if (reg.tournament.createdBy.toString() !== req.admin._id.toString()) return res.status(401).json({ message: 'Unauthorized' });
 
+  const previousPartnerRoll = (reg.partnerRollNumber || '').trim().toUpperCase();
+  const previousPartnerName = reg.partnerName || '';
+  const nextPartnerRoll = cleanedPartnerRoll;
+  const nextPartnerName = cleanedPartnerName;
+
+  let nextPartner = null;
+  if (nextPartnerRoll) {
+    nextPartner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: nextPartnerRoll });
+    if (!nextPartner) {
+      return res.status(404).json({ message: 'Partner registration not found for this tournament.' });
+    }
+  }
+
   const updatedFields = {};
   if (reg.playerName !== cleanedName) updatedFields.playerName = cleanedName;
   if (reg.nicNo !== cleanedNic) updatedFields.nicNo = cleanedNic;
@@ -245,6 +258,8 @@ try {
   if (cleanedGender && reg.gender !== cleanedGender) updatedFields.gender = cleanedGender;
   if (reg.partnerName !== cleanedPartnerName) updatedFields.partnerName = cleanedPartnerName;
   if (reg.partnerRollNumber !== cleanedPartnerRoll) updatedFields.partnerRollNumber = cleanedPartnerRoll;
+
+  const partnerChanged = previousPartnerRoll !== nextPartnerRoll;
 
   reg.playerName = cleanedName;
   reg.nicNo = cleanedNic;
@@ -258,6 +273,27 @@ try {
   reg.partnerRollNumber = cleanedPartnerRoll;
 
   await reg.save();
+
+  if (partnerChanged && previousPartnerRoll) {
+    const oldPartner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: previousPartnerRoll });
+    if (oldPartner && oldPartner.partnerRollNumber?.trim().toUpperCase() === reg.rollNumber.trim().toUpperCase()) {
+      oldPartner.partnerRollNumber = '';
+      oldPartner.partnerName = '';
+      oldPartner.partnerStatus = 'looking';
+      oldPartner.pairStatus = 'incomplete';
+      oldPartner.pairId = null;
+      await oldPartner.save();
+    }
+  }
+
+  if (nextPartner && nextPartner._id.toString() !== reg._id.toString()) {
+    nextPartner.partnerRollNumber = reg.rollNumber;
+    nextPartner.partnerName = reg.playerName;
+    nextPartner.partnerStatus = 'paired';
+    nextPartner.pairStatus = reg.pairStatus || 'incomplete';
+    nextPartner.pairId = reg.pairId || null;
+    await nextPartner.save();
+  }
 
   if (reg.status === 'confirmed') {
     await Player.findOneAndUpdate(
@@ -300,13 +336,20 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
     if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
       return res.status(401).json({ message: 'Unauthorized' });
 
-    if (!reg.partnerRollNumber) return res.status(400).json({ message: 'No partner linked to this registration.' });
+    const partnerRoll = (reg.partnerRollNumber || '').trim().toUpperCase();
+    if (!partnerRoll) return res.status(400).json({ message: 'No partner linked to this registration.' });
+
+    const partner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: partnerRoll });
+    if (!partner) return res.status(400).json({ message: 'Linked partner registration could not be found in this tournament.' });
+    if ((partner.partnerRollNumber || '').trim().toUpperCase() !== reg.rollNumber.trim().toUpperCase()) {
+      return res.status(400).json({ message: 'Both players must be linked to each other before approval.' });
+    }
 
     reg.pairStatus = 'approved';
     await reg.save();
 
-    const partner = await Registration.findOneAndUpdate(
-      { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+    await Registration.findOneAndUpdate(
+      { tournament: reg.tournament._id, rollNumber: partnerRoll },
       { pairStatus: 'approved' },
       { new: true }
     );
@@ -316,7 +359,7 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
       action: 'APPROVE_PAIR',
       targetId: reg._id,
       targetModel: 'Registration',
-      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner?._id || null, partnerRollNumber: reg.partnerRollNumber },
+      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner?._id || null, partnerRollNumber: partnerRoll },
       req
     });
 
@@ -437,7 +480,7 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
     const partner = await Registration.findById(partnerId).populate('tournament');
     if (!partner) return res.status(404).json({ message: 'Partner registration not found' });
 
-    // Must be in the same tournament
+    // Must be in the exact same tournament record
     if (reg.tournament._id.toString() !== partner.tournament._id.toString())
       return res.status(400).json({ message: 'Both players must be in the same tournament.' });
 
