@@ -2158,9 +2158,9 @@ export default function Dashboard() {
       {/* ── Link Partner Modal ── */}
       {linkTarget && (() => {
         const soloOptions = registrations.filter(r => {
-          const isSameCategoryYear =
-            r.tournament?.category === linkTarget.tournament?.category &&
-            r.tournament?.year === linkTarget.tournament?.year;
+          const targetTournamentId = String(linkTarget.tournament?._id || linkTarget.tournament || '');
+          const candidateTournamentId = String(r.tournament?._id || r.tournament || '');
+          const isSameTournament = targetTournamentId && candidateTournamentId && targetTournamentId === candidateTournamentId;
           const hasNoPartner = !r.partnerRollNumber || r.partnerRollNumber.trim() === '';
           const isConfirmed = r.status === 'confirmed';
           const isNotSelf = String(r._id) !== String(linkTarget._id);
@@ -2168,21 +2168,24 @@ export default function Dashboard() {
           const category = linkTarget.tournament?.category;
           const isGenderCompatible = (() => {
             if (!category) return false;
+            const targetGender = String(linkTarget.gender || '').trim().toLowerCase();
+            const candidateGender = String(r.gender || '').trim().toLowerCase();
+
             if (category === 'mixed-doubles') {
-              return linkTarget.gender && r.gender && linkTarget.gender !== r.gender;
+              return (targetGender === 'male' && candidateGender === 'female') || (targetGender === 'female' && candidateGender === 'male');
             }
             if (category === 'doubles-men') {
-              return linkTarget.gender === 'Male' && r.gender === 'Male';
+              return (!targetGender || targetGender === 'male') && (!candidateGender || candidateGender === 'male');
             }
             if (category === 'doubles-women') {
-              return linkTarget.gender === 'Female' && r.gender === 'Female';
+              return (!targetGender || targetGender === 'female') && (!candidateGender || candidateGender === 'female');
             }
             return false;
           })();
 
           return (
             isNotSelf &&
-            isSameCategoryYear &&
+            isSameTournament &&
             hasNoPartner &&
             isConfirmed &&
             isGenderCompatible

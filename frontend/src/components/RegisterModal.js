@@ -7,6 +7,12 @@ const CAT_LABELS = {
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
+const SPORT_META = {
+  badminton: { label: 'Badminton', icon: '🏸', tint: '#C8A84B' },
+  'table-tennis': { label: 'Table Tennis', icon: '🏓', tint: '#2563EB' },
+  carrom: { label: 'Carrom', icon: '🎯', tint: '#D97706' },
+};
+
 const FACULTIES = [
   'Faculty of Arts', 'Faculty of Agriculture', 'Faculty of Allied Health Sciences',
   'Faculty of Engineering', 'Faculty of Hindu Studies', 'Faculty of Management Studies & Commerce',
@@ -58,6 +64,22 @@ const validateAddress = (val) => ADDRESS_REGEX.test(val);
 const validateNIC = (val) => OLD_NIC_REGEX.test(val) || NEW_NIC_REGEX.test(val);
 const validateEmail = (val) => EMAIL_REGEX.test(val);
 
+const isCategoryCompatible = (category, playerGender, partnerGender) => {
+  const player = String(playerGender || '').trim();
+  const partner = String(partnerGender || '').trim();
+
+  if (category === 'mixed-doubles') {
+    return (player === 'Male' && partner === 'Female') || (player === 'Female' && partner === 'Male');
+  }
+  if (category === 'doubles-men') {
+    return (!player || player === 'Male') && (!partner || partner === 'Male');
+  }
+  if (category === 'doubles-women') {
+    return (!player || player === 'Female') && (!partner || partner === 'Female');
+  }
+  return false;
+};
+
 const validateField = (field, value) => {
   const val = String(value).trim();
   if (!val) return '';
@@ -85,7 +107,8 @@ const validateField = (field, value) => {
 export default function RegisterModal({ tournament, onClose, initialData = null }) {
   const isDoubles = DOUBLES.includes(tournament.category);
   const isMixedDoubles = tournament.category === 'mixed-doubles';
-  const sportColor = tournament.sport === 'badminton' ? '#C8A84B' : (tournament.sport === 'table-tennis' ? '#8B5CF6' : '#EC4899');
+  const sport = SPORT_META[tournament.sport] || { label: tournament.sport, icon: '', tint: '#2563EB' };
+  const sportColor = sport.tint;
 
   const [form, setForm] = useState({
     playerName: initialData ? initialData.playerName : '',
@@ -195,12 +218,12 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
         const partnerGender = partnerLookup.gender;
         const playerGender = form.gender;
         if (category === 'mixed-doubles') {
-          if (!(playerGender === 'Male' && partnerGender === 'Female') && !(playerGender === 'Female' && partnerGender === 'Male')) {
+          if (!isCategoryCompatible(category, playerGender, partnerGender)) {
             newErrors.partnerRegNo = 'Mixed Doubles requires one male and one female player. This partner cannot be paired for Mixed Doubles.';
           }
-        } else if (category === 'doubles-men' && (playerGender !== 'Male' || partnerGender !== 'Male')) {
+        } else if (category === 'doubles-men' && !isCategoryCompatible(category, playerGender, partnerGender)) {
           newErrors.partnerRegNo = 'Doubles Men requires two male players. This partner cannot be paired for Doubles Men.';
-        } else if (category === 'doubles-women' && (playerGender !== 'Female' || partnerGender !== 'Female')) {
+        } else if (category === 'doubles-women' && !isCategoryCompatible(category, playerGender, partnerGender)) {
           newErrors.partnerRegNo = 'Doubles Women requires two female players. This partner cannot be paired for Doubles Women.';
         }
       }
@@ -320,13 +343,24 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @media (max-width: 600px) {
           .modal-overlay {
-            padding: 16px !important;
+            padding: 12px !important;
           }
           .modal-card {
-            padding: 30px 20px !important;
-            border-radius: 24px !important;
-            margin: 20px 0 !important;
+            padding: 22px 18px !important;
+            border-radius: 22px !important;
+            margin: 12px 0 !important;
             width: 100% !important;
+          }
+          .modal-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding-bottom: 0 !important;
+          }
+          .modal-title {
+            font-size: 20px !important;
+          }
+          .modal-close-btn {
+            align-self: flex-end !important;
           }
         }
       `}</style>
@@ -336,8 +370,25 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   return (
     <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 650 }}>
-        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: sportColor, letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</h2>
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16, position: 'relative' }}>
+          <div style={{ position: 'absolute', right: 0, top: 0, width: 120, height: 120, opacity: 0.08, pointerEvents: 'none', transform: 'translate(18px, -18px)' }}>
+            <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
+              <circle cx="60" cy="60" r="60" fill={sportColor} />
+              <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle" fontSize="48" fill="#fff" opacity="0.24">{sport.icon}</text>
+            </svg>
+          </div>
+          <div style={{ display: 'grid', gap: 8, lineHeight: 1.2, zIndex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.2em', textTransform: 'uppercase' }}>University of Jaffna</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 14, background: `${sportColor}15`, color: sportColor, fontSize: 18, boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)' }}>
+                {sport.icon}
+              </span>
+              <div>
+                <div className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: '#0F172A', letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</div>
+                <div style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>{sport.label} Registration — {tournament.year}</div>
+              </div>
+            </div>
+          </div>
           <button className="modal-close-btn" onClick={onClose} style={sh.closeBtn}>✕</button>
         </div>
 
@@ -620,18 +671,37 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
 }
 
 const sh = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(15px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
-  card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 32, padding: '32px 32px 24px 32px', width: '100%', position: 'relative', boxShadow: 'var(--shadow)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer' },
-  infoBar: { background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '16px 20px', borderRadius: 16, marginBottom: 20 },
-  errorBox: { background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', color: '#FCA5A5', padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, textAlign: 'center' },
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)',
+    backdropFilter: 'blur(18px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1000, padding: 20,
+  },
+  card: {
+    background: '#FFFFFF',
+    borderRadius: 30,
+    padding: '28px 30px 24px 30px',
+    width: '100%',
+    maxWidth: 700,
+    position: 'relative',
+    boxShadow: '0 40px 110px rgba(15, 23, 42, 0.25)',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+  },
+  closeBtn: { background: 'none', border: 'none', color: '#475569', fontSize: 20, cursor: 'pointer' },
+  infoBar: { background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '16px 20px', borderRadius: 18, marginBottom: 20 },
+  errorBox: { background: 'rgba(254, 226, 226, 0.95)', border: '1px solid rgba(239, 68, 68, 0.16)', color: '#B91C1C', padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, textAlign: 'center' },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' },
-  input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
+  label: { fontSize: '10px', fontWeight: 900, color: '#475569', letterSpacing: '1px', textTransform: 'uppercase' },
+  input: { background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.22)', color: '#0F172A', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
-  doublesSection: { borderTop: '1px solid var(--border)', paddingTop: 24, marginTop: 24 },
-  partnerLookupCard: { marginTop: 16, padding: 18, borderRadius: 16, background: 'var(--bg-input)', border: '1px solid var(--border)' },
-  errMsg: { fontSize: 10, color: '#EF4444', fontWeight: 700, marginTop: 4 },
-  cancelBtn: { flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
+  doublesSection: { borderTop: '1px solid rgba(148, 163, 184, 0.18)', paddingTop: 24, marginTop: 24 },
+  partnerLookupCard: { marginTop: 16, padding: 18, borderRadius: 16, background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.18)' },
+  errMsg: { fontSize: 10, color: '#DC2626', fontWeight: 700, marginTop: 4 },
+  cancelBtn: { flex: 1, background: '#E2E8F0', border: '1px solid rgba(148, 163, 184, 0.3)', color: '#0F172A', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
   submitBtn: { flex: 2, border: 'none', color: '#000', padding: '16px', borderRadius: 14, fontWeight: 950, fontSize: 14, cursor: 'pointer', letterSpacing: 0.5 }
 };
