@@ -57,29 +57,57 @@ export default function RegisterPage() {
   const handleConfirmPasswordFocus = () => setIsConfirmPasswordFocused(true);
   const handleConfirmPasswordBlur = () => setIsConfirmPasswordFocused(false);
 
-  const generateStrongPassword = () => {
-    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lower = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const special = '!@#$%^&*';
-    const allChars = upper + lower + numbers + special;
-    const length = Math.floor(Math.random() * 5) + 12;
-    const picks = [
-      upper[Math.floor(Math.random() * upper.length)],
-      lower[Math.floor(Math.random() * lower.length)],
-      numbers[Math.floor(Math.random() * numbers.length)],
-      special[Math.floor(Math.random() * special.length)],
-    ];
-
-    let password = [...picks];
-    while (password.length < length) {
-      password.push(allChars[Math.floor(Math.random() * allChars.length)]);
+  const getSecureRandomInt = (max) => {
+    const cryptoObj = globalThis.crypto;
+    if (!cryptoObj?.getRandomValues) {
+      throw new Error('Secure password generation is not available in this browser.');
     }
 
-    password = password.sort(() => Math.random() - 0.5).join('');
-    setFormData(prev => ({ ...prev, password, confirmPassword: password }));
-    setIsPasswordFocused(true);
-    setIsConfirmPasswordFocused(false);
+    const limit = Math.floor(0x100000000 / max) * max;
+    const buffer = new Uint32Array(1);
+
+    while (true) {
+      cryptoObj.getRandomValues(buffer);
+      if (buffer[0] < limit) return buffer[0] % max;
+    }
+  };
+
+  const shuffleSecure = (values) => {
+    const items = [...values];
+    for (let index = items.length - 1; index > 0; index -= 1) {
+      const swapIndex = getSecureRandomInt(index + 1);
+      [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+    }
+    return items;
+  };
+
+  const generateStrongPassword = () => {
+    try {
+      const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lower = 'abcdefghijklmnopqrstuvwxyz';
+      const numbers = '0123456789';
+      const special = '!@#$%^&*';
+      const allChars = upper + lower + numbers + special;
+      const length = getSecureRandomInt(5) + 12;
+      const picks = [
+        upper[getSecureRandomInt(upper.length)],
+        lower[getSecureRandomInt(lower.length)],
+        numbers[getSecureRandomInt(numbers.length)],
+        special[getSecureRandomInt(special.length)],
+      ];
+
+      let password = [...picks];
+      while (password.length < length) {
+        password.push(allChars[getSecureRandomInt(allChars.length)]);
+      }
+
+      password = shuffleSecure(password).join('');
+      setFormData(prev => ({ ...prev, password, confirmPassword: password }));
+      setIsPasswordFocused(true);
+      setIsConfirmPasswordFocused(false);
+    } catch {
+      setError('Secure password generation is not available in this browser.');
+    }
   };
 
   const handleSubmit = async (e) => {

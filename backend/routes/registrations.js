@@ -4,6 +4,7 @@ const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
 
 // Admin — view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -169,6 +170,28 @@ router.patch('/:id/status', protect, async (req, res) => {
           const pt = await Player.findOne({ rollNumber: reg.partnerRollNumber });
           if (pt && pt.tournamentHistory.length === 0) await Player.deleteOne({ rollNumber: reg.partnerRollNumber });
        }
+    } else if (status === 'cancelled') {
+       await Player.findOneAndUpdate(
+         { rollNumber: reg.rollNumber },
+         { $pull: { tournamentHistory: reg.tournament._id } }
+       );
+
+       if (reg.partnerRollNumber) {
+         await Player.findOneAndUpdate(
+           { rollNumber: reg.partnerRollNumber },
+           { $pull: { tournamentHistory: reg.tournament._id } }
+         );
+       }
+
+       const p = await Player.findOne({ rollNumber: reg.rollNumber });
+       if (p && p.tournamentHistory.length === 0) {
+         await Player.deleteOne({ rollNumber: reg.rollNumber });
+       }
+
+       if (reg.partnerRollNumber) {
+          const pt = await Player.findOne({ rollNumber: reg.partnerRollNumber });
+          if (pt && pt.tournamentHistory.length === 0) await Player.deleteOne({ rollNumber: reg.partnerRollNumber });
+       }
     }
 
     res.json(reg);
@@ -233,6 +256,19 @@ try {
   if (!reg) return res.status(404).json({ message: 'Registration not found' });
   if (reg.tournament.createdBy.toString() !== req.admin._id.toString()) return res.status(401).json({ message: 'Unauthorized' });
 
+  const previousPartnerRoll = (reg.partnerRollNumber || '').trim().toUpperCase();
+  const previousPartnerName = reg.partnerName || '';
+  const nextPartnerRoll = cleanedPartnerRoll;
+  const nextPartnerName = cleanedPartnerName;
+
+  let nextPartner = null;
+  if (nextPartnerRoll) {
+    nextPartner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: nextPartnerRoll });
+    if (!nextPartner) {
+      return res.status(404).json({ message: 'Partner registration not found for this tournament.' });
+    }
+  }
+
   const updatedFields = {};
   if (reg.playerName !== cleanedName) updatedFields.playerName = cleanedName;
   if (reg.nicNo !== cleanedNic) updatedFields.nicNo = cleanedNic;
@@ -244,6 +280,8 @@ try {
   if (cleanedGender && reg.gender !== cleanedGender) updatedFields.gender = cleanedGender;
   if (reg.partnerName !== cleanedPartnerName) updatedFields.partnerName = cleanedPartnerName;
   if (reg.partnerRollNumber !== cleanedPartnerRoll) updatedFields.partnerRollNumber = cleanedPartnerRoll;
+
+  const partnerChanged = previousPartnerRoll !== nextPartnerRoll;
 
   reg.playerName = cleanedName;
   reg.nicNo = cleanedNic;
@@ -257,6 +295,27 @@ try {
   reg.partnerRollNumber = cleanedPartnerRoll;
 
   await reg.save();
+
+  if (partnerChanged && previousPartnerRoll) {
+    const oldPartner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: previousPartnerRoll });
+    if (oldPartner && oldPartner.partnerRollNumber?.trim().toUpperCase() === reg.rollNumber.trim().toUpperCase()) {
+      oldPartner.partnerRollNumber = '';
+      oldPartner.partnerName = '';
+      oldPartner.partnerStatus = 'looking';
+      oldPartner.pairStatus = 'incomplete';
+      oldPartner.pairId = null;
+      await oldPartner.save();
+    }
+  }
+
+  if (nextPartner && nextPartner._id.toString() !== reg._id.toString()) {
+    nextPartner.partnerRollNumber = reg.rollNumber;
+    nextPartner.partnerName = reg.playerName;
+    nextPartner.partnerStatus = 'paired';
+    nextPartner.pairStatus = reg.pairStatus || 'incomplete';
+    nextPartner.pairId = reg.pairId || null;
+    await nextPartner.save();
+  }
 
   if (reg.status === 'confirmed') {
     await Player.findOneAndUpdate(
@@ -299,13 +358,20 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
     if (reg.tournament.createdBy.toString() !== req.admin._id.toString())
       return res.status(401).json({ message: 'Unauthorized' });
 
-    if (!reg.partnerRollNumber) return res.status(400).json({ message: 'No partner linked to this registration.' });
+    const partnerRoll = (reg.partnerRollNumber || '').trim().toUpperCase();
+    if (!partnerRoll) return res.status(400).json({ message: 'No partner linked to this registration.' });
+
+    const partner = await Registration.findOne({ tournament: reg.tournament._id, rollNumber: partnerRoll });
+    if (!partner) return res.status(400).json({ message: 'Linked partner registration could not be found in this tournament.' });
+    if ((partner.partnerRollNumber || '').trim().toUpperCase() !== reg.rollNumber.trim().toUpperCase()) {
+      return res.status(400).json({ message: 'Both players must be linked to each other before approval.' });
+    }
 
     reg.pairStatus = 'approved';
     await reg.save();
 
-    const partner = await Registration.findOneAndUpdate(
-      { tournament: reg.tournament._id, rollNumber: reg.partnerRollNumber },
+    await Registration.findOneAndUpdate(
+      { tournament: reg.tournament._id, rollNumber: partnerRoll },
       { pairStatus: 'approved' },
       { new: true }
     );
@@ -315,7 +381,7 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
       action: 'APPROVE_PAIR',
       targetId: reg._id,
       targetModel: 'Registration',
-      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner?._id || null, partnerRollNumber: reg.partnerRollNumber },
+      details: { tournament: reg.tournament._id, registrationId: reg._id, partnerId: partner?._id || null, partnerRollNumber: partnerRoll },
       req
     });
 
@@ -436,7 +502,7 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
     const partner = await Registration.findById(partnerId).populate('tournament');
     if (!partner) return res.status(404).json({ message: 'Partner registration not found' });
 
-    // Must be in the same tournament
+    // Must be in the exact same tournament record
     if (reg.tournament._id.toString() !== partner.tournament._id.toString())
       return res.status(400).json({ message: 'Both players must be in the same tournament.' });
 
@@ -447,21 +513,12 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
       return res.status(400).json({ message: 'The selected player already has a partner assigned.' });
 
     const category = reg.tournament.category;
-    if (category === 'mixed-doubles') {
-      if (!reg.gender || !partner.gender) {
-        return res.status(400).json({ message: 'Both players must have gender set for Mixed Doubles.' });
-      }
-      if (reg.gender === partner.gender) {
-        return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
-      }
-    } else if (category === 'doubles-men') {
-      if (reg.gender !== 'Male' || partner.gender !== 'Male') {
-        return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-      }
-    } else if (category === 'doubles-women') {
-      if (reg.gender !== 'Female' || partner.gender !== 'Female') {
-        return res.status(400).json({ message: 'Doubles Women requires two female players.' });
-      }
+    const compatibilityError = getPartnerCompatibilityError(category, reg.gender, partner.gender);
+
+    if (!compatibilityError) {
+      // proceed
+    } else if (category === 'mixed-doubles' || category === 'doubles-men' || category === 'doubles-women') {
+      return res.status(400).json({ message: compatibilityError });
     } else {
       return res.status(400).json({ message: 'Manual partner linking is only allowed for doubles categories.' });
     }
@@ -607,21 +664,6 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: `This NIC number is already registered for this tournament: ${cleanedNic}` });
     }
 
-    let reg = await Registration.create({
-      tournament,
-      playerName: cleanedName,
-      rollNumber: cleanedRoll,
-      nicNo: cleanedNic,
-      address: cleanedAddress,
-      email: cleanedEmail,
-      phone: cleanedPhone,
-      department,
-      year: year || 'N/A',
-      partnerName: cleanedPartnerName,
-      partnerRollNumber: cleanedPartnerRoll,
-      ...(cleanedGender ? { gender: cleanedGender } : {}),
-    });
-
     let partnerRecord = null;
     if (cleanedPartnerRoll) {
       partnerRecord = await Registration.findOne({ tournament, rollNumber: cleanedPartnerRoll });
@@ -645,49 +687,41 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ message: 'This player already has a partner assigned.' });
       }
 
-      if (tournamentDoc.category === 'mixed-doubles') {
-        if (!cleanedGender) {
-          return res.status(400).json({ message: 'Gender is required for Mixed Doubles.' });
-        }
-        if (!partnerRecord.gender) {
-          return res.status(400).json({ message: 'Partner registration is missing required gender information.' });
-        }
+      const compatibilityError = getPartnerCompatibilityError(tournamentDoc.category, cleanedGender, partnerRecord.gender);
+      if ((tournamentDoc.category === 'mixed-doubles' || tournamentDoc.category === 'doubles-men' || tournamentDoc.category === 'doubles-women') && compatibilityError) {
+        return res.status(400).json({ message: compatibilityError });
       }
+    }
 
-      const playerGender = cleanedGender;
-      const partnerGender = partnerRecord.gender;
-      if (tournamentDoc.category === 'mixed-doubles') {
-        if (!((playerGender === 'Male' && partnerGender === 'Female') || (playerGender === 'Female' && partnerGender === 'Male'))) {
-          return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
-        }
-      } else if (tournamentDoc.category === 'doubles-men') {
-        if (playerGender && partnerGender && (playerGender !== 'Male' || partnerGender !== 'Male')) {
-          return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-        }
-      } else if (tournamentDoc.category === 'doubles-women') {
-        if (playerGender && partnerGender && (playerGender !== 'Female' || partnerGender !== 'Female')) {
-          return res.status(400).json({ message: 'Doubles Women requires two female players.' });
-        }
-      }
-      let updated = await Registration.findOneAndUpdate(
-        { tournament, rollNumber: cleanedPartnerRoll },
-        { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
-        { new: true }
-      );
+    let reg = await Registration.create({
+      tournament,
+      playerName: cleanedName,
+      rollNumber: cleanedRoll,
+      nicNo: cleanedNic,
+      address: cleanedAddress,
+      email: cleanedEmail,
+      phone: cleanedPhone,
+      department,
+      year: year || 'N/A',
+      partnerName: cleanedPartnerName,
+      partnerRollNumber: cleanedPartnerRoll,
+      ...(cleanedGender ? { gender: cleanedGender } : {}),
+    });
 
-      // Fallback: case-insensitive / flexible match to handle formatting mismatches
-      if (!updated) {
-        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`^${escapeRegex(cleanedPartnerRoll)}$`, 'i');
-        updated = await Registration.findOneAndUpdate(
-          { tournament, rollNumber: { $regex: regex } },
+    if (cleanedPartnerRoll) {
+      try {
+        const updated = await Registration.findOneAndUpdate(
+          { tournament, rollNumber: cleanedPartnerRoll },
           { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
           { new: true }
         );
-      }
 
-      if (!updated) {
-        console.warn(`Partner update failed: could not locate partner ${cleanedPartnerRoll} in tournament ${tournament}`);
+        if (!updated) {
+          throw new Error(`Partner update failed: could not locate partner ${cleanedPartnerRoll} in tournament ${tournament}`);
+        }
+      } catch (partnerErr) {
+        await Registration.deleteOne({ _id: reg._id });
+        return res.status(400).json({ message: partnerErr.message });
       }
     }
 
@@ -857,13 +891,9 @@ router.post('/partner-requests/:id/accept', async (req, res) => {
     if (!tournamentDoc) return res.status(404).json({ message: 'Tournament not found for this request.' });
 
     const category = (tournamentDoc.category || '').toLowerCase();
-    if (category.includes('doubles-men')) {
-      if (requester.gender !== 'Male' || target.gender !== 'Male') return res.status(400).json({ message: 'Doubles Men requires two male players.' });
-    } else if (category.includes('doubles-women')) {
-      if (requester.gender !== 'Female' || target.gender !== 'Female') return res.status(400).json({ message: 'Doubles Women requires two female players.' });
-    } else if (category.includes('mixed')) {
-      const genders = [requester.gender, target.gender];
-      if (!(genders.includes('Male') && genders.includes('Female'))) return res.status(400).json({ message: 'Mixed Doubles requires one male and one female player.' });
+    const compatibilityError = getPartnerCompatibilityError(category, requester.gender, target.gender);
+    if (compatibilityError) {
+      return res.status(400).json({ message: compatibilityError });
     }
 
     // Create pair
