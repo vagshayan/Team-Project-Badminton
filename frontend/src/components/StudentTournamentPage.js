@@ -9,6 +9,8 @@ const CAT_LABELS = {
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
+const SINGLES = ['singles-men', 'singles-women'];
+
 const SPORT_META = {
   badminton: { label: 'BADMINTON', icon: '🏸', color: '#3B82F6' },
   'table-tennis': { label: 'TABLE TENNIS', icon: '🏓', color: '#8B5CF6' },
@@ -243,6 +245,15 @@ export default function StudentTournamentPage({ sport }) {
     setLines(newLines);
   }, [positions]);
 
+  const getDisplayName = (player) => {
+    if (!player) return '';
+    const isDoubles = viewBracketsFor && !SINGLES.includes(viewBracketsFor.category);
+    if (isDoubles && player.partnerName) {
+      return `${player.playerName} & ${player.partnerName}`;
+    }
+    return player.playerName;
+  };
+
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
@@ -464,7 +475,7 @@ export default function StudentTournamentPage({ sport }) {
                               color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
-                              {m.player1?.playerName || 'TBD'}
+                              {m.player1 ? getDisplayName(m.player1) : 'TBD'}
                             </span>
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
@@ -477,7 +488,7 @@ export default function StudentTournamentPage({ sport }) {
                               color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
-                              {m.player2?.playerName || 'TBD'}
+                              {m.player2 ? getDisplayName(m.player2) : 'TBD'}
                             </span>
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
