@@ -253,7 +253,13 @@ export default function StudentTournamentPage({ sport }) {
     }
     return player.playerName;
   };
-
+  const getNameFontSize = (name) => {
+    if (!name) return 14;
+    if (name.length > 34) return 10;
+    if (name.length > 26) return 11;
+    if (name.length > 20) return 12;
+    return 14;
+  };
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
@@ -470,12 +476,15 @@ export default function StudentTournamentPage({ sport }) {
                           }}
                         >
                           <div style={bh.pRow}>
-                            <span style={{
-                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
-                              color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player1 ? getDisplayName(m.player1) : 'TBD'}
+                            <span
+                                title={m.player1 ? getDisplayName(m.player1) : ''}
+                                style={{
+                                fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
+                                color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
+                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                fontSize: getNameFontSize(m.player1 ? getDisplayName(m.player1) : ''),
+                              }}>
+                                {m.player1 ? getDisplayName(m.player1) : 'TBD'}
                             </span>
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
@@ -483,12 +492,15 @@ export default function StudentTournamentPage({ sport }) {
                           </div>
                           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                           <div style={bh.pRow}>
-                            <span style={{
-                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
-                              color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player2 ? getDisplayName(m.player2) : 'TBD'}
+                            <span
+                                  title={m.player2 ? getDisplayName(m.player2) : ''}
+                                  style={{
+                                  fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
+                                  color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                  fontSize: getNameFontSize(m.player2 ? getDisplayName(m.player2) : ''),
+                                }}>
+                                  {m.player2 ? getDisplayName(m.player2) : 'TBD'}
                             </span>
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
