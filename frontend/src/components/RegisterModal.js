@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
+import { SPORT_META, getSportMeta } from '../constants/sports';
+import { CLOSE, LOCATION, CLOCK, WARNING, SUCCESS } from './Icons';
 
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
 const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
-};
-
-const SPORT_META = {
-  badminton: { label: 'Badminton', icon: '🏸', tint: '#C8A84B' },
-  'table-tennis': { label: 'Table Tennis', icon: '🏓', tint: '#2563EB' },
-  carrom: { label: 'Carrom', icon: '🎯', tint: '#D97706' },
 };
 
 const FACULTIES = [
@@ -105,10 +102,11 @@ const validateField = (field, value) => {
 };
 
 export default function RegisterModal({ tournament, onClose, initialData = null }) {
+  const { isDarkMode } = useTheme();
   const isDoubles = DOUBLES.includes(tournament.category);
   const isMixedDoubles = tournament.category === 'mixed-doubles';
-  const sport = SPORT_META[tournament.sport] || { label: tournament.sport, icon: '', tint: '#2563EB' };
-  const sportColor = sport.tint;
+  const sport = getSportMeta(tournament.sport, isDarkMode) || { label: tournament.sport, icon: '', tint: '#2563EB' };
+  const sportColor = sport.color || SPORT_META[tournament.sport]?.color || '#000';
 
   const [form, setForm] = useState({
     playerName: initialData ? initialData.playerName : '',
@@ -212,8 +210,9 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
       if (!validateRegNo(partnerRegNo)) newErrors.partnerRegNo = 'Use 20XX/XX/XXX or 20XX/XXX/XXX';
       else if (partnerRegNo === regNo) newErrors.partnerRegNo = 'Partner registration number must differ from yours';
       else if (partnerLookupError) newErrors.partnerRegNo = partnerLookupError;
-      else if (partnerLookup && partnerLookup.partnerRollNumber?.trim()) newErrors.partnerRegNo = 'This player already has a partner assigned.';
-      else if (partnerLookup && partnerLookup.gender && form.gender) {
+      else if (partnerLookup && partnerLookup.partnerRollNumber?.trim() && partnerLookup.partnerRollNumber.trim().toUpperCase() !== regNo.toUpperCase()) {
+        newErrors.partnerRegNo = 'This player already has a partner assigned.';
+      } else if (partnerLookup && partnerLookup.gender && form.gender) {
         const category = tournament.category;
         const partnerGender = partnerLookup.gender;
         const playerGender = form.gender;
@@ -287,7 +286,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
         setErrors((prev) => ({ ...prev, partnerRegNo: partnerLookupError }));
         return;
       }
-      if (partnerLookup && partnerLookup.partnerRollNumber?.trim()) {
+      if (partnerLookup && partnerLookup.partnerRollNumber?.trim() && partnerLookup.partnerRollNumber.trim().toUpperCase() !== form.regNo.trim().toUpperCase()) {
         setErrors((prev) => ({ ...prev, partnerRegNo: 'This player already has a partner assigned.' }));
         return;
       }
@@ -327,7 +326,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   if (success) return (
     <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 450, padding: 40, textAlign: 'center' }}>
-          <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>✅</div>
+          <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>{SUCCESS}</div>
           <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>{initialData ? 'UPDATED!' : 'VERIFIED!'}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.6, marginBottom: 32 }}>
              {initialData ? 'Player details have been updated successfully.' : (
@@ -389,18 +388,18 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
               </div>
             </div>
           </div>
-          <button className="modal-close-btn" onClick={onClose} style={sh.closeBtn}>✕</button>
+          <button className="modal-close-btn" onClick={onClose} style={sh.closeBtn}>{CLOSE}</button>
         </div>
 
         <div className="modal-info-bar" style={sh.infoBar}>
           <div className="info-bar-content" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
             <span className="info-bar-divider" style={{ fontSize: 13, color: 'var(--border)' }}>|</span>
-            <span className="info-bar-details" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>📍 {tournament.venue} · 🕐 {tournament.time}</span>
+            <span className="info-bar-details" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{LOCATION} {tournament.venue} · {CLOCK} {tournament.time}</span>
           </div>
         </div>
 
-        {submitError && <div style={sh.errorBox}>⚠ {submitError}</div>}
+        {submitError && <div style={sh.errorBox}>{WARNING_ROUND} {submitError}</div>}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div className="modal-form-content" style={{ flex: 1, overflowY: 'auto', paddingRight: 8, paddingLeft: 2, paddingTop: 16, paddingBottom: 16, display: 'flex', flexDirection: 'column', gap: 20, borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>

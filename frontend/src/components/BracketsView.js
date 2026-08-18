@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import axios from 'axios';
 import { exportTournamentResultPDF } from '../utils/exporters';
+import { LOCK, RESET, WARNING_ROUND, PUBLISH, PDF, LIGHTNING, TARGET, TROPHY, CARET_DOWN, CHECK_MARK, SUCCESS } from './Icons';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men',
@@ -222,7 +223,7 @@ export default function BracketsView({ admin, color }) {
       setSelectedTournament(updatedT);
       setTournaments(prev => prev.map(t => t._id === updatedT._id ? updatedT : t));
       fetchMatches(updatedT._id);
-      showToast('✅ Draw generated successfully!');
+      showToast(`${SUCCESS} Draw generated successfully!`);
     } catch (err) {
       alert(err.response?.data?.message || 'Generation failed.');
     } finally { setLoading(false); }
@@ -269,14 +270,14 @@ export default function BracketsView({ admin, color }) {
       setMatches([]);
       setPositions({});
       setLines([]);
-      showToast('🔄 Draw reset. You can regenerate now.');
+      showToast(`${RESET} Draw reset. You can regenerate now.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Reset failed.');
     } finally { setLoading(false); }
   };
 
   const handleForceUnlock = async () => {
-    if (!window.confirm('⚠️ TESTING ONLY: This bypasses the publish-lock safety rule and deletes all matches. Use only for testing, never for real published tournaments. Continue?')) return;
+    if (!window.confirm(`${WARNING_ROUND} TESTING ONLY: This bypasses the publish-lock safety rule and deletes all matches. Use only for testing, never for real published tournaments. Continue?`)) return;
     setLoading(true);
     try {
       await axios.delete(`/api/tournaments/${selectedTournament._id}/force-unlock`);
@@ -286,7 +287,7 @@ export default function BracketsView({ admin, color }) {
       setMatches([]);
       setPositions({});
       setLines([]);
-      showToast('⚠️ Force-unlocked for testing.');
+      showToast(`${WARNING_ROUND} Force-unlocked for testing.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Force unlock failed.');
     } finally { setLoading(false); }
@@ -300,7 +301,7 @@ export default function BracketsView({ admin, color }) {
       const updatedT = { ...selectedTournament, isPublished: true };
       setSelectedTournament(updatedT);
       setTournaments(prev => prev.map(t => t._id === updatedT._id ? updatedT : t));
-      showToast('🌐 Draw published! Students can now see the bracket.');
+      showToast(`${PUBLISH} Draw published! Students can now see the bracket.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Publish failed.');
     } finally { setLoading(false); }
@@ -312,7 +313,7 @@ export default function BracketsView({ admin, color }) {
       await axios.put(`/api/tournaments/matches/${resultModal._id}/score`, { winnerId });
       setResultModal(null);
       fetchMatches(selectedTournament._id);
-      showToast('✅ Result confirmed!');
+      showToast(`${SUCCESS} Result confirmed!`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update result');
     }
@@ -373,7 +374,7 @@ export default function BracketsView({ admin, color }) {
                       color: '#10B981',
                       border: '1px solid #10B98130'
                     }}>
-                      🌐 PUBLISHED
+                      {PUBLISH} PUBLISHED
                     </span>
                   )}
                 </>
@@ -387,7 +388,7 @@ export default function BracketsView({ admin, color }) {
               display: 'inline-block',
               fontSize: 10,
               color: 'var(--text-muted)'
-            }}>▼</span>
+            }}>{CARET_DOWN}</span>
           </button>
 
           {dropdownOpen && (
@@ -420,12 +421,12 @@ export default function BracketsView({ admin, color }) {
                           color: '#10B981',
                           border: '1px solid #10B98130'
                         }}>
-                          🌐 PUBLISHED
+                          PUBLISHED
                         </span>
                       )}
                     </div>
                     {selectedTournament?._id === t._id && (
-                      <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: 16, marginLeft: 8 }}>✓</span>
+                      <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: 16, marginLeft: 8 }}>{CHECK_MARK}</span>
                     )}
                   </button>
                 ))
@@ -451,7 +452,7 @@ export default function BracketsView({ admin, color }) {
                   color: selectedTournament.isPublished ? '#10B981' : selectedTournament.isLocked ? '#F59E0B' : '#3B82F6',
                   border: `1px solid ${selectedTournament.isPublished ? '#10B981' : selectedTournament.isLocked ? '#F59E0B' : '#3B82F6'}40`,
                 }}>
-                  {selectedTournament.isPublished ? '🌐 PUBLISHED' : selectedTournament.isLocked ? '🔒 DRAFT — NOT PUBLISHED YET' : '📋 OPEN FOR REGISTRATION'}
+                  {selectedTournament.isPublished ? 'PUBLISHED' : selectedTournament.isLocked ? `${LOCK} DRAFT — NOT PUBLISHED YET` : 'OPEN FOR REGISTRATION'}
                 </span>
               </div>
             </div>
@@ -459,16 +460,16 @@ export default function BracketsView({ admin, color }) {
             <div style={{ display: 'flex', gap: 12 }}>
               {!selectedTournament.isLocked && (
                 <button onClick={generateDraws} style={{ ...s.btn, background: color }}>
-                  ⚡ GENERATE DRAW
+                  {LIGHTNING} GENERATE DRAW
                 </button>
               )}
               {selectedTournament.isLocked && !selectedTournament.isPublished && (
                 <>
                   <button onClick={handleResetDraw} style={{ ...s.btn, background: '#EF4444' }}>
-                    🔄 RESET DRAW
+                    {RESET} RESET DRAW
                   </button>
                   <button onClick={handlePublishDraw} style={{ ...s.btn, background: '#10B981' }}>
-                    🌐 PUBLISH DRAW
+                    {PUBLISH} PUBLISH DRAW
                   </button>
                 </>
               )}
@@ -485,7 +486,7 @@ export default function BracketsView({ admin, color }) {
                     style={{ ...s.btn, background: '#6B7280', fontSize: 11 }}
                     title="Testing only — bypasses the publish safety rule"
                   >
-                    ⚠️ FORCE UNLOCK (TEST)
+                    {WARNING_ROUND} FORCE UNLOCK (TEST)
                   </button>
                 </>
               )}
@@ -496,7 +497,7 @@ export default function BracketsView({ admin, color }) {
             <div style={s.loading}>Loading bracket...</div>
           ) : matches.length === 0 ? (
             <div style={s.emptyBracket}>
-              <div style={{ fontSize: 48 }}>🎯</div>
+              <div style={{ fontSize: 48 }}>{TARGET}</div>
               <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>
                 No draw generated yet. Click "GENERATE DRAW" to start.
               </p>
@@ -622,7 +623,7 @@ export default function BracketsView({ admin, color }) {
         <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setSeedingModal(false)}>
           <div style={modalS.content}>
             <h3 style={{ marginBottom: 8, fontSize: 20, fontWeight: 900 }}>
-              🏆 Seeding — Previous Year Results
+              {TROPHY} Seeding — Previous Year Results
             </h3>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>
               Enter registration numbers of previous year's champion and runner-up.
@@ -678,7 +679,7 @@ export default function BracketsView({ admin, color }) {
                 }}
                 style={modalS.winnerOption}
               >
-                🏆 {getDisplayName(resultModal.player1)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                {TROPHY} {getDisplayName(resultModal.player1)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
               </button>
               <button
                 onClick={() => {
@@ -688,7 +689,7 @@ export default function BracketsView({ admin, color }) {
                 }}
                 style={modalS.winnerOption}
               >
-                🏆 {getDisplayName(resultModal.player2)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                {TROPHY} {getDisplayName(resultModal.player2)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
               </button>
             </div>
             <div style={modalS.actions}>
