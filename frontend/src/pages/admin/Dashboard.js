@@ -8,6 +8,7 @@ import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
+import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 
@@ -66,6 +67,7 @@ const VALID_ADMIN_TABS = new Set([
   'dashboard',
   'player-approvals',
   'tournament-setup',
+  'university-team',
   'brackets',
   'audit-log',
   'profile',
@@ -850,6 +852,7 @@ export default function Dashboard() {
               { id: 'dashboard', label: 'DASHBOARD VIEW', icon: '💎' },
               { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: '🎯' },
               { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: '🏆' },
+              { id: 'university-team', label: 'UNIVERSITY TEAM', icon: '👥' },
               { id: 'brackets', label: 'BRACKETS & DRAWS', icon: '🌳' },
               { id: 'audit-log', label: 'AUDIT LOG', icon: '🗂️' },
             ].map((tab) => (
@@ -2055,6 +2058,10 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'university-team' && (
+            <UniversityTeamAdminView color={meta.color} />
           )}
 
           {activeTab === 'brackets' && (
