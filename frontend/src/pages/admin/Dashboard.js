@@ -9,6 +9,7 @@ import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
+import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 import { SPORT_META, getSportMeta } from '../../constants/sports';
@@ -62,6 +63,7 @@ const VALID_ADMIN_TABS = new Set([
   'dashboard',
   'player-approvals',
   'tournament-setup',
+  'university-team',
   'brackets',
   'audit-log',
   'profile',
@@ -856,6 +858,7 @@ export default function Dashboard() {
               { id: 'dashboard', label: 'DASHBOARD VIEW', icon: DIAMOND },
               { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: TARGET },
               { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TROPHY },
+              { id: 'university-team', label: 'UNIVERSITY TEAM', icon: PEOPLE },
               { id: 'brackets', label: 'BRACKETS & DRAWS', icon: TREE },
               { id: 'audit-log', label: 'AUDIT LOG', icon: FOLDER },
             ].map((tab) => (
@@ -2069,6 +2072,10 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'university-team' && (
+            <UniversityTeamAdminView color={meta.color} />
           )}
 
           {activeTab === 'brackets' && (

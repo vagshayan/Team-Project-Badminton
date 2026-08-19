@@ -42,12 +42,21 @@ export default function StudentTournamentPage({ sport }) {
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [teamSearchQuery, setTeamSearchQuery] = useState('');
   const pollingRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
 
   const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
+
+  useEffect(() => {
+    axios.get(`/api/university-team?sport=${sport}`)
+      .then((res) => setTeamMembers(res.data || []))
+      .catch(console.error);
+  }, [sport]);
 
   useEffect(() => {
     setLoading(true);
@@ -319,9 +328,51 @@ export default function StudentTournamentPage({ sport }) {
       <div style={sh.hero}>
         <div style={{ ...sh.heroBlob, background: meta.color }} />
         <h1 style={sh.heroTitle} className="mobile-hero-title">{meta.label} RESULTS</h1>
-        <div style={sh.liveIndicator}>
-          <span className="live-dot" style={{ background: '#10B981' }} />
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+
+        {/* OFFICIAL LIVE TOURNAMENT BOARD Header */}
+        <div style={{ ...sh.liveIndicator, flexDirection: 'column', gap: 14, alignItems: 'center', margin: '24px 0 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="live-dot" style={{ background: '#10B981' }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+          </div>
+
+          {/* Centered UNIVERSITY TEAM MEMBERS Button inside Official Live Tournament Board */}
+          <button
+            onClick={() => navigate(`/${sport}/team`)}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 999,
+              background: `linear-gradient(135deg, ${meta.color}22, rgba(255,255,255,0.06))`,
+              border: `1.5px solid ${meta.color}60`,
+              color: 'var(--text)',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: `0 8px 24px ${meta.color}25`,
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.25s ease',
+            }}
+            className="team-members-live-board-btn"
+          >
+            <span style={{ fontSize: 16 }}>🎓</span>
+            <span>UNIVERSITY TEAM MEMBERS</span>
+            <span style={{
+              background: meta.color,
+              color: '#000',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 950,
+              marginLeft: 4,
+            }}>
+              {teamMembers.length}
+            </span>
+            <span style={{ fontSize: 13 }}>→</span>
+          </button>
         </div>
       </div>
 
@@ -501,6 +552,222 @@ export default function StudentTournamentPage({ sport }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* University Team Members Modal */}
+      {showTeamModal && (
+        <div
+          onClick={(e) => e.target === e.currentTarget && setShowTeamModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 2100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div style={{
+            width: 860,
+            maxWidth: '100%',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            background: 'var(--bg-card)',
+            borderRadius: 32,
+            border: `1px solid ${meta.color}40`,
+            padding: 32,
+            boxShadow: `0 35px 90px rgba(0,0,0,0.6), 0 0 40px ${meta.color}20`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 999, background: `${meta.color}20`, color: meta.color, fontSize: 11, fontWeight: 900, marginBottom: 8 }}>
+                  <span>{meta.icon}</span> {meta.label} TOURNAMENT SQUAD
+                </div>
+                <h2 style={{ margin: 0, fontSize: 26, fontWeight: 950 }}>UNIVERSITY TEAM MEMBERS</h2>
+                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
+                  Official university team members registered for {meta.label.toLowerCase()} tournaments.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowTeamModal(false)}
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search Box inside Modal */}
+            <div style={{ marginBottom: 24 }}>
+              <input
+                type="text"
+                placeholder={`🔍 Search ${meta.label.toLowerCase()} team member name, reg. no, faculty, role...`}
+                value={teamSearchQuery}
+                onChange={(e) => setTeamSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  borderRadius: 16,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {teamMembers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🎓</div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>No Team Members Found</h3>
+                <p style={{ fontSize: 14, marginTop: 6 }}>No official university team members are currently registered for the {meta.label} tournament.</p>
+              </div>
+            ) : (() => {
+              const filtered = teamMembers.filter((m) => {
+                const q = teamSearchQuery.toLowerCase();
+                return (
+                  (m.fullName || '').toLowerCase().includes(q) ||
+                  (m.registrationNumber || '').toLowerCase().includes(q) ||
+                  (m.faculty || '').toLowerCase().includes(q) ||
+                  (m.position || '').toLowerCase().includes(q)
+                );
+              });
+              const boys = filtered.filter((m) => (m.teamGender || 'Men') === 'Men');
+              const girls = filtered.filter((m) => m.teamGender === 'Women');
+
+              const renderCard = (member) => {
+                const badge = (pos) => {
+                  const p = (pos || '').toLowerCase();
+                  if (p.includes('captain') && !p.includes('vice')) return { bg: 'linear-gradient(135deg, #F59E0B, #D97706)', icon: '👑' };
+                  if (p.includes('vice captain') || p.includes('vice-captain')) return { bg: 'linear-gradient(135deg, #06B6D4, #0284C7)', icon: '⭐' };
+                  if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) return { bg: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', icon: '🛡️' };
+                  return { bg: 'rgba(59, 130, 246, 0.2)', icon: '🎽' };
+                };
+                const b = badge(member.position);
+                const avatarSrc = member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
+                const isGirl = member.teamGender === 'Women';
+
+                return (
+                  <div
+                    key={member._id}
+                    style={{
+                      background: 'var(--bg-panel)',
+                      borderRadius: 20,
+                      border: '1px solid var(--border)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div style={{ height: 180, position: 'relative', background: 'rgba(0,0,0,0.2)' }}>
+                      <img
+                        src={avatarSrc}
+                        alt={member.fullName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        background: b.bg,
+                        color: '#FFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                      }}>
+                        <span>{b.icon}</span> {member.position.toUpperCase()}
+                      </div>
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        background: isGirl ? 'rgba(236, 72, 153, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+                        backdropFilter: 'blur(4px)',
+                        color: isGirl ? '#EC4899' : '#3B82F6',
+                        border: `1px solid ${isGirl ? '#EC4899' : '#3B82F6'}60`,
+                      }}>
+                        {isGirl ? '👧 Girls' : '👦 Boys'}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: 18 }}>
+                      <h4 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 900, color: 'var(--text)' }}>{member.fullName}</h4>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: isGirl ? '#EC4899' : meta.color, marginBottom: 8 }}>
+                        🪪 {member.registrationNumber}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, padding: '8px 12px', borderRadius: 10, background: 'var(--bg-input)' }}>
+                        🎓 <strong>Faculty:</strong><br />{member.faculty}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+                  {/* Boys Team Section */}
+                  <div>
+                    <h4 style={{ fontSize: 16, fontWeight: 950, color: '#3B82F6', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(59, 130, 246, 0.2)', paddingBottom: 8 }}>
+                      👦 BOYS TEAM ({boys.length})
+                    </h4>
+                    {boys.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Boys Team members listed.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+                        {boys.map(renderCard)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Girls Team Section */}
+                  <div>
+                    <h4 style={{ fontSize: 16, fontWeight: 950, color: '#EC4899', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(236, 72, 153, 0.2)', paddingBottom: 8 }}>
+                      👧 GIRLS TEAM ({girls.length})
+                    </h4>
+                    {girls.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Girls Team members listed.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+                        {girls.map(renderCard)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -10,6 +10,8 @@ import BadmintonPage from './pages/student/BadmintonPage';
 import TableTennisPage from './pages/student/TableTennisPage';
 import CarromPage from './pages/student/CarromPage';
 import BracketsPage from './pages/student/BracketsPage';
+import UniversityTeamPublicPage from './pages/student/UniversityTeamPublicPage';
+import TournamentTeamPage from './pages/student/TournamentTeamPage';
 
 import LandingPage from './pages/student/LandingPage';
 
@@ -38,6 +40,10 @@ function App() {
             <Route path="/table-tennis" element={<TableTennisPage />} />
             <Route path="/carrom" element={<CarromPage />} />
             <Route path="/brackets" element={<BracketsPage />} />
+            <Route path="/:sport/team" element={<TournamentTeamPage />} />
+            <Route path="/results/:sport/team" element={<TournamentTeamPage />} />
+            <Route path="/results/university-team" element={<UniversityTeamPublicPage />} />
+            <Route path="/university-team" element={<UniversityTeamPublicPage />} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
