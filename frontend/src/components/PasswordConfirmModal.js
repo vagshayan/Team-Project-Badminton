@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SHIELD, KEY, WARNING } from './Icons';
 
 export default function PasswordConfirmModal({ title, message, confirmLabel = 'CONFIRM', danger = false, onConfirm, onClose }) {
   const [password, setPassword] = useState('');
@@ -21,7 +22,7 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
         <h2 style={{ ...sh.title, color: danger ? '#EF4444' : 'var(--primary)' }}>{title}</h2>
         <p style={sh.subtitle}>{message}</p>
         
-        {error && <div style={sh.errorBox}>⚠ {error}</div>}
+        {error && <div style={sh.errorBox}>{WARNING} {error}</div>}
 
         <form onSubmit={handleSubmit} style={sh.form}>
            <div style={sh.field}>

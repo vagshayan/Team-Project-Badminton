@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { SUN, MOON, TROPHY } from '../../components/Icons';
 import axios from 'axios';
 
 export default function ForgotPasswordPage() {
@@ -56,10 +57,10 @@ export default function ForgotPasswordPage() {
 
       <nav style={sh.nav}>
         <div style={sh.brand} onClick={() => navigate('/')}>
-          <div style={sh.logoCircle}>🏆</div>
+          <div style={sh.logoCircle}>{TROPHY}</div>
           <span style={sh.brandName}>UoJ SPORTS</span>
         </div>
-        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? '🌞' : '🌙'}</button>
+        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? SUN : MOON}</button>
       </nav>
 
       <div style={sh.content}>

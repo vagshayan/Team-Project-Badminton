@@ -2,18 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-
-const SPORTS = [
-  { id: 'badminton', label: 'Badminton', icon: '🏸', color: '#3B82F6' },
-  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
-  { id: 'carrom', label: 'Carrom', icon: '🎯', color: '#EC4899' },
-];
-
-const SPORT_META = {
-  badminton: { label: 'Badminton', color: '#3B82F6' },
-  'table-tennis': { label: 'Table Tennis', color: '#8B5CF6' },
-  carrom: { label: 'Carrom', color: '#EC4899' },
-};
+import { SUN, MOON, EYE, LOCK, TROPHY, WARNING_ROUND } from '../../components/Icons';
+import { SPORTS, getSportMeta } from '../../constants/sports';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -27,7 +17,7 @@ export default function LoginPage() {
   const location = useLocation();
 
   const sportParam = new URLSearchParams(location.search).get('sport');
-  const sportMeta = SPORT_META[sportParam] || null;
+  const sportMeta = getSportMeta(sportParam, isDarkMode) || null;
   const pageTitle = sportMeta ? `${sportMeta.label} Admin Login` : 'Admin Login';
 
   React.useEffect(() => {
@@ -59,14 +49,14 @@ export default function LoginPage() {
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">🏆</div>
+          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--text)' }} className="mobile-title-main">UoJ SPORTS</span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 3, fontWeight: 800 }} className="mobile-title-sub">TOURNAMENT MANAGER</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 15, alignItems: 'center' }} className="mobile-controls">
-          <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
+          <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
           <Link to={sportMeta ? `/${sportParam}` : '/'} style={{ ...sh.backLink, color: isDarkMode ? '#FFFFFF' : 'var(--primary)' }}>PUBLIC HUB</Link>
         </div>
       </nav>
@@ -80,7 +70,7 @@ export default function LoginPage() {
                   {sportMeta ? `Sign in to manage ${sportMeta.label} tournaments.` : 'Enter your tournament manager credentials.'}
                 </p>
               </div>
-              {error && <div style={sh.errorBox}>⚠ {error}</div>}
+              {error && <div style={sh.errorBox}>{WARNING_ROUND} {error}</div>}
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                  <div style={sh.fieldGroup}>
                     <label style={sh.fieldLabel}>USERNAME</label>
@@ -102,7 +92,7 @@ export default function LoginPage() {
                         onClick={() => setShowPass(!showPass)} 
                         style={{ position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
                       >
-                        {showPass ? '👁️' : '🔒'}
+                        {showPass ? EYE : LOCK}
                       </button>
                     </div>
                  </div>
