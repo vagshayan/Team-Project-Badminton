@@ -129,6 +129,7 @@ input[type="reset"]:hover:not(:disabled),
 .closeBtnAction:hover,
 a[href]:hover {
   transform: translateY(-1px);
+  opacity: 0.98;
 }
 
 button:active:not(:disabled),
@@ -145,7 +146,7 @@ input[type="reset"]:active:not(:disabled),
 .closeBtnAction:active,
 a[href]:active {
   transform: scale(0.98);
-  opacity: 0.95;
+  opacity: 0.9;
 }
 
 button:focus-visible,

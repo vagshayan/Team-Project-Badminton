@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { CALENDAR, LOCATION, CLOSE, WARNING, PHONE, CLIPBOARD } from './Icons';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men',
@@ -75,12 +76,12 @@ export default function RegistrationsModal({ tournament, onClose }) {
               <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ fontWeight: 950, fontSize: isMobile ? 20 : 24, color: 'var(--primary)' }}>{tournament.year}</div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>
-                  <span>🗓️ {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
-                  <span>📍 {tournament.venue}</span>
+                  <span>{CALENDAR} {new Date(tournament.date).toLocaleDateString('en-IN')}</span>
+                  <span>{LOCATION} {tournament.venue}</span>
                 </div>
               </div>
 
-              <button onClick={onClose} style={sh.closeBtn}>✕</button>
+              <button onClick={onClose} style={sh.closeBtn}>{CLOSE}</button>
             </div>
           </div>
         </div>
@@ -91,10 +92,10 @@ export default function RegistrationsModal({ tournament, onClose }) {
             <p style={{ marginTop: 20 }}>Syncing player data...</p>
           </div>
         ) : error ? (
-          <div style={sh.errorBox}>⚠ {error}</div>
+          <div style={sh.errorBox}>{WARNING} {error}</div>
         ) : registrations.length === 0 ? (
           <div style={sh.status}>
-            <div style={{ fontSize: 50, marginBottom: 15 }}>📋</div>
+            <div style={{ fontSize: 50, marginBottom: 15 }}>{CLIPBOARD}</div>
             <p style={{ fontSize: 16, opacity: 0.6 }}>No registrations recorded for this arena yet.</p>
           </div>
         ) : (
@@ -118,7 +119,7 @@ export default function RegistrationsModal({ tournament, onClose }) {
                     <td style={{ ...sh.td, fontWeight: 800, color: 'var(--primary)', letterSpacing: 0.5 }}>{r.rollNumber}</td>
                     <td style={{ ...sh.td, fontSize: 13, fontWeight: 700 }}>{r.department}</td>
                     <td style={sh.td}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>📞 {r.phone}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{PHONE} {r.phone}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{r.email}</div>
                     </td>
                     {isDoubles && (

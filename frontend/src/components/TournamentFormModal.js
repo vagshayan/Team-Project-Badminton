@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CALENDAR, CLOSE, WARNING, CLOCK, HOURGLASS, LOCATION, KEY, MEDAL, SCHEDULE } from './Icons';
 
 const CATEGORIES = [
   { value: 'singles-men',   label: 'Singles — Men' },
@@ -79,10 +80,10 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
             }}>{tournament ? 'EDIT TOURNAMENT' : 'CREATE NEW TOURNAMENT'}</h2>
             <p style={sh.subtitle}>Configure the parameters for the upcoming tournament domain.</p>
           </div>
-          <button type="button" onClick={onClose} style={sh.closeBtn}>✕</button>
+          <button type="button" onClick={onClose} style={sh.closeBtn}>{CLOSE}</button>
         </div>
 
-        {error && <div style={sh.errorBox}>⚠ {error}</div>}
+        {error && <div style={sh.errorBox}>{WARNING_ROUND} {error}</div>}
 
         <form onSubmit={handleSubmit} style={sh.form}>
            <div style={{
@@ -91,13 +92,13 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
              gap: isMobile ? 16 : 24,
            }}>
               <div style={sh.field}>
-                 <label style={sh.label}>CHOOSE CATEGORY 🏅</label>
+                 <label style={sh.label}>CHOOSE CATEGORY {MEDAL}</label>
                  <select value={form.category} onChange={(e) => set('category', e.target.value)} style={sh.input}>
                     {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                  </select>
               </div>
               <div style={sh.field}>
-                 <label style={sh.label}>TARGET YEAR 📅</label>
+                 <label style={sh.label}>TARGET YEAR {SCHEDULE}</label>
                  <select value={form.year} onChange={(e) => set('year', Number(e.target.value))} style={sh.input}>
                     {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                  </select>
@@ -110,11 +111,11 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
               gap: isMobile ? 16 : 24,
             }}>
                <div style={sh.field}>
-                  <label style={sh.label}>EVENT DATE 🗓️</label>
+                  <label style={sh.label}>EVENT DATE {CALENDAR}</label>
                   <input type="date" value={form.date} min={todayDate} onChange={(e) => set('date', e.target.value)} style={sh.input} required />
                </div>
                <div style={sh.field}>
-                  <label style={sh.label}>START TIME 🕐</label>
+                  <label style={sh.label}>START TIME {CLOCK}</label>
                   <input type="time" value={form.time} onChange={(e) => set('time', e.target.value)} style={sh.input} required />
                </div>
             </div>
@@ -125,19 +126,19 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
               gap: isMobile ? 16 : 24,
             }}>
                <div style={sh.field}>
-                  <label style={sh.label}>REGISTRATION DEADLINE ⏳</label>
+                  <label style={sh.label}>REGISTRATION DEADLINE {HOURGLASS}</label>
                   <input type="date" value={form.registrationDeadline} min={todayDate} max={form.date} onChange={(e) => set('registrationDeadline', e.target.value)} style={sh.input} required />
                </div>
             </div>
 
            <div style={sh.field}>
-              <label style={sh.label}>TOURNAMENT VENUE 📍</label>
+              <label style={sh.label}>TOURNAMENT VENUE {LOCATION}</label>
               <input type="text" value={form.venue} onChange={(e) => set('venue', e.target.value)} placeholder="e.g. University Main Sports Hall" style={sh.input} required />
            </div>
 
            {requirePassword && (
               <div style={{ ...sh.field, background: 'rgba(239, 68, 68, 0.05)', padding: 20, borderRadius: 16, border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                 <label style={{ ...sh.label, color: '#EF4444' }}>ADMIN PASSWORD 🔑</label>
+                 <label style={{ ...sh.label, color: '#EF4444' }}>ADMIN PASSWORD {KEY}</label>
                  <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} placeholder="Confirm with admin password" style={{ ...sh.input, borderColor: 'rgba(239, 68, 68, 0.2)' }} required />
               </div>
            )}

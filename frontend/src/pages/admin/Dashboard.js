@@ -4,6 +4,7 @@ import axios from 'axios';
 import Cropper from 'react-easy-crop';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { SUN, MOON, EYE, LOCK, BELL, SEARCH, LOGOUT, MENU_OPEN, MENU_CLOSE, TROPHY, DIAMOND, TARGET, TREE, FOLDER, PEOPLE, PHONE, EMAIL, ID_CARD, CALENDAR, LOCATION, TRASH, CLOSE, SUCCESS, WARNING_ROUND, ARROW_RIGHT, CHECK_MARK, CROSS, HOURGLASS, MEDAL } from '../../components/Icons';
 import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
@@ -11,12 +12,7 @@ import BracketsView from '../../components/BracketsView';
 import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
-
-const SPORT_META = {
-  badminton: { label: 'Badminton', icon: '🏸', color: '#3B82F6' },
-  'table-tennis': { label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
-  carrom: { label: 'Carrom', icon: '🎯', color: '#EC4899' },
-};
+import { SPORT_META, getSportMeta } from '../../constants/sports';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
@@ -233,6 +229,16 @@ export default function Dashboard() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverCategory, setHoverCategory] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationMenuStyle = {
+    ...ds.notificationMenu,
+    background: isDarkMode ? 'var(--bg-panel)' : '#ffffff',
+    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e5e7eb',
+    boxShadow: isDarkMode ? '0 30px 70px rgba(0,0,0,0.22)' : '0 18px 42px rgba(15,23,42,0.08)',
+  };
+  const notificationItemStyle = {
+    ...ds.notificationItem,
+    background: isDarkMode ? 'rgba(255,255,255,0.04)' : 'var(--bg-input)',
+  };
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState(admin?.name || '');
   const [profileUsername, setProfileUsername] = useState(admin?.username || '');
@@ -431,7 +437,7 @@ export default function Dashboard() {
         fontSize: 18,
       }}
     >
-      {visible ? '👁️' : '🔒'}
+      {visible ? EYE : LOCK}
     </button>
   );
 
@@ -477,7 +483,7 @@ export default function Dashboard() {
   }, [admin]);
 
   const normalizedSport = admin?.sport ? String(admin.sport).trim().toLowerCase() : '';
-  const meta = SPORT_META[normalizedSport] || { label: admin?.sport ? String(admin.sport).trim().toUpperCase() : 'ADMIN', icon: '🏆', color: '#2563EB' };
+  const meta = getSportMeta(normalizedSport, isDarkMode) || { label: admin?.sport ? String(admin.sport).trim().toUpperCase() : 'ADMIN', icon: TROPHY, color: '#2563EB' };
   const safeMetaLabel = meta.label || 'ADMIN';
 
   const loginTimeFormatted = new Date(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now()).toLocaleString('en-IN', { hour12: true });
@@ -607,7 +613,7 @@ export default function Dashboard() {
     try {
       await axios.patch(`/api/registrations/${leadId}/approve-pair`);
       fetchData();
-      showToast('✅ Pair confirmed!');
+      showToast(`${SUCCESS} Pair confirmed!`);
     } catch (err) {
       alert(err.response?.data?.message || 'Pair approval failed');
     }
@@ -634,7 +640,7 @@ export default function Dashboard() {
       await axios.patch(`/api/registrations/${removePairTarget._id}/remove-pair`);
       setRemovePairTarget(null);
       fetchData();
-      showToast('🗑️ Pair removed and both players are now unlinked');
+      showToast(`${TRASH} Pair removed and both players are now unlinked`);
     } catch (err) {
       alert(err.response?.data?.message || 'Pair removal failed');
     } finally {
@@ -651,7 +657,7 @@ export default function Dashboard() {
       setLinkSelected(null);
       setLinkSearch('');
       fetchData();
-      showToast('✅ Players linked as partners!');
+      showToast(`${SUCCESS} Players linked as partners!`);
     } catch (err) {
       alert(err.response?.data?.message || 'Linking failed');
     } finally {
@@ -663,7 +669,7 @@ export default function Dashboard() {
     try {
       const res = await axios.patch(`/api/registrations/${id}/status`, { status });
       fetchData();
-      const message = res.data.message || '✅ Status updated!';
+      const message = res.data.message || `${SUCCESS} Status updated!`;
       showToast(message);
     }
     catch (err) {
@@ -743,11 +749,11 @@ export default function Dashboard() {
   }, [filteredRegistrations]);
 
   const handleCreate = async (data) => {
-    try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast('✅ Tournament created!'); }
+    try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast(`${SUCCESS} Tournament created!`); }
     catch (err) { alert(err.response?.data?.message || 'Error creating tournament'); }
   };
   const handleUpdate = async (data) => {
-    try { await axios.put(`/api/tournaments/${editTarget._id}`, { ...data, password: data.password }); setEditTarget(null); fetchData(); showToast('✅ Tournament updated!'); }
+    try { await axios.put(`/api/tournaments/${editTarget._id}`, { ...data, password: data.password }); setEditTarget(null); fetchData(); showToast(`${SUCCESS} Tournament updated!`); }
     catch (err) { alert(err.response?.data?.message || 'Error updating tournament.'); }
   };
   const handleDelete = async (password) => {
@@ -760,7 +766,7 @@ export default function Dashboard() {
     try {
       await axios.delete('/api/tournaments/audit-logs/clear-all');
       setAuditLogs([]);
-      showToast('✅ All audit logs cleared successfully.');
+      showToast(`${SUCCESS} All audit logs cleared successfully.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Error clearing audit logs.');
     }
@@ -806,7 +812,7 @@ export default function Dashboard() {
             title={(!isMobile && sidebarCollapsed) ? 'Expand sidebar' : 'Collapse sidebar'}
             style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 8, borderRadius: 10, flexShrink: 0, transition: 'color 0.2s' }}
           >
-            {(!isMobile && sidebarCollapsed) ? '☰' : '✕'}
+            {(!isMobile && sidebarCollapsed) ? MENU_OPEN : CLOSE}
           </button>
         </div>
 
@@ -849,12 +855,12 @@ export default function Dashboard() {
 
         <nav style={ds.nav}>
           {[
-              { id: 'dashboard', label: 'DASHBOARD VIEW', icon: '💎' },
-              { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: '🎯' },
-              { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: '🏆' },
-              { id: 'university-team', label: 'UNIVERSITY TEAM', icon: '👥' },
-              { id: 'brackets', label: 'BRACKETS & DRAWS', icon: '🌳' },
-              { id: 'audit-log', label: 'AUDIT LOG', icon: '🗂️' },
+              { id: 'dashboard', label: 'DASHBOARD VIEW', icon: DIAMOND },
+              { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: TARGET },
+              { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TROPHY },
+              { id: 'university-team', label: 'UNIVERSITY TEAM', icon: PEOPLE },
+              { id: 'brackets', label: 'BRACKETS & DRAWS', icon: TREE },
+              { id: 'audit-log', label: 'AUDIT LOG', icon: FOLDER },
             ].map((tab) => (
             <button
               key={tab.id}
@@ -957,7 +963,7 @@ export default function Dashboard() {
                   }}
                   style={ds.profileMenuItem}
                 >
-                  <span style={{ fontSize: 16 }}>{isDarkMode ? '⛅' : '🌙'}</span>
+                  <span style={{ fontSize: 16 }}>{isDarkMode ? SUN : MOON}</span>
                   <span style={{ flex: 1, fontWeight: 800 }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
                 </button>
                 <button
@@ -967,7 +973,7 @@ export default function Dashboard() {
                   }}
                   style={{ ...ds.profileMenuItem, color: '#EF4444' }}
                 >
-                  <span style={{ fontSize: 16 }}>🚪</span>
+                  <span style={{ fontSize: 16 }}>{LOGOUT}</span>
                   <span style={{ flex: 1, fontWeight: 800 }}>Sign Out</span>
                 </button>
               </div>
@@ -985,7 +991,7 @@ export default function Dashboard() {
               onClick={() => setMobileSidebarOpen(true)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer', padding: 4, lineHeight: 1 }}
               aria-label="Open menu"
-            >☰</button>
+            >{MENU_OPEN}</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ ...ds.logoBox, background: meta.color, width: 32, height: 32, fontSize: 18 }}>{meta.icon}</div>
               <span style={{ fontWeight: 950, fontSize: 14, letterSpacing: 0.5 }}>ADMIN PANEL</span>
@@ -1004,14 +1010,14 @@ export default function Dashboard() {
                   style={ds.notificationBtn}
                   aria-label="Open notifications"
                 >
-                  🔔
+                  {BELL}
                   {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
                 </button>
                 {notificationsOpen && (
-                  <div style={ds.notificationMenu}>
+                  <div style={notificationMenuStyle}>
                     <div style={ds.notificationTitle}>Notification</div>
                     {notificationItems.map((item) => (
-                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
+                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={notificationItemStyle}>
                         <div style={ds.notificationItemTitle}>{item.title}</div>
                         <div style={ds.notificationItemDescription}>{item.description}</div>
                       </button>
@@ -1028,7 +1034,7 @@ export default function Dashboard() {
           <header style={ds.header}>
             <div style={ds.greetBox}>
               <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
-                {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
+                {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
             </div>
@@ -1046,14 +1052,14 @@ export default function Dashboard() {
                   style={ds.notificationBtn}
                   aria-label="Open notifications"
                 >
-                  🔔
+                  {BELL}
                   {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
                 </button>
                 {notificationsOpen && (
-                  <div style={ds.notificationMenu}>
+                  <div style={notificationMenuStyle}>
                     <div style={ds.notificationTitle}>Notification</div>
                     {notificationItems.map((item) => (
-                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={ds.notificationItem}>
+                      <button key={item.id} onClick={item.action || (() => setNotificationsOpen(false))} style={notificationItemStyle}>
                         <div style={ds.notificationItemTitle}>{item.title}</div>
                         <div style={ds.notificationItemDescription}>{item.description}</div>
                       </button>
@@ -1069,7 +1075,7 @@ export default function Dashboard() {
         {isMobile && (
           <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <h2 style={{ fontSize: 18, fontWeight: 950, margin: 0, letterSpacing: -0.5 }}>
-              {new Date().getHours() < 12 ? '☀️ GOOD MORNING' : new Date().getHours() < 18 ? '🌤️ GOOD AFTERNOON' : '🌙 GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
+              {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
             </h2>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
           </div>
@@ -1085,9 +1091,9 @@ export default function Dashboard() {
 
               <div className="responsive-grid-3" style={{ marginBottom: isMobile ? 32 : 70 }}>
                 {[
-                  { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: '👥', target: 'confirmed-summary' },
-                  { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: '⏳', target: 'pending-approvals' },
-                  { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: '🎖️', target: 'tournament-setup' },
+                  { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: PEOPLE, target: 'confirmed-summary' },
+                  { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: HOURGLASS, target: 'pending-approvals' },
+                  { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: MEDAL, target: 'tournament-setup' },
                 ].map((s) => (
                   <button
                     key={s.label}
@@ -1197,11 +1203,11 @@ export default function Dashboard() {
                             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
                           </td>
                           <td style={ds.td}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{PHONE} <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
                             <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                              📧 <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a>
+                              {EMAIL} <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.email}</a>
                             </div>
-                            {r.nicNo ? <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div> : null}
+                            {r.nicNo ? <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>{ID_CARD} {r.nicNo}</div> : null}
                           </td>
                           <td style={ds.td}>
                             <span style={{ padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 900, ...STATUS_STYLE[r.status] }}>{STATUS_STYLE[r.status].label.toUpperCase()}</span>
@@ -1369,7 +1375,7 @@ export default function Dashboard() {
                     style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
                   >💾 DOWNLOAD CSV</button>
                   <div style={{ position: 'relative', width: isMobile ? '100%' : 350 }}>
-                    <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>🔍</span>
+                    <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>{SEARCH}</span>
                     <input
                       type="text"
                       placeholder="Search Name or Reg No..."
@@ -1413,9 +1419,9 @@ export default function Dashboard() {
                                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {r.tournament?.year}</div>
                               </td>
                               <td style={ds.td}>
-                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>{PHONE} <a href={`tel:${r.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.phone}</a></div>
                                 <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                  📧 <a
+                                  {EMAIL} <a
                                     href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email || '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -1425,7 +1431,7 @@ export default function Dashboard() {
                                   </a>
                                 </div>
                                 {r.nicNo ? (
-                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {r.nicNo}</div>
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>{ID_CARD} {r.nicNo}</div>
                                 ) : null}
                               </td>
                               <td style={ds.td}>
@@ -1457,7 +1463,10 @@ export default function Dashboard() {
                         return (
                           <React.Fragment key={`${first._id}-${second ? second._id : 'solo'}`}>
                             <tr style={ds.tr}>
-                              <td style={{ ...topCellBase, borderTopLeftRadius: 24 }}>
+                              <td
+                                style={{ ...topCellBase, borderTopLeftRadius: 24, cursor: isEditMode ? 'pointer' : 'default' }}
+                                onClick={() => isEditMode && setEditRegistrationTarget(first)}
+                              >
                                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                                   <div style={{ fontWeight: 900, fontSize: 18 }}>{first.playerName}</div>
                                   {first.tournament?.category === 'mixed-doubles' && first.gender ? (
@@ -1468,15 +1477,16 @@ export default function Dashboard() {
                                 </div>
                                 <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {first.rollNumber}</div>
                                 <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{first.department}</div>
+                                {isEditMode && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>Click to edit</div>}
                               </td>
                               <td style={topCellBase}>
                                 <div style={{ fontWeight: 800, fontSize: 15 }}>{CAT_LABELS[first.tournament?.category]}</div>
                                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Year: {first.tournament?.year}</div>
                               </td>
                               <td style={topCellBase}>
-                                <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${first.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{first.phone}</a></div>
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>{PHONE} <a href={`tel:${first.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{first.phone}</a></div>
                                 <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                  📧 <a
+                                  {EMAIL} <a
                                     href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(first.email || '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -1486,7 +1496,7 @@ export default function Dashboard() {
                                   </a>
                                 </div>
                                 {first.nicNo ? (
-                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {first.nicNo}</div>
+                                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>{ID_CARD} {first.nicNo}</div>
                                 ) : null}
                               </td>
                               <td style={topCellBase}>
@@ -1506,7 +1516,10 @@ export default function Dashboard() {
                               </td>
                             </tr>
                             <tr style={ds.tr}>
-                              <td style={middleCellBase}>
+                              <td
+                                style={{ ...middleCellBase, cursor: isEditMode && second ? 'pointer' : 'default' }}
+                                onClick={() => isEditMode && second && setEditRegistrationTarget(second)}
+                              >
                                 {second ? (
                                   <>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -1519,6 +1532,7 @@ export default function Dashboard() {
                                     </div>
                                     <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>REG: {second.rollNumber}</div>
                                     <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>{second.department}</div>
+                                    {isEditMode && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>Click to edit</div>}
                                   </>
                                 ) : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1557,9 +1571,9 @@ export default function Dashboard() {
                               <td style={middleCellBase}>
                                 {second ? (
                                   <>
-                                    <div style={{ fontSize: 14, fontWeight: 600 }}>📞 <a href={`tel:${second.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{second.phone}</a></div>
+                                    <div style={{ fontSize: 14, fontWeight: 600 }}>{PHONE} <a href={`tel:${second.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{second.phone}</a></div>
                                     <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                                      📧 <a
+                                      {EMAIL} <a
                                         href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(second.email || '')}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
@@ -1569,7 +1583,7 @@ export default function Dashboard() {
                                       </a>
                                     </div>
                                     {second.nicNo ? (
-                                      <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>🪪 {second.nicNo}</div>
+                                      <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>{ID_CARD} {second.nicNo}</div>
                                     ) : null}
                                   </>
                                 ) : null}
@@ -1656,7 +1670,7 @@ export default function Dashboard() {
                                       transition: 'all 0.25s ease',
                                     }}
                                   >
-                                    {pairApproved ? '✓ PAIR APPROVED' : 'APPROVE PAIR'}
+                                    {pairApproved ? `${CHECK_MARK} PAIR APPROVED` : 'APPROVE PAIR'}
                                   </button>
                                 </div>
                               </td>
@@ -1686,14 +1700,14 @@ export default function Dashboard() {
                       <div style={{ ...ds.catBadge, color: 'var(--primary)' }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={ds.tournInfo}>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>🗓️ <span>Event: {fmtDate(t.date)}</span></div>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>⏳ <span>Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</span></div>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>📍 <span>{t.venue}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{CALENDAR} <span>Event: {fmtDate(t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{HOURGLASS} <span>Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{LOCATION} <span>{t.venue}</span></div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       <button onClick={() => setViewTarget(t)} style={{ ...ds.viewBtn, minWidth: 0, flex: '1 1 100%' }}>VIEW REGISTERED PLAYERS</button>
                       <button onClick={() => setEditTarget(t)} style={{ ...ds.viewBtn, flex: '1 1 auto', width: 'auto' }}>✏️ EDIT</button>
-                      <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, flex: '1 1 auto', width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>🗑️</button>
+                      <button onClick={() => setDeleteTarget(t)} style={{ ...ds.viewBtn, flex: '1 1 auto', width: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>{TRASH}</button>
                     </div>
                   </div>
                 ))}
@@ -1762,7 +1776,7 @@ export default function Dashboard() {
                           <div style={{ fontSize: 18, fontWeight: 900 }}>Crop your profile photo</div>
                           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>Drag the crop box, pinch/scroll to zoom, then save.</div>
                         </div>
-                        <button type="button" onClick={() => setCropModalOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                        <button type="button" onClick={() => setCropModalOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer' }}>{CLOSE}</button>
                       </div>
 
                       <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -1876,7 +1890,7 @@ export default function Dashboard() {
                       {savingProfile ? 'Saving...' : 'Save Profile'}
                     </button>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12 }}>
-                      <span style={{ fontSize: 14 }}>🔒</span>
+                      <span style={{ fontSize: 14 }}>{LOCK}</span>
                       <span>Your information is secure and only visible to administrators.</span>
                     </div>
                   </div>
@@ -1918,11 +1932,11 @@ export default function Dashboard() {
                       {showPasswordRequirements && (
                         <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 16, background: 'rgba(15, 23, 42, 0.06)' }}>
                           <div style={{ marginBottom: 8, fontWeight: 700 }}>Password must include:</div>
-                          <div style={{ color: passwordChecks.length ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.length ? '✓' : '✗'}</span><span>At least 8 characters</span></div>
-                          <div style={{ color: passwordChecks.uppercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.uppercase ? '✓' : '✗'}</span><span>One uppercase letter (A-Z)</span></div>
-                          <div style={{ color: passwordChecks.lowercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.lowercase ? '✓' : '✗'}</span><span>One lowercase letter (a-z)</span></div>
-                          <div style={{ color: passwordChecks.number ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.number ? '✓' : '✗'}</span><span>One number (0-9)</span></div>
-                          <div style={{ color: passwordChecks.special ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.special ? '✓' : '✗'}</span><span>One special character</span></div>
+                          <div style={{ color: passwordChecks.length ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.length ? CHECK_MARK : CROSS}</span><span>At least 8 characters</span></div>
+                          <div style={{ color: passwordChecks.uppercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.uppercase ? CHECK_MARK : CROSS}</span><span>One uppercase letter (A-Z)</span></div>
+                          <div style={{ color: passwordChecks.lowercase ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.lowercase ? CHECK_MARK : CROSS}</span><span>One lowercase letter (a-z)</span></div>
+                          <div style={{ color: passwordChecks.number ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.number ? CHECK_MARK : CROSS}</span><span>One number (0-9)</span></div>
+                          <div style={{ color: passwordChecks.special ? '#10B981' : '#EF4444', display: 'flex', gap: 8 }}><span>{passwordChecks.special ? CHECK_MARK : CROSS}</span><span>One special character</span></div>
                         </div>
                       )}
                     </div>
@@ -1942,7 +1956,7 @@ export default function Dashboard() {
                       </div>
                       {showPasswordMatchMessage && (
                         <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>
-                          {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match.'}
+                          {passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match.`}
                         </div>
                       )}
                     </div>
@@ -2025,7 +2039,7 @@ export default function Dashboard() {
                     onClick={handleClearAllAuditLogs}
                     style={{ ...ds.actionBtn, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '0 20px', height: 44, borderRadius: 16, whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700 }}
                   >
-                    🗑️ CLEAR ALL
+                    {TRASH} CLEAR ALL
                   </button>
                 </div>
               </div>
@@ -2239,7 +2253,7 @@ export default function Dashboard() {
 
               {/* Search */}
               <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>{SEARCH}</span>
                 <input
                   autoFocus
                   type="text"
@@ -2285,7 +2299,7 @@ export default function Dashboard() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 13, color: '#fff', flexShrink: 0, transition: 'all 0.15s'
                       }}>
-                        {isSelected ? '✓' : ''}
+                        {isSelected ? CHECK_MARK : ''}
                       </div>
                     </div>
                   );

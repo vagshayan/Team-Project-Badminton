@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { SUN, MOON, TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE } from '../components/Icons';
 import RegisterModal from './RegisterModal';
+import { SPORT_META, getSportMeta } from '../constants/sports';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
-};
-
-const SPORT_META = {
-  badminton: { label: 'BADMINTON', icon: '🏸', color: '#3B82F6' },
-  'table-tennis': { label: 'TABLE TENNIS', icon: '🏓', color: '#8B5CF6' },
-  carrom: { label: 'CARROM', icon: '🎯', color: '#EC4899' },
 };
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -51,15 +47,18 @@ export default function StudentTournamentPage({ sport }) {
   const [teamSearchQuery, setTeamSearchQuery] = useState('');
   const pollingRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
 
-  const meta = SPORT_META[sport] || SPORT_META['badminton'];
+  const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
+
 
   useEffect(() => {
     axios.get(`/api/university-team?sport=${sport}`)
       .then((res) => setTeamMembers(res.data || []))
       .catch(console.error);
   }, [sport]);
+
 
   useEffect(() => {
     setLoading(true);
@@ -267,26 +266,29 @@ export default function StudentTournamentPage({ sport }) {
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">🏆</div>
+          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
           <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
         </div>
 
         {/* Desktop inline tabs */}
         <div style={sh.sportSwitcher} className="desktop-sport-switcher">
-          {Object.keys(SPORT_META).map((s) => (
-            <button
-              key={s}
-              onClick={() => navigate(`/${s}`)}
-              style={{ ...sh.sportBtn, color: sport === s ? SPORT_META[s].color : 'var(--text-muted)', borderBottom: sport === s ? `3px solid ${SPORT_META[s].color}` : 'none' }}
-            >
-              <span style={{ fontSize: 24 }}>{SPORT_META[s].icon}</span>
-              <span style={{ fontSize: 13, fontWeight: 900 }}>{SPORT_META[s].label}</span>
-            </button>
-          ))}
+          {Object.keys(SPORT_META).map((s) => {
+            const sMeta = getSportMeta(s, isDarkMode);
+            return (
+              <button
+                key={s}
+                onClick={() => navigate(`/${s}`)}
+                style={{ ...sh.sportBtn, color: sport === s ? sMeta.color : 'var(--text-muted)', borderBottom: sport === s ? `3px solid ${sMeta.color}` : 'none' }}
+              >
+                <span style={{ fontSize: 24 }}>{sMeta.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 900 }}>{sMeta.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
-          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
+          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
           <button onClick={() => navigate(`/admin/login?sport=${encodeURIComponent(sport)}`)} style={sh.adminBtn} className="mobile-btn">
             <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
@@ -297,7 +299,7 @@ export default function StudentTournamentPage({ sport }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle game menu"
           >
-            <span className="hamburger-icon">{menuOpen ? '✕' : '☰'}</span>
+            <span className="hamburger-icon">{menuOpen ? MENU_CLOSE : MENU_OPEN}</span>
           </button>
         </div>
       </nav>
@@ -306,18 +308,21 @@ export default function StudentTournamentPage({ sport }) {
       {menuOpen && (
         <div className="mobile-dropdown-overlay" onClick={() => setMenuOpen(false)}>
           <div className="mobile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-            {Object.keys(SPORT_META).map((s) => (
-              <button
-                key={s}
-                className={`mobile-dropdown-item${sport === s ? ' active' : ''}`}
-                style={{ '--sport-color': SPORT_META[s].color }}
-                onClick={() => { navigate(`/${s}`); setMenuOpen(false); }}
-              >
-                <span style={{ fontSize: 22 }}>{SPORT_META[s].icon}</span>
-                <span style={{ fontWeight: 800, fontSize: 15 }}>{SPORT_META[s].label}</span>
-                {sport === s && <span style={{ marginLeft: 'auto', fontSize: 14 }}>✓</span>}
-              </button>
-            ))}
+            {Object.keys(SPORT_META).map((s) => {
+              const sMeta = getSportMeta(s, isDarkMode);
+              return (
+                <button
+                  key={s}
+                  className={`mobile-dropdown-item${sport === s ? ' active' : ''}`}
+                  style={{ '--sport-color': sMeta.color }}
+                  onClick={() => { navigate(`/${s}`); setMenuOpen(false); }}
+                >
+                  <span style={{ fontSize: 22 }}>{sMeta.icon}</span>
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>{sMeta.label}</span>
+                  {sport === s && <span style={{ marginLeft: 'auto', fontSize: 14 }}>{CHECK_MARK}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -382,7 +387,7 @@ export default function StudentTournamentPage({ sport }) {
             </div>
           ) : tournaments.length === 0 ? (
             <div style={sh.statusFill}>
-              <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>🏟️</div>
+              <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>{STADIUM}</div>
               <h3 style={{ fontSize: 24, fontWeight: 950 }}>Arena Empty</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 16 }}>No tournaments are currently active for registration.</p>
             </div>
@@ -398,10 +403,10 @@ export default function StudentTournamentPage({ sport }) {
                       <div style={{ ...sh.catBadge, border: `1px solid ${meta.color}40`, color: meta.color }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={sh.cardBody}>
-                      <div style={sh.infoLine}>🗓️ Event: {fmtDate(t.date)}</div>
-                      <div style={sh.infoLine}>⏳ Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</div>
-                      <div style={sh.infoLine}>🕐 {t.time}</div>
-                      <div style={sh.infoLine}>📍 {t.venue}</div>
+                      <div style={sh.infoLine}>{CALENDAR} Event: {fmtDate(t.date)}</div>
+                      <div style={sh.infoLine}>{HOURGLASS} Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</div>
+                      <div style={sh.infoLine}>{CLOCK} {t.time}</div>
+                      <div style={sh.infoLine}>{LOCATION} {t.venue}</div>
                     </div>
                     {t.isPublished ? (
                       <div style={{ display: 'flex', gap: 10 }}>
@@ -439,7 +444,12 @@ export default function StudentTournamentPage({ sport }) {
       {registerFor && <RegisterModal tournament={registerFor} onClose={() => setRegisterFor(null)} />}
 
       {viewBracketsFor && (
-        <div className="modal-overlay" style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
+        <div className="modal-overlay" style={bh.overlay} onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setViewBracketsFor(null);
+            if (location.state?.fromBrackets) navigate('/brackets');
+          }
+        }}>
           <div className="modal-card" style={bh.card}>
             <div style={bh.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -449,7 +459,10 @@ export default function StudentTournamentPage({ sport }) {
                   LIVE · updates every 10s
                 </span>
               </div>
-              <button onClick={() => setViewBracketsFor(null)} style={bh.close}>✕</button>
+              <button onClick={() => {
+                setViewBracketsFor(null);
+                if (location.state?.fromBrackets) navigate('/brackets');
+              }} style={bh.close}>{CLOSE}</button>
             </div>
             {bracketLoading ? <div style={{ padding: 100, textAlign: 'center' }}>Loading bracket...</div> : (
               <div style={bh.bracketScroll}>
@@ -767,8 +780,8 @@ export default function StudentTournamentPage({ sport }) {
 const bh = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
   card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  close: { background: 'none', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer' },
+  header: { position: 'relative', padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  close: { position: 'absolute', top: 15, right: 10, zIndex: 30, width: 44, height: 44, borderRadius: 999, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   bracketScroll: { flex: 1, overflowX: 'auto', overflowY: 'auto', padding: 50 },
   matchCard: { background: 'var(--bg-input)', padding: 16, borderRadius: 12, border: '1px solid var(--border)' },
   pRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 },
