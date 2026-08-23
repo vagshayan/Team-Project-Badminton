@@ -52,11 +52,13 @@ export default function StudentTournamentPage({ sport }) {
 
   const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
 
+
   useEffect(() => {
     axios.get(`/api/university-team?sport=${sport}`)
       .then((res) => setTeamMembers(res.data || []))
       .catch(console.error);
   }, [sport]);
+
 
   useEffect(() => {
     setLoading(true);
