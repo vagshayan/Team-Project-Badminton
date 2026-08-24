@@ -28,6 +28,7 @@ const CARD_HEIGHT = 96;
 const GAP = 28;
 const COLUMN_WIDTH = 260;
 const COLUMN_GAP = 70;
+const NAME_CELL_WIDTH = 180;
 
 function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
@@ -35,6 +36,120 @@ function isHiddenByeMatch(m) {
 
 function isMatchWinner(match, player) {
   return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
+// ── Length-based font ladder + horizontal compression for very long names ──
+// Geometry (CARD_HEIGHT/COLUMN_WIDTH/etc) is untouched — this only affects
+// how the name text itself is sized/rendered inside the existing box.
+function getNameStyle(name) {
+  const len = name ? name.length : 0;
+  let fontSize = 14;
+  if (len > 34) fontSize = 11;
+  else if (len > 26) fontSize = 12;
+  else if (len > 20) fontSize = 13;
+
+  const base = {
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    fontSize,
+  };
+
+  if (len > 34) {
+    // Widen only this absolutely-positioned inner span (see renderPlayerName)
+    // so ellipsis calculates against more characters, then compress it back
+    // visually with scaleX. Because the outer wrapper is a fixed-width,
+    // overflow:hidden box, this 118% never reserves extra flex layout space
+    // or pushes the W/L badge next to it.
+    return {
+      ...base,
+      width: '118%',
+      transform: 'scaleX(0.85)',
+      transformOrigin: 'left',
+    };
+  }
+  return base;
+}
+
+// ── Renders a player's name cell: truncated + shrunk to fit, with
+// hover title, aria-label, and tap/click/keyboard-to-reveal — but only
+// for names long enough to actually risk truncation.
+function renderPlayerName(m, player, slot, getDisplayName, expandedName, setExpandedName) {
+  if (!player) return <i style={{ color: '#555' }}>TBD</i>;
+
+  const displayName = getDisplayName(player);
+  const key = `${m._id}-${slot}`;
+  const isExpanded = expandedName === key;
+  const isWinnerPlayer = isMatchWinner(m, player);
+  const dimmed = m.isCompleted && m.winner?._id !== player._id;
+  const needsInteraction = displayName.length > 20;
+
+  const toggle = () => setExpandedName(isExpanded ? null : key);
+
+  const interactiveProps = needsInteraction ? {
+    onClick: toggle,
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    },
+    onFocus: () => setExpandedName(key),
+    onBlur: () => setExpandedName(null),
+    tabIndex: 0,
+    role: 'button',
+    'aria-label': displayName,
+  } : {};
+
+  return (
+    <span
+      title={displayName}
+      {...interactiveProps}
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        width: NAME_CELL_WIDTH,
+        flexShrink: 0,
+        verticalAlign: 'middle',
+        cursor: needsInteraction ? 'pointer' : 'default',
+      }}
+    >
+      <span style={{ display: 'block', width: '100%', overflow: 'hidden' }}>
+        <span style={{
+          display: 'block',
+          width: '100%',
+          fontWeight: isWinnerPlayer ? 900 : 400,
+          color: dimmed ? 'var(--text-muted)' : 'var(--text)',
+          ...getNameStyle(displayName),
+        }}>
+          {displayName}
+        </span>
+      </span>
+
+      {isExpanded && needsInteraction && (
+        <span style={{
+          position: 'absolute',
+          left: 0,
+          top: '100%',
+          marginTop: 4,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px 8px',
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--text)',
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          maxWidth: 220,
+          zIndex: 10,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {displayName}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function StudentTournamentPage({ sport }) {
@@ -48,6 +163,7 @@ export default function StudentTournamentPage({ sport }) {
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [expandedName, setExpandedName] = useState(null);
   const pollingRef = useRef(null);
   const navigate = useNavigate();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -253,13 +369,7 @@ export default function StudentTournamentPage({ sport }) {
     }
     return player.playerName;
   };
-  const getNameFontSize = (name) => {
-    if (!name) return 14;
-    if (name.length > 34) return 10;
-    if (name.length > 26) return 11;
-    if (name.length > 20) return 12;
-    return 14;
-  };
+
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
@@ -476,32 +586,14 @@ export default function StudentTournamentPage({ sport }) {
                           }}
                         >
                           <div style={bh.pRow}>
-                            <span
-                                title={m.player1 ? getDisplayName(m.player1) : ''}
-                                style={{
-                                fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
-                                color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
-                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                fontSize: getNameFontSize(m.player1 ? getDisplayName(m.player1) : ''),
-                              }}>
-                                {m.player1 ? getDisplayName(m.player1) : 'TBD'}
-                            </span>
+                            {renderPlayerName(m, m.player1, 'p1', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
                             </span>
                           </div>
                           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                           <div style={bh.pRow}>
-                            <span
-                                  title={m.player2 ? getDisplayName(m.player2) : ''}
-                                  style={{
-                                  fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
-                                  color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
-                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                  fontSize: getNameFontSize(m.player2 ? getDisplayName(m.player2) : ''),
-                                }}>
-                                  {m.player2 ? getDisplayName(m.player2) : 'TBD'}
-                            </span>
+                            {renderPlayerName(m, m.player2, 'p2', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
                             </span>

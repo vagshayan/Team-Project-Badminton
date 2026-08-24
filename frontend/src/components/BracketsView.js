@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { exportTournamentResultPDF } from '../utils/exporters';
 
@@ -12,10 +13,84 @@ const CAT_LABELS = {
 
 const SINGLES = ['singles-men', 'singles-women'];
 
-const CARD_HEIGHT = 96;
+// CARD_HEIGHT must equal the card's actual rendered height — the position
+// algorithm and connector lines both space/center off this value.
+// Singles stay compact; doubles keep extra vertical room for wrapped names
+// and the completed-match winner status line.
+const SINGLE_CARD_HEIGHT = 110;
+const DOUBLE_CARD_HEIGHT = 140;
 const GAP = 28;
 const COLUMN_WIDTH = 260;
 const COLUMN_GAP = 70;
+const CARD_NAME_FONT = '13px system-ui, -apple-system, Segoe UI, sans-serif';
+const CARD_TEXT_MAX_WIDTH = COLUMN_WIDTH - 54;
+
+let nameMeasureCanvas;
+
+function getNameMeasureContext() {
+  if (!nameMeasureCanvas && typeof document !== 'undefined') {
+    nameMeasureCanvas = document.createElement('canvas');
+  }
+  return nameMeasureCanvas ? nameMeasureCanvas.getContext('2d') : null;
+}
+
+function measureCardNameWidth(text) {
+  const context = getNameMeasureContext();
+  if (!context) return text.length * 7;
+  context.font = CARD_NAME_FONT;
+  return context.measureText(text).width;
+}
+
+function normalizeCardName(name) {
+  return String(name || '').replace(/\s+/g, ' ').trim();
+}
+
+function compactPersonName(name) {
+  const normalized = normalizeCardName(name);
+  if (!normalized) return '';
+
+  const parts = normalized.split(' ');
+  if (parts.length <= 2) return normalized;
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const middle = parts.slice(1, -1).map(token => {
+    if (/^[A-Za-z]\.$/.test(token)) return token;
+    if (token.length <= 3) return token;
+    return `${token[0]}.`;
+  });
+
+  const compact = [first, ...middle, last].join(' ');
+  if (measureCardNameWidth(compact) <= CARD_TEXT_MAX_WIDTH * 1.75) return compact;
+
+  const tighter = [first, ...parts.slice(1, -1).map(token => `${token[0]}.`), last].join(' ');
+  return tighter;
+}
+
+function getCardDisplayName(player, isDoubles) {
+  if (!player) return '';
+
+  const fullName = isDoubles && player.partnerName
+    ? `${normalizeCardName(player.playerName)} & ${normalizeCardName(player.partnerName)}`
+    : normalizeCardName(player.playerName);
+
+  if (!fullName) return '';
+
+  const width = measureCardNameWidth(fullName);
+  if (width <= CARD_TEXT_MAX_WIDTH) return fullName;
+
+  if (isDoubles && player.partnerName) {
+    if (width <= CARD_TEXT_MAX_WIDTH * 2) return fullName;
+
+    const playerName = compactPersonName(player.playerName);
+    const partnerName = compactPersonName(player.partnerName);
+    return `${playerName} & ${partnerName}`;
+  }
+
+  if (width <= CARD_TEXT_MAX_WIDTH * 2) return fullName;
+
+  return compactPersonName(player.playerName);
+}
 
 function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
@@ -23,6 +98,16 @@ function isHiddenByeMatch(m) {
 
 function isMatchWinner(match, player) {
   return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
+// ── Match label e.g. "Match 2.1" — uses the match's position within its
+// own round's visible list (1st, 2nd, 3rd...) rather than the raw
+// matchNumber field, since matchNumber is a global sequence across the
+// whole draw and can jump around within a round (e.g. round 1 showing
+// matchNumbers 1 and 4). Position-in-round always reads sequentially,
+// matching top-to-bottom order in the bracket. No backend change needed.
+function getMatchLabel(roundIdx, positionInRound) {
+  return `Match ${roundIdx + 1}.${positionInRound + 1}`;
 }
 
 export default function BracketsView({ admin, color }) {
@@ -40,6 +125,20 @@ export default function BracketsView({ admin, color }) {
   const [containerHeight, setContainerHeight] = useState(400);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isSinglesTournament = selectedTournament ? SINGLES.includes(selectedTournament.category) : false;
+  const CARD_HEIGHT = isSinglesTournament ? SINGLE_CARD_HEIGHT : DOUBLE_CARD_HEIGHT;
+  const cardPaddingY = isSinglesTournament ? 5 : 8;
+  const playerRowMinHeight = isSinglesTournament ? 28 : 34;
+  const footerMinHeight = isSinglesTournament ? 16 : 18;
+  const footerFontSize = isSinglesTournament ? 9 : 11;
+  // ── Click-to-reveal player info. Holds { key, rect, expanded } — rect is
+  // the trigger's viewport bounding box, captured on click, used to
+  // position the popover via a portal so it's never clipped by the card's
+  // overflow:hidden or the bracket's horizontal scroll container.
+  // `expanded` gates the second, more sensitive tier of fields (NIC,
+  // phone, address) behind an explicit "View full details" click — the
+  // first tier only shows Reg No / Department / Gender / Email. ──
+  const [activePlayerInfo, setActivePlayerInfo] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -57,6 +156,33 @@ export default function BracketsView({ admin, color }) {
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [dropdownOpen]);
+
+  // ── Close player-info popover on outside click, Escape, or any scroll ──
+  // (scroll/resize close it rather than reposition it, since the anchor
+  // rect is captured once at click time and the bracket area scrolls
+  // horizontally independently of the page).
+  useEffect(() => {
+    if (!activePlayerInfo) return;
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.player-info-trigger') && !e.target.closest('.player-info-popover')) {
+        setActivePlayerInfo(null);
+      }
+    };
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setActivePlayerInfo(null);
+    };
+    const handleScrollOrResize = () => setActivePlayerInfo(null);
+    document.addEventListener('click', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [activePlayerInfo]);
 
   useEffect(() => { fetchTournaments(); }, []);
 
@@ -86,6 +212,7 @@ export default function BracketsView({ admin, color }) {
     setMatches([]);
     setPositions({});
     setLines([]);
+    setActivePlayerInfo(null);
     if (t.isLocked) fetchMatches(t._id);
   };
 
@@ -102,6 +229,14 @@ export default function BracketsView({ admin, color }) {
       .filter(m => !isHiddenByeMatch(m))
       .sort((a, b) => a.matchNumber - b.matchNumber);
   });
+
+  // The final is the single match in the last round. If there's more than
+  // one match in the last round, the bracket isn't fully resolved down to
+  // one match yet, so we don't show a spotlight (avoids guessing which is
+  // "the" final).
+  const finalRoundNum = roundNums.length > 0 ? roundNums[roundNums.length - 1] : null;
+  const finalRoundMatches = finalRoundNum !== null ? (visibleByRound[finalRoundNum] || []) : [];
+  const finalMatch = finalRoundMatches.length === 1 ? finalRoundMatches[0] : null;
 
   // ── VERIFIED TIGHT-STACKING POSITION ALGORITHM (unchanged) ──
   useLayoutEffect(() => {
@@ -139,7 +274,7 @@ export default function BracketsView({ admin, color }) {
     setPositions(pos);
     const allTops = Object.values(pos).map(p => p.top + CARD_HEIGHT);
     setContainerHeight(Math.max(400, ...allTops) + 60);
-  }, [matches]);
+  }, [matches, CARD_HEIGHT]);
 
   // ── Lines derived directly from position data (unchanged) ──
   useEffect(() => {
@@ -200,7 +335,7 @@ export default function BracketsView({ admin, color }) {
     }
 
     setLines(newLines);
-  }, [positions]);
+  }, [positions, CARD_HEIGHT]);
 
   const generateDraws = () => {
     const isSingles = SINGLES.includes(selectedTournament.category);
@@ -291,7 +426,7 @@ export default function BracketsView({ admin, color }) {
       alert(err.response?.data?.message || 'Force unlock failed.');
     } finally { setLoading(false); }
   };
-  
+
   const handlePublishDraw = async () => {
     if (!window.confirm('Publish draw? Students will see the bracket. Cannot be undone!')) return;
     setLoading(true);
@@ -317,7 +452,10 @@ export default function BracketsView({ admin, color }) {
       alert(err.response?.data?.message || 'Failed to update result');
     }
   };
-  // ── Display name: shows "Name & Partner" for doubles ───
+
+  // ── Display name: full name for popovers / modals; card display is
+  // generated separately so the player-info popover always keeps the full
+  // original name intact.
   const getDisplayName = (player) => {
     if (!player) return '';
     const isDoubles = selectedTournament && !SINGLES.includes(selectedTournament.category);
@@ -326,12 +464,181 @@ export default function BracketsView({ admin, color }) {
     }
     return player.playerName;
   };
+
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
     if (remaining === 1) return 'FINAL';
     if (remaining === 2) return 'SEMI FINALS';
     if (remaining === 3) return 'QUARTER FINALS';
     return `ROUND ${roundIdx + 1}`;
+  };
+
+  // ── Renders a player cell as NAME ONLY on the card — no reg no inline.
+  // Singles: one line, the player's name.
+  // Doubles: two lines, "Name1  &" then "Name2" (partner), so the pairing
+  // reads naturally without cramming registration numbers into the same
+  // line. Reg No, Department, Gender, and Email now live exclusively in
+  // the click-to-reveal popover (see renderPlayerInfoPortal) — the card
+  // itself is purely a scanning surface for "who is this."
+  const renderPlayerCell = (m, player, slot) => {
+    if (!player) {
+      return <i style={{ color: '#555' }}>TBD</i>;
+    }
+
+    const key = `${m._id}-${slot}`;
+    const isOpen = activePlayerInfo?.key === key;
+    const isDoubles = selectedTournament && !SINGLES.includes(selectedTournament.category);
+    const displayName = getCardDisplayName(player, isDoubles);
+
+    const isWinner = isMatchWinner(m, player);
+    const textColor = isWinner ? 'var(--text)' : 'var(--text-muted)';
+
+    return (
+      <span
+        className="player-info-trigger"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isOpen) {
+            setActivePlayerInfo(null);
+            return;
+          }
+          const rect = e.currentTarget.getBoundingClientRect();
+          setActivePlayerInfo({ key, rect, expanded: false });
+        }}
+        title={`View details for ${player.playerName}`}
+        style={{
+          display: 'flex',
+          minWidth: 0,
+          flex: 1,
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{
+          fontSize: 13,
+          fontWeight: isWinner ? 900 : 700,
+          color: textColor,
+          whiteSpace: 'normal',
+          overflowWrap: 'break-word',
+          wordBreak: 'normal',
+          lineHeight: 1.15,
+          textDecoration: isOpen ? 'underline' : 'none',
+          maxWidth: '100%',
+          minWidth: 0,
+        }}>
+          {displayName}
+        </span>
+      </span>
+    );
+  };
+
+  // ── The actual popover content, rendered once via portal (see below),
+  // positioned from the captured trigger rect rather than CSS relative
+  // positioning, so ancestor overflow/scroll can never clip it.
+  //
+  // Two-tier disclosure:
+  //   Tier 1 (always visible): Reg No, Department, Gender, Email — plus
+  //   partner's Name/Reg No for doubles. This is what an admin usually
+  //   needs during live event operation.
+  //   Tier 2 (behind "View full details"): NIC, Phone, Address — shown
+  //   only once the admin explicitly asks for it.
+  // ──
+  const renderPlayerInfoPortal = () => {
+    if (!activePlayerInfo) return null;
+    const { key, rect, expanded } = activePlayerInfo;
+    const [matchId, slot] = [key.slice(0, key.lastIndexOf('-')), key.slice(key.lastIndexOf('-') + 1)];
+    const match = matches.find(m => m._id === matchId);
+    const player = slot === 'p1' ? match?.player1 : match?.player2;
+    if (!match || !player) return null;
+
+    const isDoubles = selectedTournament && !SINGLES.includes(selectedTournament.category);
+    const POPOVER_WIDTH = 270;
+    const MARGIN = 8;
+
+    // Prefer opening below the trigger; flip above if there's not enough
+    // room below the viewport. Prefer left-aligned; flip to right-aligned
+    // if it would run off the right edge of the screen.
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove = spaceBelow < 300 && rect.top > 300;
+    const top = openAbove ? rect.top - MARGIN : rect.bottom + MARGIN;
+    const overflowsRight = rect.left + POPOVER_WIDTH > window.innerWidth - MARGIN;
+    const left = overflowsRight
+      ? Math.max(MARGIN, window.innerWidth - POPOVER_WIDTH - MARGIN)
+      : rect.left;
+
+    return createPortal(
+      <div
+        className="player-info-popover"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          top,
+          left,
+          transform: openAbove ? 'translateY(-100%)' : 'none',
+          width: POPOVER_WIDTH,
+          maxWidth: '90vw',
+          maxHeight: '75vh',
+          overflowY: 'auto',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          padding: 14,
+          zIndex: 2000,
+          boxShadow: '0 12px 30px rgba(0,0,0,0.45)',
+          fontSize: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 8, color: 'var(--text)' }}>
+          {player.playerName}
+        </div>
+
+        <PlayerInfoRow label="Reg No" value={player.rollNumber} />
+        <PlayerInfoRow label="Department" value={player.department} />
+        <PlayerInfoRow label="Gender" value={player.gender} />
+        <PlayerInfoRow label="Email" value={player.email} />
+
+        {isDoubles && player.partnerName && (
+          <>
+            <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
+            <div style={{ fontWeight: 800, fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>
+              PARTNER
+            </div>
+            <PlayerInfoRow label="Name" value={player.partnerName} />
+            <PlayerInfoRow label="Reg No" value={player.partnerRollNumber} />
+          </>
+        )}
+
+        {expanded && (
+          <>
+            <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
+            <div style={{ fontWeight: 800, fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>
+              FULL DETAILS
+            </div>
+            <PlayerInfoRow label="NIC No" value={player.nicNo} />
+            <PlayerInfoRow label="Phone" value={player.phone} />
+            <PlayerInfoRow label="Address" value={player.address} />
+          </>
+        )}
+
+        <button
+          onClick={() => setActivePlayerInfo(prev => ({ ...prev, expanded: !prev.expanded }))}
+          style={{
+            marginTop: 12,
+            width: '100%',
+            padding: '8px',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--primary, #3B82F6)',
+            fontWeight: 800,
+            fontSize: 11,
+            cursor: 'pointer',
+          }}
+        >
+          {expanded ? '▲ Hide full details' : '▼ View full details'}
+        </button>
+      </div>,
+      document.body
+    );
   };
 
   const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
@@ -381,8 +688,8 @@ export default function BracketsView({ admin, color }) {
                 <span style={{ color: 'var(--text-muted)', fontWeight: 800 }}>-- SELECT TOURNAMENT --</span>
               )}
             </div>
-            <span style={{ 
-              transition: 'transform 0.2s ease', 
+            <span style={{
+              transition: 'transform 0.2s ease',
               transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
               display: 'inline-block',
               fontSize: 10,
@@ -502,118 +809,144 @@ export default function BracketsView({ admin, color }) {
               </p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto', paddingBottom: 40 }}>
-              <div style={{ position: 'relative', width: totalWidth, height: containerHeight }}>
+            <>
+              {/* ── Final spotlight — pulled out above the tree. No dedicated
+                  3rd-place match exists in the current data model (only
+                  round/matchNumber tree matches), so that box from the
+                  reference design isn't shown here — it would need a real
+                  backend-generated 3rd-place match to do correctly. ── */}
+              {finalMatch && (
+                <div style={s.spotlightRow}>
+                  <div style={s.spotlightCard}>
+                    <div style={s.spotlightLabel}>
+                      {getMatchLabel(roundNums.length - 1, 0)} — FINAL
+                    </div>
+                    <SpotlightMatchBody
+                      match={finalMatch}
+                      getDisplayName={getDisplayName}
+                      color={color}
+                    />
+                  </div>
+                </div>
+              )}
 
-                {roundNums.map((r, rIdx) => (
-                  <div
-                    key={`label-${r}`}
+              <div style={{ overflowX: 'auto', paddingBottom: 40 }}>
+                <div style={{ position: 'relative', width: totalWidth, height: containerHeight }}>
+
+                  {roundNums.map((r, rIdx) => (
+                    <div
+                      key={`label-${r}`}
+                      style={{
+                        position: 'absolute',
+                        left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                        top: 0,
+                        width: COLUMN_WIDTH,
+                        textAlign: 'center',
+                        fontSize: 11,
+                        letterSpacing: 2,
+                        fontWeight: 950,
+                        color,
+                      }}
+                    >
+                      {getRoundLabel(rIdx, roundNums.length)}
+                    </div>
+                  ))}
+
+                  <svg
                     style={{
                       position: 'absolute',
-                      left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
-                      top: 0,
-                      width: COLUMN_WIDTH,
-                      textAlign: 'center',
-                      fontSize: 11,
-                      letterSpacing: 2,
-                      fontWeight: 950,
-                      color,
+                      top: 36,
+                      left: 0,
+                      width: '100%',
+                      height: containerHeight,
+                      pointerEvents: 'none',
+                      overflow: 'visible',
                     }}
                   >
-                    {getRoundLabel(rIdx, roundNums.length)}
-                  </div>
-                ))}
+                    {lines.map((line) => (
+                      <path key={line.id} d={line.path} fill="none" stroke={`${color}70`} strokeWidth="1.5" />
+                    ))}
+                  </svg>
 
-                <svg
-                  style={{
-                    position: 'absolute',
-                    top: 36,
-                    left: 0,
-                    width: '100%',
-                    height: containerHeight,
-                    pointerEvents: 'none',
-                    overflow: 'visible',
-                  }}
-                >
-                  {lines.map((line) => (
-                    <path key={line.id} d={line.path} fill="none" stroke={`${color}70`} strokeWidth="1.5" />
-                  ))}
-                </svg>
+                  {roundNums.map((r, rIdx) =>
+                    (visibleByRound[r] || []).map((m, posInRound) => {
+                      const pos = positions[m._id];
+                      if (!pos) return null;
 
-                {roundNums.map((r, rIdx) =>
-                  (visibleByRound[r] || []).map(m => {
-                    const pos = positions[m._id];
-                    if (!pos) return null;
-                    return (
-                      <div
-                        key={m._id}
-                        style={{
-                          position: 'absolute',
-                          left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
-                          top: pos.top + 36,
-                          width: COLUMN_WIDTH,
-                          height: CARD_HEIGHT,
-                          ...s.matchCard,
-                          borderColor: m.isCompleted ? '#10B981' : 'var(--border)',
-                          borderWidth: m.isCompleted ? 2 : 1,
-                          boxSizing: 'border-box',
-                          zIndex: 2,
-                        }}
-                      >
-                        <div style={s.playerRow}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {isMatchWinner(m, m.player1) && (
-                              <span style={{ ...s.winnerBadge, background: color }}>W</span>
+                      const p1IsWinner = isMatchWinner(m, m.player1);
+                      const p2IsWinner = isMatchWinner(m, m.player2);
+                      const p1IsLoser = m.isCompleted && m.winner?._id !== m.player1?._id && m.player1;
+                      const p2IsLoser = m.isCompleted && m.winner?._id !== m.player2?._id && m.player2;
+
+                      return (
+                        <div
+                          key={m._id}
+                          style={{
+                            position: 'absolute',
+                            left: rIdx * (COLUMN_WIDTH + COLUMN_GAP),
+                            top: pos.top + 36,
+                            width: COLUMN_WIDTH,
+                            height: CARD_HEIGHT,
+                            ...s.matchCard,
+                            padding: `${cardPaddingY}px 14px`,
+                            borderColor: m.isCompleted ? '#10B981' : 'var(--border)',
+                            borderWidth: m.isCompleted ? 2 : 1,
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            zIndex: 2,
+                          }}
+                        >
+                          <div style={s.matchLabel}>{getMatchLabel(rIdx, posInRound)}</div>
+
+                          <div style={{ ...s.playerRow, minHeight: playerRowMinHeight }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0, flex: 1 }}>
+                              {p1IsWinner && <span style={{ ...s.winnerBadge, background: color, marginTop: 1 }}>W</span>}
+                              {p1IsLoser && <span style={{ ...s.loserBadge, marginTop: 1 }}>L</span>}
+                              {renderPlayerCell(m, m.player1, 'p1')}
+                            </div>
+                          </div>
+
+                          <div style={s.divider} />
+
+                          <div style={{ ...s.playerRow, minHeight: playerRowMinHeight }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0, flex: 1 }}>
+                              {p2IsWinner && <span style={{ ...s.winnerBadge, background: color, marginTop: 1 }}>W</span>}
+                              {p2IsLoser && <span style={{ ...s.loserBadge, marginTop: 1 }}>L</span>}
+                              {renderPlayerCell(m, m.player2, 'p2')}
+                            </div>
+                          </div>
+
+                          {/* Footer slot keeps only the action button. Completed
+                              matches intentionally leave it empty; W/L badges
+                              above are the result indicator. */}
+                          <div style={{ ...s.cardFooter, minHeight: footerMinHeight }}>
+                            {!m.isCompleted && m.player1 && m.player2 && (
+                              <button
+                                onClick={() => setResultModal(m)}
+                                style={{
+                                  ...s.scoreBtn,
+                                  borderColor: color,
+                                  color,
+                                  padding: isSinglesTournament ? '4px 6px' : '6px',
+                                  fontSize: isSinglesTournament ? 9 : 10,
+                                }}
+                              >
+                                Mark Result
+                              </button>
                             )}
-                            {m.isCompleted && m.winner?._id !== m.player1?._id && m.player1 && (
-                              <span style={s.loserBadge}>L</span>
+                            {m.isCompleted && (m.winner || p1IsWinner || p2IsWinner) && (
+                              <div style={{ ...s.winnerCaption, fontSize: footerFontSize, lineHeight: 1.2, overflowWrap: 'break-word', textAlign: 'left' }}>
+                                ✓ RESULT CONFIRMED
+                              </div>
                             )}
-                            <span style={{
-                              fontSize: 13,
-                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
-                              color: isMatchWinner(m, m.player1) ? 'var(--text)' : 'var(--text-muted)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player1 ? getDisplayName(m.player1) : <i style={{ color: '#555' }}>TBD</i>}
-                            </span>
                           </div>
                         </div>
-
-                        <div style={s.divider} />
-
-                        <div style={s.playerRow}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            {isMatchWinner(m, m.player2) && (
-                              <span style={{ ...s.winnerBadge, background: color }}>W</span>
-                            )}
-                            {m.isCompleted && m.winner?._id !== m.player2?._id && m.player2 && (
-                              <span style={s.loserBadge}>L</span>
-                            )}
-                            <span style={{
-                              fontSize: 13,
-                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
-                              color: isMatchWinner(m, m.player2) ? 'var(--text)' : 'var(--text-muted)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player2 ? getDisplayName(m.player2) : <i style={{ color: '#555' }}>TBD</i>}
-                            </span>
-                          </div>
-                        </div>
-
-                        {!m.isCompleted && m.player1 && m.player2 && (
-                          <button
-                            onClick={() => setResultModal(m)}
-                            style={{ ...s.scoreBtn, borderColor: color, color }}
-                          >
-                            Mark Result
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
@@ -697,9 +1030,59 @@ export default function BracketsView({ admin, color }) {
           </div>
         </div>
       )}
+
+      {renderPlayerInfoPortal()}
     </div>
   );
 }
+
+// ── Small labeled row inside the player-info popover; skips empty fields ──
+function PlayerInfoRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0' }}>
+      <span style={{ color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--text)', fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{value}</span>
+    </div>
+  );
+}
+
+// ── Body of the Final spotlight card ──
+function SpotlightMatchBody({ match, getDisplayName, color }) {
+  const p1IsWinner = Boolean(match.winner?._id && match.player1?._id && match.winner._id === match.player1._id);
+  const p2IsWinner = Boolean(match.winner?._id && match.player2?._id && match.winner._id === match.player2._id);
+
+  return (
+    <>
+      <div style={spotlightS.row}>
+        <span style={{ fontWeight: p1IsWinner ? 900 : 500 }}>
+          {match.player1 ? getDisplayName(match.player1) : 'TBD'}
+        </span>
+        {match.isCompleted && match.player1 && (
+          <span style={{ ...spotlightS.badge, color: p1IsWinner ? '#10B981' : '#EF4444' }}>
+            {p1IsWinner ? 'W' : 'L'}
+          </span>
+        )}
+      </div>
+      <div style={spotlightS.row}>
+        <span style={{ fontWeight: p2IsWinner ? 900 : 500 }}>
+          {match.player2 ? getDisplayName(match.player2) : 'TBD'}
+        </span>
+        {match.isCompleted && match.player2 && (
+          <span style={{ ...spotlightS.badge, color: p2IsWinner ? '#10B981' : '#EF4444' }}>
+            {p2IsWinner ? 'W' : 'L'}
+          </span>
+        )}
+      </div>
+    </>
+  );
+}
+
+const spotlightS = {
+  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 },
+  badge: { fontWeight: 900, fontSize: 12 },
+  winnerLine: { fontSize: 12, fontWeight: 800, marginTop: 8 },
+};
 
 const s = {
   container: { padding: '40px 0' },
@@ -716,14 +1099,22 @@ const s = {
   statusBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, padding: '16px 20px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)' },
   badge: { display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: 1 },
   btn: { border: 'none', color: '#FFF', padding: '12px 24px', borderRadius: 10, fontWeight: 900, cursor: 'pointer', fontSize: 13 },
-  matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
-  playerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' },
-  divider: { height: 1, background: 'var(--border)', margin: '4px 0' },
-  scoreBtn: { width: '100%', marginTop: 8, padding: '6px', borderRadius: 6, background: 'transparent', border: '1px solid', cursor: 'pointer', fontSize: 10, fontWeight: 800 },
+  matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', flexDirection: 'column' },
+  matchLabel: { flex: '0 0 auto', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 0.5, marginBottom: 4, lineHeight: '12px' },
+  playerRow: { flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
+  divider: { flex: '0 0 auto', height: 1, background: 'var(--border)', margin: '3px 0' },
+  // Flex-grow so this area always fills whatever space is left in the fixed
+  // CARD_HEIGHT box — whether it holds a caption, a button, or nothing.
+  cardFooter: { flex: '1 1 auto', display: 'flex', alignItems: 'center', minHeight: 0 },
+  winnerCaption: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' },
+  scoreBtn: { width: '100%', padding: '6px', borderRadius: 6, background: 'transparent', border: '1px solid', cursor: 'pointer', fontSize: 10, fontWeight: 800 },
   winnerBadge: { color: '#000', fontSize: 9, fontWeight: 900, padding: '2px 5px', borderRadius: 3, flexShrink: 0 },
   loserBadge: { background: '#EF444430', color: '#EF4444', fontSize: 9, fontWeight: 900, padding: '2px 5px', borderRadius: 3, flexShrink: 0 },
   loading: { textAlign: 'center', padding: 50, color: 'var(--text-muted)' },
   toast: { position: 'fixed', top: 24, right: 24, background: '#10B981', color: '#fff', padding: '14px 24px', borderRadius: 12, fontWeight: 700, fontSize: 14, zIndex: 9999, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' },
+  spotlightRow: { marginBottom: 28, display: 'flex', justifyContent: 'center' },
+  spotlightCard: { background: 'var(--bg-card)', border: '2px solid var(--border)', borderRadius: 16, padding: '20px 28px', minWidth: 320, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' },
+  spotlightLabel: { fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase' },
 };
 
 const modalS = {
