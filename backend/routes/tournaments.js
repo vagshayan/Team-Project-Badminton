@@ -109,6 +109,27 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
 
   const totalMatches = bracketSize / 2;
   const naturalByes = bracketSize - players.length;
+
+  // Full brackets have no bye slots, so keep the two seeds in opposite halves.
+  if (naturalByes === 0 && bracketSize >= 4) {
+    const result = new Array(bracketSize).fill(null);
+    const halfSize = bracketSize / 2;
+
+    if (seeded1) {
+      result[Math.floor(Math.random() * halfSize)] = seeded1;
+    }
+    if (seeded2) {
+      result[halfSize + Math.floor(Math.random() * halfSize)] = seeded2;
+    }
+
+    let restIdx = 0;
+    for (let i = 0; i < result.length; i++) {
+      if (!result[i]) result[i] = rest[restIdx++];
+    }
+
+    return result;
+  }
+
   const fightingPlayers = players.length - naturalByes;
   const r1Winners = fightingPlayers / 2;
 
