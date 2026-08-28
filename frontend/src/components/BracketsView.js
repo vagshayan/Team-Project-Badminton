@@ -492,7 +492,9 @@ export default function BracketsView({ admin, color }) {
     const displayName = getCardDisplayName(player, isDoubles);
 
     const isWinner = isMatchWinner(m, player);
-    const textColor = isWinner ? 'var(--text)' : 'var(--text-muted)';
+    const hasCompletedWinner = m.isCompleted && Boolean(m.winner?._id);
+    const isLoser = hasCompletedWinner && !isWinner;
+    const textColor = isLoser ? 'var(--text-muted)' : 'var(--text)';
 
     return (
       <span
@@ -516,7 +518,7 @@ export default function BracketsView({ admin, color }) {
       >
         <span style={{
           fontSize: 13,
-          fontWeight: isWinner ? 900 : 700,
+          fontWeight: isWinner ? 900 : 400,
           color: textColor,
           whiteSpace: 'normal',
           overflowWrap: 'break-word',
