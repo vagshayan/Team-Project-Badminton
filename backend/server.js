@@ -65,10 +65,12 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
+const universityTeamRoutes = require('./routes/universityTeam');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/university-team', universityTeamRoutes);
 
 // Lightweight auth/me fallback: respond safely without touching DB
 // This prevents front-end 500 responses while the DB or models may be initializing.
@@ -169,5 +171,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-

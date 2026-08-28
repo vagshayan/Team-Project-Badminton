@@ -19,6 +19,7 @@ const adminSchema = new mongoose.Schema(
     password: { type: String, required: true },
     sport: { type: String, required: true, enum: ['badminton', 'table-tennis', 'carrom'] },
     name: { type: String, required: true },
+    role: { type: String, enum: ['admin', 'super_admin'], default: 'admin', required: true },
     avatarUrl: { type: String },
     securityQuestion: { type: String },
     securityAnswer: { type: String },

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { SUN, MOON, TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE, STADIUM} from '../components/Icons';
 import RegisterModal from './RegisterModal';
+import { SPORT_META, getSportMeta } from '../constants/sports';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
@@ -10,12 +12,6 @@ const CAT_LABELS = {
 };
 
 const SINGLES = ['singles-men', 'singles-women'];
-
-const SPORT_META = {
-  badminton: { label: 'BADMINTON', icon: '🏸', color: '#3B82F6' },
-  'table-tennis': { label: 'TABLE TENNIS', icon: '🏓', color: '#8B5CF6' },
-  carrom: { label: 'CARROM', icon: '🎯', color: '#EC4899' },
-};
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtDeadline = (d, fallback) => {
@@ -164,11 +160,23 @@ export default function StudentTournamentPage({ sport }) {
   const [containerHeight, setContainerHeight] = useState(400);
   const [menuOpen, setMenuOpen] = useState(false);
   const [expandedName, setExpandedName] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [teamSearchQuery, setTeamSearchQuery] = useState('');
   const pollingRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
 
-  const meta = SPORT_META[sport] || SPORT_META['badminton'];
+  const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
+
+
+  useEffect(() => {
+    axios.get(`/api/university-team?sport=${sport}`)
+      .then((res) => setTeamMembers(res.data || []))
+      .catch(console.error);
+  }, [sport]);
+
 
   useEffect(() => {
     setLoading(true);
@@ -385,26 +393,29 @@ export default function StudentTournamentPage({ sport }) {
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">🏆</div>
+          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
           <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
         </div>
 
         {/* Desktop inline tabs */}
         <div style={sh.sportSwitcher} className="desktop-sport-switcher">
-          {Object.keys(SPORT_META).map((s) => (
-            <button
-              key={s}
-              onClick={() => navigate(`/${s}`)}
-              style={{ ...sh.sportBtn, color: sport === s ? SPORT_META[s].color : 'var(--text-muted)', borderBottom: sport === s ? `3px solid ${SPORT_META[s].color}` : 'none' }}
-            >
-              <span style={{ fontSize: 24 }}>{SPORT_META[s].icon}</span>
-              <span style={{ fontSize: 13, fontWeight: 900 }}>{SPORT_META[s].label}</span>
-            </button>
-          ))}
+          {Object.keys(SPORT_META).map((s) => {
+            const sMeta = getSportMeta(s, isDarkMode);
+            return (
+              <button
+                key={s}
+                onClick={() => navigate(`/${s}`)}
+                style={{ ...sh.sportBtn, color: sport === s ? sMeta.color : 'var(--text-muted)', borderBottom: sport === s ? `3px solid ${sMeta.color}` : 'none' }}
+              >
+                <span style={{ fontSize: 24 }}>{sMeta.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 900 }}>{sMeta.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
-          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? '🌞' : '🌙'}</button>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
+          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
           <button onClick={() => navigate(`/admin/login?sport=${encodeURIComponent(sport)}`)} style={sh.adminBtn} className="mobile-btn">
             <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
@@ -415,7 +426,7 @@ export default function StudentTournamentPage({ sport }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle game menu"
           >
-            <span className="hamburger-icon">{menuOpen ? '✕' : '☰'}</span>
+            <span className="hamburger-icon">{menuOpen ? MENU_CLOSE : MENU_OPEN}</span>
           </button>
         </div>
       </nav>
@@ -424,18 +435,21 @@ export default function StudentTournamentPage({ sport }) {
       {menuOpen && (
         <div className="mobile-dropdown-overlay" onClick={() => setMenuOpen(false)}>
           <div className="mobile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-            {Object.keys(SPORT_META).map((s) => (
-              <button
-                key={s}
-                className={`mobile-dropdown-item${sport === s ? ' active' : ''}`}
-                style={{ '--sport-color': SPORT_META[s].color }}
-                onClick={() => { navigate(`/${s}`); setMenuOpen(false); }}
-              >
-                <span style={{ fontSize: 22 }}>{SPORT_META[s].icon}</span>
-                <span style={{ fontWeight: 800, fontSize: 15 }}>{SPORT_META[s].label}</span>
-                {sport === s && <span style={{ marginLeft: 'auto', fontSize: 14 }}>✓</span>}
-              </button>
-            ))}
+            {Object.keys(SPORT_META).map((s) => {
+              const sMeta = getSportMeta(s, isDarkMode);
+              return (
+                <button
+                  key={s}
+                  className={`mobile-dropdown-item${sport === s ? ' active' : ''}`}
+                  style={{ '--sport-color': sMeta.color }}
+                  onClick={() => { navigate(`/${s}`); setMenuOpen(false); }}
+                >
+                  <span style={{ fontSize: 22 }}>{sMeta.icon}</span>
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>{sMeta.label}</span>
+                  {sport === s && <span style={{ marginLeft: 'auto', fontSize: 14 }}>{CHECK_MARK}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -443,9 +457,51 @@ export default function StudentTournamentPage({ sport }) {
       <div style={sh.hero}>
         <div style={{ ...sh.heroBlob, background: meta.color }} />
         <h1 style={sh.heroTitle} className="mobile-hero-title">{meta.label} RESULTS</h1>
-        <div style={sh.liveIndicator}>
-          <span className="live-dot" style={{ background: '#10B981' }} />
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+
+        {/* OFFICIAL LIVE TOURNAMENT BOARD Header */}
+        <div style={{ ...sh.liveIndicator, flexDirection: 'column', gap: 14, alignItems: 'center', margin: '24px 0 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="live-dot" style={{ background: '#10B981' }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+          </div>
+
+          {/* Centered UNIVERSITY TEAM MEMBERS Button inside Official Live Tournament Board */}
+          <button
+            onClick={() => navigate(`/${sport}/team`)}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 999,
+              background: `linear-gradient(135deg, ${meta.color}22, rgba(255,255,255,0.06))`,
+              border: `1.5px solid ${meta.color}60`,
+              color: 'var(--text)',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: `0 8px 24px ${meta.color}25`,
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.25s ease',
+            }}
+            className="team-members-live-board-btn"
+          >
+            <span style={{ fontSize: 16 }}>🎓</span>
+            <span>UNIVERSITY TEAM MEMBERS</span>
+            <span style={{
+              background: meta.color,
+              color: '#000',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 950,
+              marginLeft: 4,
+            }}>
+              {teamMembers.length}
+            </span>
+            <span style={{ fontSize: 13 }}>→</span>
+          </button>
         </div>
       </div>
 
@@ -458,7 +514,7 @@ export default function StudentTournamentPage({ sport }) {
             </div>
           ) : tournaments.length === 0 ? (
             <div style={sh.statusFill}>
-              <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>🏟️</div>
+              <div style={{ fontSize: 80, marginBottom: 24, opacity: 0.2 }}>{STADIUM}</div>
               <h3 style={{ fontSize: 24, fontWeight: 950 }}>Arena Empty</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 16 }}>No tournaments are currently active for registration.</p>
             </div>
@@ -474,10 +530,10 @@ export default function StudentTournamentPage({ sport }) {
                       <div style={{ ...sh.catBadge, border: `1px solid ${meta.color}40`, color: meta.color }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={sh.cardBody}>
-                      <div style={sh.infoLine}>🗓️ Event: {fmtDate(t.date)}</div>
-                      <div style={sh.infoLine}>⏳ Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</div>
-                      <div style={sh.infoLine}>🕐 {t.time}</div>
-                      <div style={sh.infoLine}>📍 {t.venue}</div>
+                      <div style={sh.infoLine}>{CALENDAR} Event: {fmtDate(t.date)}</div>
+                      <div style={sh.infoLine}>{HOURGLASS} Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</div>
+                      <div style={sh.infoLine}>{CLOCK} {t.time}</div>
+                      <div style={sh.infoLine}>{LOCATION} {t.venue}</div>
                     </div>
                     {t.isPublished ? (
                       <div style={{ display: 'flex', gap: 10 }}>
@@ -515,7 +571,12 @@ export default function StudentTournamentPage({ sport }) {
       {registerFor && <RegisterModal tournament={registerFor} onClose={() => setRegisterFor(null)} />}
 
       {viewBracketsFor && (
-        <div className="modal-overlay" style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setViewBracketsFor(null)}>
+        <div className="modal-overlay" style={bh.overlay} onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setViewBracketsFor(null);
+            if (location.state?.fromBrackets) navigate('/brackets');
+          }
+        }}>
           <div className="modal-card" style={bh.card}>
             <div style={bh.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -525,7 +586,10 @@ export default function StudentTournamentPage({ sport }) {
                   LIVE · updates every 10s
                 </span>
               </div>
-              <button onClick={() => setViewBracketsFor(null)} style={bh.close}>✕</button>
+              <button onClick={() => {
+                setViewBracketsFor(null);
+                if (location.state?.fromBrackets) navigate('/brackets');
+              }} style={bh.close}>{CLOSE}</button>
             </div>
             {bracketLoading ? <div style={{ padding: 100, textAlign: 'center' }}>Loading bracket...</div> : (
               <div style={bh.bracketScroll}>
@@ -608,6 +672,222 @@ export default function StudentTournamentPage({ sport }) {
           </div>
         </div>
       )}
+
+      {/* University Team Members Modal */}
+      {showTeamModal && (
+        <div
+          onClick={(e) => e.target === e.currentTarget && setShowTeamModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 2100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div style={{
+            width: 860,
+            maxWidth: '100%',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            background: 'var(--bg-card)',
+            borderRadius: 32,
+            border: `1px solid ${meta.color}40`,
+            padding: 32,
+            boxShadow: `0 35px 90px rgba(0,0,0,0.6), 0 0 40px ${meta.color}20`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 999, background: `${meta.color}20`, color: meta.color, fontSize: 11, fontWeight: 900, marginBottom: 8 }}>
+                  <span>{meta.icon}</span> {meta.label} TOURNAMENT SQUAD
+                </div>
+                <h2 style={{ margin: 0, fontSize: 26, fontWeight: 950 }}>UNIVERSITY TEAM MEMBERS</h2>
+                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
+                  Official university team members registered for {meta.label.toLowerCase()} tournaments.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowTeamModal(false)}
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search Box inside Modal */}
+            <div style={{ marginBottom: 24 }}>
+              <input
+                type="text"
+                placeholder={`🔍 Search ${meta.label.toLowerCase()} team member name, reg. no, faculty, role...`}
+                value={teamSearchQuery}
+                onChange={(e) => setTeamSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  borderRadius: 16,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {teamMembers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🎓</div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>No Team Members Found</h3>
+                <p style={{ fontSize: 14, marginTop: 6 }}>No official university team members are currently registered for the {meta.label} tournament.</p>
+              </div>
+            ) : (() => {
+              const filtered = teamMembers.filter((m) => {
+                const q = teamSearchQuery.toLowerCase();
+                return (
+                  (m.fullName || '').toLowerCase().includes(q) ||
+                  (m.registrationNumber || '').toLowerCase().includes(q) ||
+                  (m.faculty || '').toLowerCase().includes(q) ||
+                  (m.position || '').toLowerCase().includes(q)
+                );
+              });
+              const boys = filtered.filter((m) => (m.teamGender || 'Men') === 'Men');
+              const girls = filtered.filter((m) => m.teamGender === 'Women');
+
+              const renderCard = (member) => {
+                const badge = (pos) => {
+                  const p = (pos || '').toLowerCase();
+                  if (p.includes('captain') && !p.includes('vice')) return { bg: 'linear-gradient(135deg, #F59E0B, #D97706)', icon: '👑' };
+                  if (p.includes('vice captain') || p.includes('vice-captain')) return { bg: 'linear-gradient(135deg, #06B6D4, #0284C7)', icon: '⭐' };
+                  if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) return { bg: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', icon: '🛡️' };
+                  return { bg: 'rgba(59, 130, 246, 0.2)', icon: '🎽' };
+                };
+                const b = badge(member.position);
+                const avatarSrc = member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
+                const isGirl = member.teamGender === 'Women';
+
+                return (
+                  <div
+                    key={member._id}
+                    style={{
+                      background: 'var(--bg-panel)',
+                      borderRadius: 20,
+                      border: '1px solid var(--border)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div style={{ height: 180, position: 'relative', background: 'rgba(0,0,0,0.2)' }}>
+                      <img
+                        src={avatarSrc}
+                        alt={member.fullName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        background: b.bg,
+                        color: '#FFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                      }}>
+                        <span>{b.icon}</span> {member.position.toUpperCase()}
+                      </div>
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        background: isGirl ? 'rgba(236, 72, 153, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+                        backdropFilter: 'blur(4px)',
+                        color: isGirl ? '#EC4899' : '#3B82F6',
+                        border: `1px solid ${isGirl ? '#EC4899' : '#3B82F6'}60`,
+                      }}>
+                        {isGirl ? '👧 Girls' : '👦 Boys'}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: 18 }}>
+                      <h4 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 900, color: 'var(--text)' }}>{member.fullName}</h4>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: isGirl ? '#EC4899' : meta.color, marginBottom: 8 }}>
+                        🪪 {member.registrationNumber}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, padding: '8px 12px', borderRadius: 10, background: 'var(--bg-input)' }}>
+                        🎓 <strong>Faculty:</strong><br />{member.faculty}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+                  {/* Boys Team Section */}
+                  <div>
+                    <h4 style={{ fontSize: 16, fontWeight: 950, color: '#3B82F6', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(59, 130, 246, 0.2)', paddingBottom: 8 }}>
+                      👦 BOYS TEAM ({boys.length})
+                    </h4>
+                    {boys.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Boys Team members listed.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+                        {boys.map(renderCard)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Girls Team Section */}
+                  <div>
+                    <h4 style={{ fontSize: 16, fontWeight: 950, color: '#EC4899', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(236, 72, 153, 0.2)', paddingBottom: 8 }}>
+                      👧 GIRLS TEAM ({girls.length})
+                    </h4>
+                    {girls.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Girls Team members listed.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+                        {girls.map(renderCard)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -615,8 +895,8 @@ export default function StudentTournamentPage({ sport }) {
 const bh = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
   card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  close: { background: 'none', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer' },
+  header: { position: 'relative', padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  close: { position: 'absolute', top: 15, right: 10, zIndex: 30, width: 44, height: 44, borderRadius: 999, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   bracketScroll: { flex: 1, overflowX: 'auto', overflowY: 'auto', padding: 50 },
   matchCard: { background: 'var(--bg-input)', padding: 16, borderRadius: 12, border: '1px solid var(--border)' },
   pRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 },

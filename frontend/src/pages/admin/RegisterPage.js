@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { SUN, MOON, EYE, LOCK, TROPHY, CHECK_MARK, CROSS, KEY, SHIELD } from '../../components/Icons';
 import axios from 'axios';
-
-
+import { SPORTS as SPORT_OPTIONS, getSportMeta } from '../../constants/sports';
 
 const SparklesIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -14,20 +14,16 @@ const SparklesIcon = (props) => (
   </svg>
 );
 
-const SPORT_OPTIONS = [
-  { id: 'badminton', label: 'Badminton', icon: '🏸', color: '#3B82F6' },
-  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
-  { id: 'carrom', label: 'Carrom', icon: '🎯', color: '#EC4899' },
-];
-
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({ name: '', username: '', password: '', confirmPassword: '', sport: '', securityQuestion: '', securityAnswer: '' });
+  const [formData, setFormData] = useState({ name: '', username: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showAccessCode, setShowAccessCode] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isConfirmPasswordFocused, setIsConfirmPasswordFocused] = useState(false);
+  const [accessCodeStatus, setAccessCodeStatus] = useState('idle');
   const { loginFromData } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -46,11 +42,15 @@ export default function RegisterPage() {
   const showPasswordRequirements = isPasswordFocused && formData.password.length > 0 && !passwordValid;
   const showPasswordMatchMessage = isConfirmPasswordFocused && formData.confirmPassword.length > 0;
   const passwordsMatch = showPasswordMatchMessage && formData.password === formData.confirmPassword;
-  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match';
+  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'accessCode') {
+      setAccessCodeStatus('idle');
+    }
   };
   const handlePasswordFocus = () => setIsPasswordFocused(true);
   const handlePasswordBlur = () => setIsPasswordFocused(false);
@@ -117,15 +117,23 @@ export default function RegisterPage() {
     if (!passwordValid) return setError('Password does not meet all requirements');
     if (password !== confirmPassword) return setError('Passwords do not match');
     if (!sport) return setError('Please select your arena domain');
+    if (!formData.accessCode || !String(formData.accessCode).trim()) return setError('Admin onboarding code is required');
     if (!securityQuestion || !securityAnswer) return setError('Security question and answer are required');
 
     setLoading(true);
     try {
-      const res = await axios.post('/api/auth/register', { name, username, password, sport, securityQuestion, securityAnswer });
+      const res = await axios.post('/api/auth/register', { name, username, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
+      setAccessCodeStatus('verified');
       loginFromData(res.data.token, res.data.admin);
       navigate('/admin/dashboard', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Initialization failed. Username might be taken.');
+      if (err.response?.status === 403) {
+        setAccessCodeStatus('invalid');
+        setError(err.response?.data?.message || 'Access restricted. Admin onboarding code is required.');
+      } else {
+        setAccessCodeStatus('idle');
+        setError(err.response?.data?.message || 'Initialization failed. Username might be taken.');
+      }
     } finally {
       setLoading(false);
     }
@@ -137,6 +145,15 @@ export default function RegisterPage() {
       <div style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
 
       <style>{`
+        input[type="password"]::-ms-reveal { display: none; }
+        input[type="password"]::-ms-clear { display: none; }
+        input[type="password"]::-webkit-reveal-button { display: none; }
+        input[type="password"]::-ms-reveal { display: none; }
+        input[type="password"]::-ms-clear { display: none; }
+        input[type="password"]::-webkit-reveal-button { display: none; }
+        input[type="password"]::-ms-reveal { display: none; }
+        input[type="password"]::-ms-clear { display: none; }
+        input[type="password"]::-webkit-reveal-button { display: none; }
         @media (max-width: 900px) {
           .content-container {
             flex-direction: column !important;
@@ -178,10 +195,10 @@ export default function RegisterPage() {
 
       <nav className="nav-container" style={sh.nav}>
         <div style={sh.brand} onClick={() => navigate('/')}>
-          <div style={sh.logoCircle}>🏆</div>
+          <div style={sh.logoCircle}>{TROPHY}</div>
           <span style={sh.brandName}>UoJ SPORTS</span>
         </div>
-        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? '🌞' : '🌙'}</button>
+        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? SUN : MOON}</button>
       </nav>
 
       <div className="content-container" style={sh.content}>
@@ -193,7 +210,7 @@ export default function RegisterPage() {
            <div className="benefit-list" style={sh.benefitList}>
               {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map(b => (
                  <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>✔</span> {b}
+                    <span style={sh.check}>{CHECK_MARK}</span> {b}
                  </div>
               ))}
            </div>
@@ -203,35 +220,38 @@ export default function RegisterPage() {
           <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
               <div style={sh.section}>
                 <label style={sh.label}>CHOOSE DOMAIN</label>
                 <div className="sport-grid" style={sh.sportGrid}>
-                   {SPORT_OPTIONS.map(s => (
-                      <div 
-                         key={s.id} 
-                         onClick={() => setFormData({ ...formData, sport: s.id })}
-                         style={{ 
-                            ...sh.sportCard, 
-                            borderColor: formData.sport === s.id ? s.color : 'var(--border)',
-                            background: formData.sport === s.id ? `${s.color}08` : 'var(--bg-input)'
-                         }}
-                      >
-                         <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
-                         <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? s.color : 'var(--text-muted)' }}>{s.label.toUpperCase()}</div>
-                      </div>
-                   ))}
+                   {SPORT_OPTIONS.map(s => {
+                      const sMeta = getSportMeta(s.id, isDarkMode);
+                      return (
+                        <div 
+                           key={s.id} 
+                           onClick={() => setFormData({ ...formData, sport: s.id })}
+                           style={{ 
+                              ...sh.sportCard, 
+                              borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
+                              background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)'
+                           }}
+                        >
+                           <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
+                           <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text-muted)' }}>{sMeta.label.toUpperCase()}</div>
+                        </div>
+                      );
+                   })}
                 </div>
               </div>
 
               <div className="field-group" style={sh.fieldGroup}>
                 <div style={sh.field}>
                    <label style={sh.label}>MANAGER NAME</label>
-                   <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" style={sh.input} required />
+                   <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" style={sh.input} autoComplete="name" required />
                 </div>
                 <div style={sh.field}>
                    <label style={sh.label}>USERNAME</label>
-                   <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} required />
+                   <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} autoComplete="off" required />
                 </div>
               </div>
 
@@ -239,34 +259,34 @@ export default function RegisterPage() {
                 <div style={sh.field}>
                    <label style={sh.label}>PASSWORD</label>
                    <div style={sh.passwordInputWrapper}>
-                     <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} onFocus={handlePasswordFocus} onBlur={handlePasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 72 }} required />
+                     <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} onFocus={handlePasswordFocus} onBlur={handlePasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 72 }} autoComplete="new-password" required />
                      <button type="button" title="Generate strong password" onClick={generateStrongPassword} style={sh.suggestPasswordBtn} aria-label="Generate strong password">
                        <SparklesIcon style={sh.suggestPasswordIcon} />
                      </button>
                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? '👁️' : '🔒'}
+                       {showPassword ? EYE : LOCK}
                      </button>
                    </div>
                    {showPasswordRequirements && (
                      <div style={sh.passwordReqBox} aria-live="polite">
                        <div style={{ ...sh.requirement, color: passwordChecks.length ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.length ? '✓' : '✗'}</span>
+                         <span style={sh.reqIcon}>{passwordChecks.length ? CHECK_MARK : CROSS}</span>
                          <span>At least 8 characters ({formData.password.length}/8)</span>
                        </div>
                        <div style={{ ...sh.requirement, color: passwordChecks.uppercase ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.uppercase ? '✓' : '✗'}</span>
+                         <span style={sh.reqIcon}>{passwordChecks.uppercase ? CHECK_MARK : CROSS}</span>
                          <span>One uppercase letter (A-Z)</span>
                        </div>
                        <div style={{ ...sh.requirement, color: passwordChecks.lowercase ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.lowercase ? '✓' : '✗'}</span>
+                         <span style={sh.reqIcon}>{passwordChecks.lowercase ? CHECK_MARK : CROSS}</span>
                          <span>One lowercase letter (a-z)</span>
                        </div>
                        <div style={{ ...sh.requirement, color: passwordChecks.number ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.number ? '✓' : '✗'}</span>
+                         <span style={sh.reqIcon}>{passwordChecks.number ? CHECK_MARK : CROSS}</span>
                          <span>One number (0-9)</span>
                        </div>
                        <div style={{ ...sh.requirement, color: passwordChecks.special ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.special ? '✓' : '✗'}</span>
+                         <span style={sh.reqIcon}>{passwordChecks.special ? CHECK_MARK : CROSS}</span>
                          <span>One special character (!@#$%^&*)</span>
                        </div>
                      </div>
@@ -275,9 +295,9 @@ export default function RegisterPage() {
                 <div style={sh.field}>
                    <label style={sh.label}>CONFIRM PASSWORD</label>
                    <div style={sh.passwordInputWrapper}>
-                     <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} required />
+                     <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} autoComplete="new-password" required />
                      <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? '👁️' : '🔒'}
+                       {showConfirmPassword ? EYE : LOCK}
                      </button>
                    </div>
                    {showPasswordMatchMessage && (
@@ -288,23 +308,90 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div style={sh.field}>
-                <label style={sh.label}>SECURITY QUESTION</label>
-                <input type="text" name="securityQuestion" value={formData.securityQuestion} onChange={handleChange} placeholder="e.g., What is your favorite sport?" style={sh.input} required />
-              </div>
+              <div style={sh.securitySection}>
+                <div style={sh.sectionTitleRow}>
+                  <span style={sh.securityIcon}>{SHIELD}</span>
+                  <span style={sh.securityTitle}>SECURITY ACCESS</span>
+                </div>
 
-              <div style={sh.field}>
-                <label style={sh.label}>SECURITY ANSWER</label>
-                <input type="text" name="securityAnswer" value={formData.securityAnswer} onChange={handleChange} placeholder="Your answer" style={sh.input} required />
+                <div style={{ ...sh.securityAccessField, marginTop: 12 }}>
+                  <label style={{ ...sh.label, marginBottom: 10 }}>ACCESS CODE</label>
+                  <div style={sh.accessCodeWrap}>
+                    <span aria-hidden="true" style={sh.accessCodeIcon}>{KEY}</span>
+                    <input
+                      type={showAccessCode ? 'text' : 'password'}
+                      name="accessCode"
+                      value={formData.accessCode}
+                      onChange={handleChange}
+                      placeholder="XXXX-XXXX-XXXX"
+                      autoComplete="off"
+                      spellCheck="false"
+                      inputMode="text"
+                      style={{ ...sh.accessCodeInput, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
+                      required
+                    />
+                    {showAccessCode ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowAccessCode(false);
+                        }}
+                        style={sh.accessCodeToggleBtn}
+                        aria-label="Hide access code"
+                        aria-pressed={true}
+                      >
+                        {EYE}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowAccessCode(true);
+                        }}
+                        style={sh.accessCodeToggleBtn}
+                        aria-label="Show access code"
+                        aria-pressed={false}
+                      >
+                        {LOCK}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ ...sh.accessCodeHelp, marginTop: 10 }}>Given to you by the platform owner or the manager handing over this facility</div>
+                  {accessCodeStatus !== 'idle' && (
+                    <div style={{ ...sh.validationRow, ...(accessCodeStatus === 'verified' ? sh.validationRowConfirmed : accessCodeStatus === 'invalid' ? sh.validationRowInvalid : sh.validationRowNeutral) }} aria-live="polite">
+                      <span style={sh.validationIcon}>{accessCodeStatus === 'verified' ? CHECK_MARK : accessCodeStatus === 'invalid' ? CROSS : '•'}</span>
+                      <span>
+                        {accessCodeStatus === 'verified' && 'Code confirmed'}
+                        {accessCodeStatus === 'invalid' && 'Code not recognized'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={sh.securityDivider} />
+
+                <div style={{ ...sh.securityQuestionField, marginTop: 24 }}>
+                  <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY QUESTION</label>
+                  <input type="text" name="securityQuestion" value={formData.securityQuestion} onChange={handleChange} placeholder="e.g., What is your favorite sport?" style={sh.input} required />
+                </div>
+
+                <div style={{ ...sh.securityAnswerField, marginTop: 24 }}>
+                  <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY ANSWER</label>
+                  <input type="text" name="securityAnswer" value={formData.securityAnswer} onChange={handleChange} placeholder="Your answer" style={sh.input} required />
+                </div>
               </div>
 
               <button type="submit" style={sh.submitBtn} disabled={loading}>
-                {loading ? 'INITIALIZING ARENA...' : 'CREATE DASHBOARD ACCESS'}
+                {loading ? 'INITIALIZING ARENA...' : 'CREATE ACCOUNT'}
               </button>
             </form>
 
             <p style={sh.footerLinkWrap}>
-              Existing Manager? <Link to="/" style={sh.footerLink}>Login here</Link>
+              Existing Manager? <Link to="/admin/login" style={sh.footerLink}>Login here</Link>
             </p>
           </div>
         </div>
@@ -338,6 +425,24 @@ const sh = {
   fieldGroup: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
   field: { display: 'flex', flexDirection: 'column', gap: 8 },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 18px', borderRadius: '14px', fontSize: '15px', outline: 'none', transition: 'border 0.2s', width: '100%', boxSizing: 'border-box' },
+  securitySection: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '20px', padding: '20px 20px 8px', marginTop: '2px', opacity: 1, filter: 'none' },
+  sectionTitleRow: { display: 'flex', alignItems: 'center', gap: '10px' },
+  securityIcon: { color: 'var(--text)', fontSize: '15px' },
+  securityTitle: { color: 'var(--text)', fontSize: '10px', fontWeight: 900, letterSpacing: '1.6px' },
+  securityAccessField: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24, opacity: 1 },
+  securityQuestionField: { display: 'flex', flexDirection: 'column', gap: 10 },
+  securityAnswerField: { display: 'flex', flexDirection: 'column', gap: 10 },
+  securityDivider: { height: '1px', width: '100%', background: 'var(--border)', margin: '0 0 10px' },
+  accessCodeWrap: { display: 'flex', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden', minHeight: '48px', position: 'relative' },
+  accessCodeIcon: { paddingLeft: '14px', color: 'var(--text)', fontSize: '16px', display: 'inline-flex', alignItems: 'center', opacity: 1 },
+  accessCodeInput: { background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', fontWeight: 800, outline: 'none', width: '100%', padding: '14px 44px 14px 10px', letterSpacing: '0.12em', boxSizing: 'border-box', opacity: 1, filter: 'none' },
+  accessCodeToggleBtn: { position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text)', opacity: 1, filter: 'none' },
+  accessCodeHelp: { fontSize: '11px', lineHeight: 1.5, color: 'var(--text)' },
+  validationRow: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', marginTop: '10px', fontWeight: 700 },
+  validationIcon: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '16px' },
+  validationRowNeutral: { color: 'var(--text-muted)' },
+  validationRowConfirmed: { color: '#10B981' },
+  validationRowInvalid: { color: '#EF4444' },
   submitBtn: { background: 'var(--primary)', border: 'none', color: '#FFF', padding: '20px', borderRadius: '16px', fontWeight: 900, fontSize: '14px', letterSpacing: '1px', cursor: 'pointer', marginTop: '10px', boxShadow: '0 12px 25px -5px rgba(59, 130, 246, 0.4)' },
   errorBox: { background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '16px', borderRadius: '16px', fontSize: 13, marginBottom: 32, textAlign: 'center' },
   footerLinkWrap: { textAlign: 'center', marginTop: 32, fontSize: 14, color: 'var(--text-muted)' },
