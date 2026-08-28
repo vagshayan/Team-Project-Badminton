@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { SUN, MOON, TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE } from '../components/Icons';
+import { SUN, MOON, TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE, STADIUM} from '../components/Icons';
 import RegisterModal from './RegisterModal';
 import { SPORT_META, getSportMeta } from '../constants/sports';
 
@@ -10,6 +10,8 @@ const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
   'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
 };
+
+const SINGLES = ['singles-men', 'singles-women'];
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtDeadline = (d, fallback) => {
@@ -22,6 +24,7 @@ const CARD_HEIGHT = 96;
 const GAP = 28;
 const COLUMN_WIDTH = 260;
 const COLUMN_GAP = 70;
+const NAME_CELL_WIDTH = 180;
 
 function isHiddenByeMatch(m) {
   return m.isCompleted === true && (!m.player1 || !m.player2);
@@ -29,6 +32,120 @@ function isHiddenByeMatch(m) {
 
 function isMatchWinner(match, player) {
   return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
+}
+
+// ── Length-based font ladder + horizontal compression for very long names ──
+// Geometry (CARD_HEIGHT/COLUMN_WIDTH/etc) is untouched — this only affects
+// how the name text itself is sized/rendered inside the existing box.
+function getNameStyle(name) {
+  const len = name ? name.length : 0;
+  let fontSize = 14;
+  if (len > 34) fontSize = 11;
+  else if (len > 26) fontSize = 12;
+  else if (len > 20) fontSize = 13;
+
+  const base = {
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    fontSize,
+  };
+
+  if (len > 34) {
+    // Widen only this absolutely-positioned inner span (see renderPlayerName)
+    // so ellipsis calculates against more characters, then compress it back
+    // visually with scaleX. Because the outer wrapper is a fixed-width,
+    // overflow:hidden box, this 118% never reserves extra flex layout space
+    // or pushes the W/L badge next to it.
+    return {
+      ...base,
+      width: '118%',
+      transform: 'scaleX(0.85)',
+      transformOrigin: 'left',
+    };
+  }
+  return base;
+}
+
+// ── Renders a player's name cell: truncated + shrunk to fit, with
+// hover title, aria-label, and tap/click/keyboard-to-reveal — but only
+// for names long enough to actually risk truncation.
+function renderPlayerName(m, player, slot, getDisplayName, expandedName, setExpandedName) {
+  if (!player) return <i style={{ color: '#555' }}>TBD</i>;
+
+  const displayName = getDisplayName(player);
+  const key = `${m._id}-${slot}`;
+  const isExpanded = expandedName === key;
+  const isWinnerPlayer = isMatchWinner(m, player);
+  const dimmed = m.isCompleted && m.winner?._id !== player._id;
+  const needsInteraction = displayName.length > 20;
+
+  const toggle = () => setExpandedName(isExpanded ? null : key);
+
+  const interactiveProps = needsInteraction ? {
+    onClick: toggle,
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    },
+    onFocus: () => setExpandedName(key),
+    onBlur: () => setExpandedName(null),
+    tabIndex: 0,
+    role: 'button',
+    'aria-label': displayName,
+  } : {};
+
+  return (
+    <span
+      title={displayName}
+      {...interactiveProps}
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        width: NAME_CELL_WIDTH,
+        flexShrink: 0,
+        verticalAlign: 'middle',
+        cursor: needsInteraction ? 'pointer' : 'default',
+      }}
+    >
+      <span style={{ display: 'block', width: '100%', overflow: 'hidden' }}>
+        <span style={{
+          display: 'block',
+          width: '100%',
+          fontWeight: isWinnerPlayer ? 900 : 400,
+          color: dimmed ? 'var(--text-muted)' : 'var(--text)',
+          ...getNameStyle(displayName),
+        }}>
+          {displayName}
+        </span>
+      </span>
+
+      {isExpanded && needsInteraction && (
+        <span style={{
+          position: 'absolute',
+          left: 0,
+          top: '100%',
+          marginTop: 4,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px 8px',
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--text)',
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          maxWidth: 220,
+          zIndex: 10,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {displayName}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function StudentTournamentPage({ sport }) {
@@ -42,6 +159,7 @@ export default function StudentTournamentPage({ sport }) {
   const [lines, setLines] = useState([]);
   const [containerHeight, setContainerHeight] = useState(400);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [expandedName, setExpandedName] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [teamSearchQuery, setTeamSearchQuery] = useState('');
@@ -250,6 +368,15 @@ export default function StudentTournamentPage({ sport }) {
 
     setLines(newLines);
   }, [positions]);
+
+  const getDisplayName = (player) => {
+    if (!player) return '';
+    const isDoubles = viewBracketsFor && !SINGLES.includes(viewBracketsFor.category);
+    if (isDoubles && player.partnerName) {
+      return `${player.playerName} & ${player.partnerName}`;
+    }
+    return player.playerName;
+  };
 
   const getRoundLabel = (roundIdx, totalRounds) => {
     const remaining = totalRounds - roundIdx;
@@ -523,26 +650,14 @@ export default function StudentTournamentPage({ sport }) {
                           }}
                         >
                           <div style={bh.pRow}>
-                            <span style={{
-                              fontWeight: isMatchWinner(m, m.player1) ? 900 : 400,
-                              color: m.isCompleted && m.winner?._id !== m.player1?._id ? 'var(--text-muted)' : 'var(--text)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player1?.playerName || 'TBD'}
-                            </span>
+                            {renderPlayerName(m, m.player1, 'p1', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
                             </span>
                           </div>
                           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                           <div style={bh.pRow}>
-                            <span style={{
-                              fontWeight: isMatchWinner(m, m.player2) ? 900 : 400,
-                              color: m.isCompleted && m.winner?._id !== m.player2?._id ? 'var(--text-muted)' : 'var(--text)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {m.player2?.playerName || 'TBD'}
-                            </span>
+                            {renderPlayerName(m, m.player2, 'p2', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
                               {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
                             </span>
