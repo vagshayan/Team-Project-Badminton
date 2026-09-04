@@ -15,7 +15,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const getRequiredEnv = (name) => {
-  const value = process.env[name];
+  const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
@@ -25,6 +25,7 @@ const getRequiredEnv = (name) => {
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = getRequiredEnv('MONGODB_URI');
 const JWT_SECRET = getRequiredEnv('JWT_SECRET');
+getRequiredEnv('ADMIN_ACCESS_CODE');
 
 const app = express();
 
