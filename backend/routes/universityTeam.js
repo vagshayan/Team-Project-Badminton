@@ -7,26 +7,20 @@ const UniversityTeamMember = require('../models/UniversityTeamMember');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const { validateUploadFile } = require('../utils/fileValidator');
 
 // Multer storage configuration for team photos
 const uploadDir = path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 
-const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `team-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  },
-});
-
+// Use memory storage for validation before saving
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (allowedMimeTypes.includes(file.mimetype)) return cb(null, true);
-    cb(new Error('Only JPEG, PNG, and WEBP images are allowed'));
+    // Validation will happen after multer processes the file in the route handler
+    cb(null, true);
   },
 });
 
@@ -164,8 +158,18 @@ router.post('/', protect, upload.single('photoFile'), async (req, res) => {
     }
 
     let photoPath = photoUrl || '';
-    if (req.file) {
-      photoPath = `/uploads/${req.file.filename}`;
+    if (req.file && req.file.buffer) {
+      // Validate file using magic bytes instead of trusting browser-supplied MIME type
+      const validation = validateUploadFile(req.file, req.file.buffer);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      // Save file to disk with validated safe filename
+      const safeFilename = validation.filename;
+      const filePath = path.join(uploadDir, safeFilename);
+      fs.writeFileSync(filePath, req.file.buffer);
+      photoPath = `/uploads/${safeFilename}`;
     }
 
     const newMember = await UniversityTeamMember.create({
@@ -179,7 +183,6 @@ router.post('/', protect, upload.single('photoFile'), async (req, res) => {
     });
 
     await logAdminAction({
-      adminId: req.admin._id,
       action: 'ADD_TEAM_MEMBER',
       targetId: newMember._id,
       targetModel: 'UniversityTeamMember',
@@ -235,14 +238,26 @@ router.put('/:id', protect, upload.single('photoFile'), async (req, res) => {
     member.sport = targetSport;
     member.teamGender = targetGender;
 
-    if (req.file) {
+    if (req.file && req.file.buffer) {
+      // Validate file using magic bytes instead of trusting browser-supplied MIME type
+      const validation = validateUploadFile(req.file, req.file.buffer);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      // Delete old photo if exists
       if (member.photo && member.photo.startsWith('/uploads/')) {
         const oldPath = path.join(__dirname, '..', member.photo);
         if (fs.existsSync(oldPath)) {
           try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
         }
       }
-      member.photo = `/uploads/${req.file.filename}`;
+
+      // Save new file to disk with validated safe filename
+      const safeFilename = validation.filename;
+      const filePath = path.join(uploadDir, safeFilename);
+      fs.writeFileSync(filePath, req.file.buffer);
+      member.photo = `/uploads/${safeFilename}`;
     } else if (removePhoto === 'true') {
       if (member.photo && member.photo.startsWith('/uploads/')) {
         const oldPath = path.join(__dirname, '..', member.photo);
@@ -258,7 +273,6 @@ router.put('/:id', protect, upload.single('photoFile'), async (req, res) => {
     await member.save();
 
     await logAdminAction({
-      adminId: req.admin._id,
       action: 'UPDATE_TEAM_MEMBER',
       targetId: member._id,
       targetModel: 'UniversityTeamMember',

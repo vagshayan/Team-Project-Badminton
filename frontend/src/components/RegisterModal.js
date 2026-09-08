@@ -324,7 +324,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   };
 
   if (success) return (
-    <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" style={{ ...sh.overlay, background: isDarkMode ? 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)' : 'rgba(15, 23, 42, 0.45)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 450, padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>{SUCCESS}</div>
           <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>{initialData ? 'UPDATED!' : 'VERIFIED!'}</h2>
@@ -367,7 +367,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   );
 
   return (
-    <div style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div style={{ ...sh.overlay, background: isDarkMode ? 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)' : 'rgba(15, 23, 42, 0.45)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 650 }}>
         <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16, position: 'relative' }}>
           <div style={{ position: 'absolute', right: 0, top: 0, width: 120, height: 120, opacity: 0.08, pointerEvents: 'none', transform: 'translate(18px, -18px)' }}>
@@ -383,19 +383,31 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                 {sport.icon}
               </span>
               <div>
-                <div className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: '#0F172A', letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</div>
-                <div style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>{sport.label} Registration — {tournament.year}</div>
+                <div className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: 'var(--text)', letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{sport.label} Registration — {tournament.year}</div>
               </div>
             </div>
           </div>
           <button className="modal-close-btn" onClick={onClose} style={sh.closeBtn}>{CLOSE}</button>
         </div>
-
-        <div className="modal-info-bar" style={sh.infoBar}>
-          <div className="info-bar-content" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{CAT_LABELS[tournament.category]} — {tournament.year}</span>
-            <span className="info-bar-divider" style={{ fontSize: 13, color: 'var(--border)' }}>|</span>
-            <span className="info-bar-details" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{LOCATION} {tournament.venue} · {CLOCK} {tournament.time}</span>
+        <div className="modal-info-bar" style={{ ...sh.infoBar, position: 'relative' }}>
+          <div className="info-bar-content" style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
+            <span className="info-bar-category" style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+              {CAT_LABELS[tournament.category]} — {tournament.year}
+            </span>
+            <span className="info-bar-divider" style={{ flex: '0 0 auto', marginLeft: 16, marginRight: 16, fontSize: 13, color: 'var(--border)' }}>|</span>
+            <div className="info-bar-venue" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <span>{LOCATION}</span>
+              <strong>Venue:</strong>
+              <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {tournament.venue || tournament.location || 'Not specified'}
+              </span>
+            </div>
+            <div className="info-bar-time" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto', fontSize: 12, color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <span>{CLOCK}</span>
+              <strong>Time:</strong>
+              <span>{tournament.time || tournament.startTime || 'Not specified'}</span>
+            </div>
           </div>
         </div>
 
@@ -619,16 +631,58 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
               margin-right: -6px !important;
             }
             .modal-info-bar {
-              padding: 10px 12px !important;
+              position: relative !important;
+              width: 100% !important;
+              padding: 14px 16px !important;
+              min-height: 86px !important;
               margin-bottom: 16px !important;
             }
             .info-bar-content {
-              flex-direction: column !important;
-              align-items: flex-start !important;
-              gap: 4px !important;
+              display: flex !important;
+              flex-wrap: wrap !important;
+              align-items: center !important;
+              width: 100% !important;
+              gap: 0 !important;
+            }
+            .info-bar-category {
+              width: 100% !important;
+              flex: 0 0 100% !important;
+              font-size: 12px !important;
+              line-height: 20px !important;
+              margin-bottom: 12px !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
             }
             .info-bar-divider {
               display: none !important;
+            }
+            .info-bar-venue {
+              position: static !important;
+              left: auto !important;
+              transform: none !important;
+              display: flex !important;
+              align-items: center !important;
+              flex: 1 1 auto !important;
+              min-width: 0 !important;
+              gap: 5px !important;
+              font-size: 11px !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+            }
+            .info-bar-venue > span:last-child {
+              max-width: 90px !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
+            }
+            .info-bar-time {
+              margin-left: auto !important;
+              display: flex !important;
+              align-items: center !important;
+              flex: 0 0 auto !important;
+              gap: 5px !important;
+              font-size: 11px !important;
+              white-space: nowrap !important;
             }
             .modal-form-content {
               gap: 16px !important;
@@ -663,6 +717,24 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
               margin: 0 !important;
             }
           }
+          @media (max-width: 400px) {
+            .modal-info-bar {
+              padding: 12px 14px !important;
+              min-height: 82px !important;
+            }
+            .info-bar-category {
+              font-size: 11px !important;
+              margin-bottom: 10px !important;
+            }
+            .info-bar-venue,
+            .info-bar-time {
+              font-size: 10px !important;
+              gap: 4px !important;
+            }
+            .info-bar-venue > span:last-child {
+              max-width: 70px !important;
+            }
+          }
         `}</style>
       </div>
     </div>
@@ -672,35 +744,35 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
 const sh = {
   overlay: {
     position: 'fixed', inset: 0,
-    background: 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)',
+    background: 'var(--bg)',
     backdropFilter: 'blur(18px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 1000, padding: 20,
   },
   card: {
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 30,
     padding: '28px 30px 24px 30px',
     width: '100%',
     maxWidth: 700,
     position: 'relative',
-    boxShadow: '0 40px 110px rgba(15, 23, 42, 0.25)',
+    boxShadow: 'var(--shadow)',
     maxHeight: '90vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    border: '1px solid rgba(148, 163, 184, 0.18)',
+    border: '1px solid var(--border)',
   },
-  closeBtn: { background: 'none', border: 'none', color: '#475569', fontSize: 20, cursor: 'pointer' },
-  infoBar: { background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '16px 20px', borderRadius: 18, marginBottom: 20 },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer' },
+  infoBar: { background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '16px 20px', borderRadius: 18, marginBottom: 20 },
   errorBox: { background: 'rgba(254, 226, 226, 0.95)', border: '1px solid rgba(239, 68, 68, 0.16)', color: '#B91C1C', padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, textAlign: 'center' },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: '10px', fontWeight: 900, color: '#475569', letterSpacing: '1px', textTransform: 'uppercase' },
-  input: { background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.22)', color: '#0F172A', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
+  label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' },
+  input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontSize: '14px', outline: 'none' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
   doublesSection: { borderTop: '1px solid rgba(148, 163, 184, 0.18)', paddingTop: 24, marginTop: 24 },
-  partnerLookupCard: { marginTop: 16, padding: 18, borderRadius: 16, background: '#F8FAFC', border: '1px solid rgba(148, 163, 184, 0.18)' },
+  partnerLookupCard: { marginTop: 16, padding: 18, borderRadius: 16, background: 'var(--bg-input)', border: '1px solid var(--border)' },
   errMsg: { fontSize: 10, color: '#DC2626', fontWeight: 700, marginTop: 4 },
-  cancelBtn: { flex: 1, background: '#E2E8F0', border: '1px solid rgba(148, 163, 184, 0.3)', color: '#0F172A', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
-  submitBtn: { flex: 2, border: 'none', color: '#000', padding: '16px', borderRadius: 14, fontWeight: 950, fontSize: 14, cursor: 'pointer', letterSpacing: 0.5 }
+  cancelBtn: { flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontWeight: 900, cursor: 'pointer' },
+  submitBtn: { flex: 2, border: 'none', color: '#FFF', padding: '16px', borderRadius: 14, fontWeight: 950, fontSize: 14, cursor: 'pointer', letterSpacing: 0.5 }
 };

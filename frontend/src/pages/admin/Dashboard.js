@@ -42,6 +42,8 @@ const AUDIT_ACTION_LABELS = {
   GENERATE_DRAW: 'Generated Draw',
   PUBLISH_DRAW: 'Published Draw',
   UPDATE_MATCH_SCORE: 'Updated Match Result',
+  ADD_TEAM_MEMBER: 'Added Team Member',
+  UPDATE_TEAM_MEMBER: 'Updated Team Member',
   APPROVE_PAIR: 'Approved Pair',
   RESET_PAIR: 'Reset Pair',
   LINK_PARTNER: 'Linked Partner',
@@ -86,6 +88,32 @@ const getTabFromSearch = (search) => {
   }
 };
 
+const formatAuditValue = (value, fallback = '') => {
+  if (value === null || value === undefined || value === '') return fallback;
+  return String(value);
+};
+
+const formatAuditFieldName = (key) => key
+  .replace(/([A-Z])/g, ' $1')
+  .replace(/^./, (letter) => letter.toUpperCase());
+
+const formatTeamMemberDetails = (details, actionLabel) => {
+  const fields = [
+    formatAuditValue(details.fullName),
+    formatAuditValue(details.position),
+    formatAuditValue(details.sport).replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    formatAuditValue(details.teamGender),
+  ].filter(Boolean);
+  const registrationNumber = formatAuditValue(details.registrationNumber);
+  if (registrationNumber) fields.push(`Registration No: ${registrationNumber}`);
+  return `${actionLabel} team member${fields.length ? ` — ${fields.join(', ')}` : ''}`;
+};
+
+const formatGenericAuditDetails = (details) => Object.entries(details)
+  .filter(([, value]) => value !== null && value !== undefined && value !== '')
+  .map(([key, value]) => `${formatAuditFieldName(key)}: ${typeof value === 'object' ? formatGenericAuditDetails(value) : value}`)
+  .join(', ') || '—';
+
 const formatAuditDetails = (log) => {
   if (!log?.details) return '—';
   const details = log.details;
@@ -94,6 +122,10 @@ const formatAuditDetails = (log) => {
   const lbl = (category) => CAT_LABELS[category] || category;
 
   switch (log.action) {
+    case 'ADD_TEAM_MEMBER':
+      return formatTeamMemberDetails(details, 'Added');
+    case 'UPDATE_TEAM_MEMBER':
+      return formatTeamMemberDetails(details, 'Updated');
     case 'CREATE_TOURNAMENT':
       return `Created tournament ${lbl(details.category)} ${details.year}`;
     case 'UPDATE_TOURNAMENT': {
@@ -144,7 +176,7 @@ const formatAuditDetails = (log) => {
       }
       return `Updated player ${details.rollNumber}`;
     default:
-      return JSON.stringify(details, null, 0);
+      return formatGenericAuditDetails(details);
   }
 };
 
@@ -2064,7 +2096,7 @@ export default function Dashboard() {
                           <td style={ds.td}>{log.admin?.name || log.admin?.username || 'System'}</td>
                           <td style={ds.td}><strong>{formatAuditAction(log.action)}</strong></td>
                           <td style={ds.td}>{formatAuditModule(log)}</td>
-                          <td style={{ ...ds.td, maxWidth: 320, wordBreak: 'break-word', whiteSpace: 'normal' }}>{formatAuditDetails(log)}</td>
+                          <td style={{ ...ds.td, maxWidth: 320, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.5 }}>{formatAuditDetails(log)}</td>
                         </tr>
                       ))
                     )}
