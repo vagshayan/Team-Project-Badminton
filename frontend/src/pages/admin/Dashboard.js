@@ -536,15 +536,21 @@ export default function Dashboard() {
     return () => document.body.classList.remove('sidebar-open');
   }, [mobileSidebarOpen]);
 
-  const filteredRegistrations = registrations.filter(r => {
-    const matName = (r.playerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matReg = (r.rollNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-    if (statusFilter === 'all') return matName || matReg;
+  const matchesStatusFilter = (r) => {
     const [cat, stat] = statusFilter.includes(':') ? statusFilter.split(':') : ['all', statusFilter];
     const matCategory = cat === 'all' ? true : r.tournament?.category === cat;
     const matStatus = stat === 'all' ? true : r.status === stat;
-    return (matName || matReg) && matCategory && matStatus;
+    return matCategory && matStatus;
+  };
+
+  const filteredRegistrations = registrations.filter(r => {
+    const search = searchTerm.toLowerCase();
+    const matName = (r.playerName || '').toLowerCase().includes(search);
+    const matReg = (r.rollNumber || '').toLowerCase().includes(search);
+    return (matName || matReg) && matchesStatusFilter(r);
   });
+
+  const pairCandidates = registrations.filter(matchesStatusFilter);
 
   const activeCatId = statusFilter.includes(':') ? statusFilter.split(':')[0] : null;
   const loginEvents = Array.isArray(loginHistory) && loginHistory.length > 0 ? loginHistory : [];
@@ -714,7 +720,7 @@ export default function Dashboard() {
     const reverseRefs = {};
     const doublesCategories = new Set(['doubles-men', 'doubles-women', 'mixed-doubles']);
 
-    filteredRegistrations.forEach((r) => {
+    pairCandidates.forEach((r) => {
       const rollKey = r.rollNumber?.trim().toUpperCase();
       const tournamentId = r.tournament?._id?.toString() || r.tournament;
       if (!rollKey || !tournamentId) return;
@@ -778,7 +784,7 @@ export default function Dashboard() {
     });
 
     return groups;
-  }, [filteredRegistrations]);
+  }, [filteredRegistrations, pairCandidates]);
 
   const handleCreate = async (data) => {
     try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast(`${SUCCESS} Tournament created!`); }
