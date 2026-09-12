@@ -411,7 +411,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
           </div>
         </div>
 
-        {submitError && <div style={sh.errorBox}>{WARNING_ROUND} {submitError}</div>}
+        {submitError && <div style={sh.errorBox}>{WARNING} {submitError}</div>}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div className="modal-form-content" style={{ flex: 1, overflowY: 'auto', paddingRight: 8, paddingLeft: 2, paddingTop: 16, paddingBottom: 16, display: 'flex', flexDirection: 'column', gap: 20, borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>

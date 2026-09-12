@@ -77,8 +77,36 @@ const resetPasswordLimiter = rateLimit({
   },
 });
 
+const publicRegistrationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: 'Too many registration attempts. Please try again after 1 minute.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many registration attempts. Please try again after 1 minute.',
+    });
+  },
+});
+
+const publicPartnerLookupLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: 'Too many partner lookup attempts. Please try again after 1 minute.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many partner lookup attempts. Please try again after 1 minute.',
+    });
+  },
+});
+
 module.exports = {
   loginLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  publicRegistrationLimiter,
+  publicPartnerLookupLimiter,
 };
