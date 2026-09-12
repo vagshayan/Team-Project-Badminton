@@ -574,7 +574,8 @@ router.get('/lookup/:regNo?', async (req, res) => {
 
     for (const s of sports) {
       const { Registration } = getModelsForSport(s);
-      const reg = await Registration.findOne({ tournament, rollNumber: regNo.trim().toUpperCase() });
+      const reg = await Registration.findOne({ tournament, rollNumber: regNo.trim().toUpperCase() })
+        .select('-_id playerName rollNumber department status');
       if (reg) {
         foundReg = reg;
         break;
@@ -793,7 +794,8 @@ router.get('/partner-lookup', async (req, res) => {
 
     const { Registration } = getModelsForSport(targetSport);
     const normalizedRoll = String(rollNumber).trim().toUpperCase();
-    const partnerReg = await Registration.findOne({ tournament, rollNumber: normalizedRoll });
+    const partnerReg = await Registration.findOne({ tournament, rollNumber: normalizedRoll })
+      .select('-_id playerName rollNumber department status partnerStatus pairStatus');
     if (!partnerReg) return res.status(404).json({ message: 'Partner not found.' });
 
     if (!(partnerReg.partnerStatus === 'looking' && partnerReg.pairStatus === 'incomplete')) {
@@ -804,12 +806,7 @@ router.get('/partner-lookup', async (req, res) => {
       playerName: partnerReg.playerName,
       rollNumber: partnerReg.rollNumber,
       department: partnerReg.department,
-      phone: partnerReg.phone,
-      email: partnerReg.email,
-      nicNo: partnerReg.nicNo,
-      gender: partnerReg.gender,
-      partnerStatus: partnerReg.partnerStatus,
-      pairStatus: partnerReg.pairStatus,
+      status: partnerReg.status,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

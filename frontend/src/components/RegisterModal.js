@@ -579,11 +579,6 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                       <div style={{ wordBreak: 'break-word' }}><strong>Name:</strong> {partnerLookup.playerName}</div>
                       <div style={{ wordBreak: 'break-word' }}><strong>Reg No:</strong> {partnerLookup.rollNumber}</div>
                       <div style={{ wordBreak: 'break-word' }}><strong>Faculty:</strong> {partnerLookup.department || 'N/A'}</div>
-                      <div style={{ wordBreak: 'break-word' }}><strong>Phone:</strong> {partnerLookup.phone || 'N/A'}</div>
-                      <div style={{ wordBreak: 'break-word' }}><strong>Email:</strong> {partnerLookup.email || 'N/A'}</div>
-                      {isMixedDoubles && partnerLookup.gender ? (
-                        <div style={{ wordBreak: 'break-word' }}><strong>Gender:</strong> {partnerLookup.gender}</div>
-                      ) : null}
                       <div style={{ wordBreak: 'break-word' }}><strong>Status:</strong> {partnerLookup.status ? partnerLookup.status.toUpperCase() : 'N/A'}</div>
                     </div>
                   </div>
