@@ -3,6 +3,7 @@ const router = express.Router();
 const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
+const { publicRegistrationLimiter, publicPartnerLookupLimiter } = require('../middleware/rateLimiter');
 const { logAdminAction } = require('../utils/auditLogger');
 const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
 
@@ -293,6 +294,11 @@ try {
   if (cleanedGender) reg.gender = cleanedGender;
   reg.partnerName = cleanedPartnerName;
   reg.partnerRollNumber = cleanedPartnerRoll;
+  const pairInitiatedAt = nextPartner ? new Date() : null;
+  if (nextPartner) {
+    reg.pairInitiatedByRollNumber = reg.rollNumber;
+    reg.pairInitiatedAt = pairInitiatedAt;
+  }
 
   await reg.save();
 
@@ -311,6 +317,8 @@ try {
   if (nextPartner && nextPartner._id.toString() !== reg._id.toString()) {
     nextPartner.partnerRollNumber = reg.rollNumber;
     nextPartner.partnerName = reg.playerName;
+    nextPartner.pairInitiatedByRollNumber = reg.rollNumber;
+    nextPartner.pairInitiatedAt = pairInitiatedAt;
     nextPartner.partnerStatus = 'paired';
     nextPartner.pairStatus = reg.pairStatus || 'incomplete';
     nextPartner.pairId = reg.pairId || null;
@@ -524,12 +532,17 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
     }
 
     // Link bidirectionally
+    const pairInitiatedAt = new Date();
     reg.partnerRollNumber = partner.rollNumber;
     reg.partnerName = partner.playerName;
+    reg.pairInitiatedByRollNumber = reg.rollNumber;
+    reg.pairInitiatedAt = pairInitiatedAt;
     await reg.save();
 
     partner.partnerRollNumber = reg.rollNumber;
     partner.partnerName = reg.playerName;
+    partner.pairInitiatedByRollNumber = reg.rollNumber;
+    partner.pairInitiatedAt = pairInitiatedAt;
     await partner.save();
 
     await logAdminAction({
@@ -563,7 +576,7 @@ router.get('/tournament/:tournamentId', protect, async (req, res) => {
 });
 
 // Public — lookup registration by number within a tournament
-router.get('/lookup/:regNo?', async (req, res) => {
+router.get('/lookup/:regNo?', publicPartnerLookupLimiter, async (req, res) => {
   const tournament = req.query.tournament;
   const regNo = req.params.regNo || req.query.regNo;
   if (!tournament || !regNo) return res.status(400).json({ message: 'Tournament and registration number are required' });
@@ -574,7 +587,8 @@ router.get('/lookup/:regNo?', async (req, res) => {
 
     for (const s of sports) {
       const { Registration } = getModelsForSport(s);
-      const reg = await Registration.findOne({ tournament, rollNumber: regNo.trim().toUpperCase() });
+      const reg = await Registration.findOne({ tournament, rollNumber: regNo.trim().toUpperCase() })
+        .select('-_id playerName rollNumber department status');
       if (reg) {
         foundReg = reg;
         break;
@@ -589,7 +603,7 @@ router.get('/lookup/:regNo?', async (req, res) => {
 });
 
 // Public — student registers
-router.post('/', async (req, res) => {
+router.post('/', publicRegistrationLimiter, async (req, res) => {
   const {
     tournament, playerName, nicNo, address, email, phone,
     rollNumber, department, year, gender, partnerName, partnerRollNumber,
@@ -693,6 +707,7 @@ router.post('/', async (req, res) => {
       }
     }
 
+    const pairInitiatedAt = cleanedPartnerRoll ? new Date() : null;
     let reg = await Registration.create({
       tournament,
       playerName: cleanedName,
@@ -705,6 +720,10 @@ router.post('/', async (req, res) => {
       year: year || 'N/A',
       partnerName: cleanedPartnerName,
       partnerRollNumber: cleanedPartnerRoll,
+      ...(cleanedPartnerRoll ? {
+        pairInitiatedByRollNumber: cleanedRoll,
+        pairInitiatedAt,
+      } : {}),
       ...(cleanedGender ? { gender: cleanedGender } : {}),
     });
 
@@ -712,7 +731,12 @@ router.post('/', async (req, res) => {
       try {
         const updated = await Registration.findOneAndUpdate(
           { tournament, rollNumber: cleanedPartnerRoll },
-          { partnerRollNumber: cleanedRoll, partnerName: cleanedName },
+          {
+            partnerRollNumber: cleanedRoll,
+            partnerName: cleanedName,
+            pairInitiatedByRollNumber: cleanedRoll,
+            pairInitiatedAt,
+          },
           { new: true }
         );
 
@@ -742,7 +766,7 @@ router.post('/', async (req, res) => {
 });
 
 // Find partner for already-registered players: create a partner request between two existing waiting players
-router.post('/find-partner', async (req, res) => {
+router.post('/find-partner', publicRegistrationLimiter, async (req, res) => {
   const { tournament, yourRollNumber, partnerRollNumber } = req.body;
   if (!tournament || !yourRollNumber || !partnerRollNumber) return res.status(400).json({ message: 'Required fields missing.' });
   if (yourRollNumber === partnerRollNumber) return res.status(400).json({ message: 'Cannot request yourself.' });
@@ -777,7 +801,7 @@ router.post('/find-partner', async (req, res) => {
 });
 
 // Lookup a partner by registration number in a tournament
-router.get('/partner-lookup', async (req, res) => {
+router.get('/partner-lookup', publicPartnerLookupLimiter, async (req, res) => {
   const { tournament, rollNumber } = req.query;
   if (!tournament || !rollNumber) return res.status(400).json({ message: 'Tournament and registration number are required.' });
 
@@ -793,7 +817,8 @@ router.get('/partner-lookup', async (req, res) => {
 
     const { Registration } = getModelsForSport(targetSport);
     const normalizedRoll = String(rollNumber).trim().toUpperCase();
-    const partnerReg = await Registration.findOne({ tournament, rollNumber: normalizedRoll });
+    const partnerReg = await Registration.findOne({ tournament, rollNumber: normalizedRoll })
+      .select('-_id playerName rollNumber department status partnerStatus pairStatus');
     if (!partnerReg) return res.status(404).json({ message: 'Partner not found.' });
 
     if (!(partnerReg.partnerStatus === 'looking' && partnerReg.pairStatus === 'incomplete')) {
@@ -804,12 +829,7 @@ router.get('/partner-lookup', async (req, res) => {
       playerName: partnerReg.playerName,
       rollNumber: partnerReg.rollNumber,
       department: partnerReg.department,
-      phone: partnerReg.phone,
-      email: partnerReg.email,
-      nicNo: partnerReg.nicNo,
-      gender: partnerReg.gender,
-      partnerStatus: partnerReg.partnerStatus,
-      pairStatus: partnerReg.pairStatus,
+      status: partnerReg.status,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -898,8 +918,11 @@ router.post('/partner-requests/:id/accept', async (req, res) => {
 
     // Create pair
     const pair = await Pair.create({ tournament: found.tournament, players: [requester._id, target._id] });
+    const pairInitiatedAt = found.createdAt || new Date();
     requester.partnerName = target.playerName; requester.partnerRollNumber = target.rollNumber;
+    requester.pairInitiatedByRollNumber = requester.rollNumber; requester.pairInitiatedAt = pairInitiatedAt;
     target.partnerName = requester.playerName; target.partnerRollNumber = requester.rollNumber;
+    target.pairInitiatedByRollNumber = requester.rollNumber; target.pairInitiatedAt = pairInitiatedAt;
     requester.partnerStatus = 'paired'; requester.pairStatus = 'complete'; requester.pairId = pair._id;
     target.partnerStatus = 'paired'; target.pairStatus = 'complete'; target.pairId = pair._id;
     await requester.save(); await target.save();

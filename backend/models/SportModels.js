@@ -32,6 +32,8 @@ const registrationSchema = new mongoose.Schema({
   partnerStatus: { type: String, enum: ['none', 'looking', 'requested', 'paired'], default: 'none' },
   pairStatus: { type: String, enum: ['none', 'incomplete', 'complete', 'approved'], default: 'none' },
   pairId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  pairInitiatedByRollNumber: { type: String, default: '' },
+  pairInitiatedAt: { type: Date, default: null },
   status: { type: String, default: 'pending' },
 }, { timestamps: true });
 // Unique constraints per tournament

@@ -227,7 +227,6 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
 
       const token = localStorage.getItem('token');
       const headers = {
-        'Content-Type': 'multipart/form-data',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
 

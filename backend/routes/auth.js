@@ -7,28 +7,25 @@ const multer = require('multer');
 const { Admin, validatePasswordRequirements } = require('../models/Admin');
 const { protect, requireSuperAdmin } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const { validateUploadFile } = require('../utils/fileValidator');
+const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimiter');
 
 const uploadDir = path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
-const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  },
-});
+
+// Use memory storage for validation before saving
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (allowedMimeTypes.includes(file.mimetype)) return cb(null, true);
-    cb(new Error('Only JPEG, PNG, and WEBP images are allowed'));
+    // Validation will happen after multer processes the file in the route handler
+    cb(null, true);
   },
 });
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const ADMIN_ACCESS_CODE = String(process.env.ADMIN_ACCESS_CODE || 'UOJ-ADMIN-ACCESS-2026').trim();
+const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE.trim();
 
 const generateToken = (id) =>
   jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
@@ -58,8 +55,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
-router.post('/login', async (req, res) => {
+// Login (with rate limiting: 5 attempts per 15 minutes)
+router.post('/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
     return res.status(400).json({ message: 'Username and password required' });
@@ -78,7 +75,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current admin
+// Get current admin - return only essential fields (PII minimization)
 router.get('/me', async (req, res) => {
   let token;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -87,8 +84,17 @@ router.get('/me', async (req, res) => {
   if (!token) return res.json(null);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const admin = await Admin.findById(decoded.id).select('-password');
-    return res.json(admin || null);
+    const admin = await Admin.findById(decoded.id).select('id username name sport avatarUrl role');
+    if (!admin) return res.json(null);
+    // Return minimal fields only (no password, no internal details)
+    return res.json({
+      id: admin._id,
+      username: admin.username,
+      name: admin.name,
+      sport: admin.sport,
+      avatarUrl: admin.avatarUrl,
+      role: admin.role || 'admin',
+    });
   } catch (err) {
     console.error('Auth /me lookup failed:', err && err.message ? err.message : err);
     return res.json(null);
@@ -97,15 +103,38 @@ router.get('/me', async (req, res) => {
 
 // Upload current admin avatar
 router.post('/me/avatar', protect, upload.single('avatar'), async (req, res) => {
-  if (!req.file) {
+  if (!req.file || !req.file.buffer) {
     return res.status(400).json({ message: 'No avatar file uploaded' });
   }
 
   try {
-    const admin = await Admin.findById(req.admin._id);
-    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+    // Validate file using magic bytes instead of trusting browser-supplied MIME type
+    const validation = validateUploadFile(req.file, req.file.buffer);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.error });
+    }
 
-    admin.avatarUrl = `/uploads/${req.file.filename}`;
+    // Save file to disk with validated safe filename
+    const safeFilename = validation.filename;
+    const filePath = path.join(uploadDir, safeFilename);
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) {
+      // Clean up uploaded file if admin not found
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    // Delete old avatar if exists
+    if (admin.avatarUrl && admin.avatarUrl.startsWith('/uploads/')) {
+      const oldFilePath = path.join(__dirname, '..', admin.avatarUrl.replace(/^\//, ''));
+      if (fs.existsSync(oldFilePath)) {
+        try { fs.unlinkSync(oldFilePath); } catch (e) { /* ignore */ }
+      }
+    }
+
+    admin.avatarUrl = `/uploads/${safeFilename}`;
     await admin.save();
 
     res.json({ avatarUrl: admin.avatarUrl });
@@ -157,7 +186,15 @@ router.put('/me', protect, async (req, res) => {
     admin.avatarUrl = avatarUrl ? avatarUrl.trim() : admin.avatarUrl;
     await admin.save();
 
-    res.json({ id: admin._id, username: admin.username, name: admin.name, sport: admin.sport, avatarUrl: admin.avatarUrl });
+    // Return minimal fields (PII minimization)
+    res.json({
+      id: admin._id,
+      username: admin.username,
+      name: admin.name,
+      sport: admin.sport,
+      avatarUrl: admin.avatarUrl,
+      role: admin.role || 'admin',
+    });
   } catch (err) {
     console.error('Update admin profile error:', err);
     res.status(500).json({ message: 'Unable to update profile' });
@@ -261,7 +298,8 @@ router.post('/reset-password', protect, async (req, res) => {
 });
 
 // Forgot password - get security question
-router.post('/forgot-password', async (req, res) => {
+// Forgot-password (with rate limiting: 5 attempts per 30 minutes)
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   const { username } = req.body;
   if (!username) return res.status(400).json({ message: 'Username is required' });
   try {
@@ -273,8 +311,8 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Reset password via security question (no token required — public endpoint)
-router.post('/reset-forgot-password', async (req, res) => {
+// Reset password via security question (with rate limiting: 3 attempts per 30 minutes)
+router.post('/reset-forgot-password', resetPasswordLimiter, async (req, res) => {
   const { username, securityAnswer, newPassword } = req.body;
   if (!username || !securityAnswer || !newPassword)
     return res.status(400).json({ message: 'All fields are required' });

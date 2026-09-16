@@ -307,7 +307,7 @@ router.get('/admin', protect, async (req, res) => {
 router.get('/audit-logs', protect, async (req, res) => {
   try {
     const { search, from, to, action } = req.query;
-    const query = {};
+    const query = { admin: req.admin._id, sport: req.admin.sport };
 
     if (action && action !== 'all') query.action = action;
 
@@ -338,8 +338,6 @@ router.get('/audit-logs', protect, async (req, res) => {
     if (Object.keys(createdAtQuery).length > 0) {
       query.createdAt = createdAtQuery;
     }
-
-    query.sport = req.admin.sport;
 
     const logs = await AuditLog.find(query)
       .populate('admin', 'name username sport')
@@ -926,7 +924,7 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
 // ─── CLEAR ALL AUDIT LOGS ────────────────────────────────
 router.delete('/audit-logs/clear-all', protect, async (req, res) => {
   try {
-    const result = await AuditLog.deleteMany({ sport: req.admin.sport });
+    const result = await AuditLog.deleteMany({ admin: req.admin._id, sport: req.admin.sport });
     res.json({ 
       message: `Cleared ${result.deletedCount} audit logs for ${req.admin.sport}`,
       deletedCount: result.deletedCount 

@@ -13,6 +13,8 @@ const registrationSchema = new mongoose.Schema(
     year: { type: String, default: 'N/A' },
     partnerName: { type: String, trim: true, default: '' },
     partnerRollNumber: { type: String, trim: true, default: '' },
+    pairInitiatedByRollNumber: { type: String, trim: true, default: '' },
+    pairInitiatedAt: { type: Date, default: null },
     status: { type: String, enum: ['pending', 'confirmed', 'rejected', 'cancelled'], default: 'pending' },
   },
   { timestamps: true }
