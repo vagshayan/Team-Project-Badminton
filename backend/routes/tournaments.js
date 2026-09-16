@@ -572,7 +572,13 @@ router.delete('/:id', protect, async (req, res) => {
 // ─── GET MATCHES — admin ──────────────────────────────────
 router.get('/:id/matches', protect, async (req, res) => {
   try {
-    const { Registration } = getModelsForSport(req.admin.sport);
+    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.id,
+      createdBy: req.admin._id
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+
     const matches = await Match.find({ tournament: req.params.id })
       .sort({ round: 1, matchNumber: 1 });
     const populated = await Promise.all(matches.map(async (m) => {
@@ -865,6 +871,14 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
 
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ message: 'Match not found' });
+
+    const { Tournament } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: match.tournament,
+      createdBy: req.admin._id
+    });
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+
     if (match.isCompleted) return res.status(400).json({ message: 'Match already completed' });
 
     const winnerStr = String(winnerId);
