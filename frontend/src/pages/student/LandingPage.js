@@ -116,6 +116,9 @@ export default function LandingPage() {
                 <button className="button-primary" onClick={() => navigate('/brackets')}>
                   View live brackets {ARROW_RIGHT}
                 </button>
+                <button className="button-secondary" onClick={() => navigate('/analytics')}>
+                  Player Analytics {ARROW_RIGHT}
+                </button>
               </div>
             </div>
 
