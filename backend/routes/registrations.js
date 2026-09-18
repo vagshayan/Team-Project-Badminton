@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const Admin = require('../models/Admin');
 const { getModelsForSport } = require('../models/SportModels');
 const { protect } = require('../middleware/auth');
 const { publicRegistrationLimiter, publicPartnerLookupLimiter } = require('../middleware/rateLimiter');
 const { logAdminAction } = require('../utils/auditLogger');
 const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
+const notificationService = require('../services/notificationService');
 
 // Admin — view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -88,6 +90,9 @@ router.patch('/:id/status', protect, async (req, res) => {
         req
       });
 
+      // Notify player of rejection (fire-and-forget)
+      notificationService.sendRegistrationRejection(reg, reg.tournament).catch(() => {});
+
       return res.json({ message: 'Registration marked as rejected.' });
     }
 
@@ -146,6 +151,11 @@ router.patch('/:id/status', protect, async (req, res) => {
           { name: reg.partnerName, $addToSet: { tournamentHistory: reg.tournament._id } },
           { upsert: true, new: true }
         );
+      }
+
+      // Notify player of approval (fire-and-forget)
+      if (originalStatus !== 'confirmed') {
+        notificationService.sendRegistrationApproval(reg, reg.tournament).catch(() => {});
       }
     } else if (status === 'pending') {
        // If changing from confirmed to pending, remove from Player table
@@ -720,10 +730,15 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       year: year || 'N/A',
       partnerName: cleanedPartnerName,
       partnerRollNumber: cleanedPartnerRoll,
+
       ...(cleanedPartnerRoll ? {
         pairInitiatedByRollNumber: cleanedRoll,
         pairInitiatedAt,
       } : {}),
+
+      qrToken: crypto.randomBytes(20).toString('hex'),
+      qrTokenCreatedAt: new Date(),
+      qrTokenRevoked: false,
       ...(cleanedGender ? { gender: cleanedGender } : {}),
     });
 
@@ -748,6 +763,9 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
         return res.status(400).json({ message: partnerErr.message });
       }
     }
+
+    // Notify player of registration receipt (fire-and-forget)
+    notificationService.sendRegistrationConfirmation(reg, tournamentDoc).catch(() => {});
 
     res.status(201).json(reg);
   } catch (err) {

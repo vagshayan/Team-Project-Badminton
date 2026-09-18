@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const registrationSchema = new mongoose.Schema(
   {
@@ -16,10 +17,19 @@ const registrationSchema = new mongoose.Schema(
     pairInitiatedByRollNumber: { type: String, trim: true, default: '' },
     pairInitiatedAt: { type: Date, default: null },
     status: { type: String, enum: ['pending', 'confirmed', 'rejected', 'cancelled'], default: 'pending' },
+    qrToken: { type: String, sparse: true, trim: true },
+    qrTokenCreatedAt: { type: Date, default: Date.now },
+    qrTokenRevoked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-registrationSchema.index({ tournament: 1, nicNo: 1 }, { unique: true });
+registrationSchema.pre('save', function (next) {
+  if (!this.qrToken) {
+    this.qrToken = crypto.randomBytes(20).toString('hex');
+    this.qrTokenCreatedAt = new Date();
+  }
+  next();
+});
 
 module.exports = mongoose.model('Registration', registrationSchema);

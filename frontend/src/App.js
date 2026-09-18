@@ -14,6 +14,8 @@ import UniversityTeamPublicPage from './pages/student/UniversityTeamPublicPage';
 import TournamentTeamPage from './pages/student/TournamentTeamPage';
 
 import LandingPage from './pages/student/LandingPage';
+import DigitalPlayerPassPage from './pages/student/DigitalPlayerPassPage';
+import PlayerAnalyticsPage from './pages/student/PlayerAnalyticsPage';
 
 function ProtectedRoute({ children }) {
   const { admin, loading } = useAuth();
@@ -44,6 +46,12 @@ function App() {
             <Route path="/results/:sport/team" element={<TournamentTeamPage />} />
             <Route path="/results/university-team" element={<UniversityTeamPublicPage />} />
             <Route path="/university-team" element={<UniversityTeamPublicPage />} />
+            <Route path="/player/qr/:token" element={<DigitalPlayerPassPage />} />
+            <Route path="/pass/:token" element={<DigitalPlayerPassPage />} />
+            <Route path="/player-pass/:token" element={<DigitalPlayerPassPage />} />
+            <Route path="/:sport/analytics" element={<PlayerAnalyticsPage />} />
+            <Route path="/analytics" element={<PlayerAnalyticsPage />} />
+            <Route path="/player-analytics" element={<PlayerAnalyticsPage />} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
