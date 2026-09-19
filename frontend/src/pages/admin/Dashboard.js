@@ -247,6 +247,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ totalPlayers: 0, pendingApprovals: 0, activeCategories: 0 });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
+  const [toastType, setToastType] = useState('success');
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -377,6 +378,13 @@ export default function Dashboard() {
 
   const passwordChecks = validatePassword(newPassword);
   const passwordValid = Object.values(passwordChecks).every(Boolean);
+  const passwordStrength = newPassword.length === 0
+    ? null
+    : Object.values(passwordChecks).filter(Boolean).length;
+  const passwordStrengthLabel = passwordStrength === 5 ? 'Strong' : passwordStrength >= 3 ? 'Medium' : 'Weak';
+  const profileDirty = profileName !== (admin?.name || '')
+    || profileUsername !== (admin?.username || '')
+    || profileAvatarUrl !== (admin?.avatarUrl || '');
   const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
   const showPasswordRequirements = passwordFocus && newPassword.length > 0;
   const showPasswordMatchMessage = confirmFocus && confirmPassword.length > 0;
@@ -404,11 +412,14 @@ export default function Dashboard() {
         setProfileAvatarUrl(avatarUrl);
         setAdmin((prev) => prev ? { ...prev, avatarUrl } : prev);
         setProfileMessage('Profile photo updated successfully.');
+        showToast(`${SUCCESS} Profile photo updated successfully.`);
       } else {
         throw new Error(res?.data?.message || 'Unable to upload avatar');
       }
     } catch (err) {
-      setProfileMessage(err.response?.data?.message || err.message || 'Unable to upload avatar');
+      const message = err.response?.data?.message || err.message || 'Unable to upload avatar';
+      setProfileMessage(message);
+      showToast(message, 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -425,11 +436,14 @@ export default function Dashboard() {
         setProfileAvatarUrl('');
         setAdmin((prev) => prev ? { ...prev, avatarUrl: '' } : prev);
         setProfileMessage('Profile photo removed.');
+        showToast(`${SUCCESS} Profile photo removed.`);
       } else {
         throw new Error(res?.data?.message || 'Unable to remove avatar');
       }
     } catch (err) {
-      setProfileMessage(err.response?.data?.message || err.message || 'Unable to remove avatar');
+      const message = err.response?.data?.message || err.message || 'Unable to remove avatar';
+      setProfileMessage(message);
+      showToast(message, 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -441,6 +455,7 @@ export default function Dashboard() {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       setProfileMessage('Only JPG, PNG, or WEBP files are allowed.');
+      showToast('Only JPG, PNG, or WEBP files are allowed.', 'error');
       e.target.value = null;
       return;
     }
@@ -645,7 +660,11 @@ export default function Dashboard() {
     }
   }, [removePairTarget]);
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
+  const showToast = (msg, type = 'success') => {
+    setToast(msg);
+    setToastType(type);
+    setTimeout(() => setToast(''), 3500);
+  };
 
   const handleApprovePair = async (leadId) => {
     try {
@@ -1074,7 +1093,6 @@ export default function Dashboard() {
               <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
                 {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
               </h2>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
             </div>
             <div style={ds.headerActions}>
               <div ref={notificationsRef} style={{ position: 'relative' }}>
@@ -1115,17 +1133,16 @@ export default function Dashboard() {
             <h2 style={{ fontSize: 18, fontWeight: 950, margin: 0, letterSpacing: -0.5 }}>
               {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
             </h2>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM STATUS: OPTIMAL</p>
           </div>
         )}
 
         <main style={{ padding: isMobile ? '20px' : '60px' }} className="mobile-padding">
-          {toast && <div className="alert alert-success" style={{ padding: '16px 24px', fontSize: 16, marginBottom: 32 }}>{toast}</div>}
+          {toast && <div className={`alert ${toastType === 'error' ? 'alert-error' : 'alert-success'}`} style={{ padding: '16px 24px', fontSize: 16, marginBottom: 32 }}>{toast}</div>}
 
           {activeTab === 'dashboard' && (
             <div>
               <h1 style={{ ...ds.title, fontSize: isMobile ? 28 : 56 }}>DASHBOARD OVERVIEW</h1>
-              <p style={{ ...ds.subtitle, fontSize: isMobile ? 14 : 18, marginBottom: isMobile ? 24 : 60 }}>Real-time metrics for your managed tournaments.</p>
+              <p style={{ ...ds.subtitle, fontSize: isMobile ? 14 : 18, marginBottom: isMobile ? 24 : 60 }}>Track your tournament progress and activity.</p>
 
               <div className="responsive-grid-3" style={{ marginBottom: isMobile ? 32 : 70 }}>
                 {[
@@ -1757,14 +1774,14 @@ export default function Dashboard() {
             <div style={ds.section}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 40 }}>
                 <div>
-                  <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 24 : 36 }}>ADMIN PROFILE</h2>
+                  <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 24 : 36, textTransform: 'none' }}>Profile Settings</h2>
                   <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Update your admin profile details and password.</p>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: 24, marginBottom: 32 }}>
                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 28 }}>
                     <div style={{ position: 'relative', width: 88, height: 88 }}>
                       <img
                         src={profileAvatarUrl || `https://ui-avatars.com/api/?name=${safeAdminName}&background=random&size=128`}
@@ -1791,8 +1808,9 @@ export default function Dashboard() {
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 950 }}>{safeAdminName}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{admin.username}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
-                      <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: 12, letterSpacing: 0.5 }}>Upload Profile Photo</div>
+                      <button type="button" onClick={handleAvatarUploadClick} disabled={uploadingAvatar} style={{ ...ds.uploadButton, marginTop: 12, padding: '9px 14px', fontSize: 12 }}>
+                        {uploadingAvatar ? 'Uploading...' : 'Change Photo'}
+                      </button>
                       {profileAvatarUrl && (
                         <button
                           type="button"
@@ -1870,9 +1888,9 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div style={{ position: 'relative' }}>
-                      <label style={ds.fieldLabel}>Username</label>
+                      <label style={ds.fieldLabel}>Email Address</label>
                       <div style={ds.inputIconWrapper}>
-                        <span style={ds.inputIcon}>@</span>
+                        <span style={ds.inputIcon}>{EMAIL}</span>
                         <input
                           type="text"
                           value={profileUsername}
@@ -1881,18 +1899,6 @@ export default function Dashboard() {
                           style={{ ...ds.input, paddingLeft: 48 }}
                         />
                       </div>
-                    </div>
-                    <div style={ds.fileUploadBox} onClick={handleAvatarUploadClick}>
-                      <div style={ds.fileUploadInfo}>
-                        <div style={ds.uploadIconCircle}>☁️</div>
-                        <div>
-                          <div style={ds.uploadTextPrimary}>Choose a file or drag & drop</div>
-                          <div style={ds.uploadTextSecondary}>JPG, PNG or WEBP. Max size 2MB.</div>
-                        </div>
-                      </div>
-                      <button type="button" onClick={handleAvatarUploadClick} style={ds.uploadButton} disabled={uploadingAvatar}>
-                        {uploadingAvatar ? 'Uploading...' : 'Choose File'}
-                      </button>
                     </div>
                     {profileMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{profileMessage}</div>}
                     <button
@@ -1908,7 +1914,8 @@ export default function Dashboard() {
                           });
 
                           if (res?.status >= 200 && res?.status < 300 && res?.data) {
-                            setProfileMessage('Profile updated successfully.');
+                            showToast(`${SUCCESS} Profile updated successfully.`);
+                            setProfileMessage('');
                             setAdmin(res.data);
                             setProfileName(res.data.name || '');
                             setProfileUsername(res.data.username || '');
@@ -1917,13 +1924,15 @@ export default function Dashboard() {
                             throw new Error(res?.data?.message || 'Unable to update profile');
                           }
                         } catch (err) {
-                          setProfileMessage(err.response?.data?.message || err.message || 'Unable to update profile');
+                          const message = err.response?.data?.message || err.message || 'Unable to update profile';
+                          setProfileMessage(message);
+                          showToast(message, 'error');
                         } finally {
                           setSavingProfile(false);
                         }
                       }}
-                      style={{ ...ds.createBtn, width: '100%', padding: '18px 20px', fontSize: 13, borderRadius: 18 }}
-                      disabled={savingProfile}
+                      style={{ ...ds.createBtn, width: '100%', padding: '18px 20px', fontSize: 13, borderRadius: 18, opacity: savingProfile || !profileDirty ? 0.55 : 1, cursor: savingProfile || !profileDirty ? 'not-allowed' : 'pointer' }}
+                      disabled={savingProfile || !profileDirty}
                     >
                       {savingProfile ? 'Saving...' : 'Save Profile'}
                     </button>
@@ -1967,6 +1976,18 @@ export default function Dashboard() {
                         />
                         {renderPasswordToggle('New', showNewPassword, () => setShowNewPassword((v) => !v))}
                       </div>
+                      {newPassword.length > 0 && (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                            {[1, 2, 3, 4, 5].map((level) => (
+                              <div key={level} style={{ height: 4, flex: 1, borderRadius: 99, background: level <= passwordStrength ? (passwordStrength >= 5 ? '#10B981' : passwordStrength >= 3 ? '#F59E0B' : '#EF4444') : 'var(--border)' }} />
+                            ))}
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: passwordStrength >= 5 ? '#10B981' : passwordStrength >= 3 ? '#F59E0B' : '#EF4444' }}>
+                            Password strength: {passwordStrengthLabel}
+                          </div>
+                        </div>
+                      )}
                       {showPasswordRequirements && (
                         <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 16, background: 'rgba(15, 23, 42, 0.06)' }}>
                           <div style={{ marginBottom: 8, fontWeight: 700 }}>Password must include:</div>
@@ -2004,27 +2025,37 @@ export default function Dashboard() {
                         setChangingPassword(true);
                         setPasswordMessage('');
                         if (!currentPassword) {
-                          setPasswordMessage('Current password is required to change your password.');
+                          const message = 'Current password is required to change your password.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                           setChangingPassword(false);
                           return;
                         }
                         if (!passwordValid) {
-                          setPasswordMessage('New password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
+                          const message = 'New password must be at least 8 characters and include uppercase, lowercase, number, and special character.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                           setChangingPassword(false);
                           return;
                         }
                         if (currentPassword === newPassword) {
-                          setPasswordMessage('New password must be different from the current password.');
+                          const message = 'New password must be different from the current password.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                           setChangingPassword(false);
                           return;
                         }
                         if (!confirmPassword) {
-                          setPasswordMessage('Please confirm your new password.');
+                          const message = 'Please confirm your new password.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                           setChangingPassword(false);
                           return;
                         }
                         if (!passwordsMatch) {
-                          setPasswordMessage('New password and confirmation do not match.');
+                          const message = 'New password and confirmation do not match.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                           setChangingPassword(false);
                           return;
                         }
@@ -2035,12 +2066,16 @@ export default function Dashboard() {
                             newPassword,
                             confirmPassword,
                           });
-                          setPasswordMessage(res.data?.message || 'Password updated successfully');
+                          const message = res.data?.message || 'Password updated successfully';
+                          setPasswordMessage(message);
+                          showToast(`${SUCCESS} ${message}`);
                           setCurrentPassword('');
                           setNewPassword('');
                           setConfirmPassword('');
                         } catch (err) {
-                          setPasswordMessage(err.response?.data?.message || 'Unable to update password');
+                          const message = err.response?.data?.message || 'Unable to update password';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
                         } finally {
                           setChangingPassword(false);
                         }

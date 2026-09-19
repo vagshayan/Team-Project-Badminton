@@ -180,6 +180,10 @@ export default function RegisterPage() {
           .form-card {
             padding: 30px !important;
             border-radius: 24px !important;
+            max-height: 82vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
           }
           .field-group {
             grid-template-columns: 1fr !important;
@@ -204,13 +208,18 @@ export default function RegisterPage() {
       <div className="content-container" style={sh.content}>
         <div className="hero-side" style={sh.heroSide}>
            <div style={sh.badge}>OFFICIAL ACCESS</div>
-           <h1 className="hero-title" style={sh.title}>CREATE YOUR <br/><span style={sh.highlight}>ARENA HUB</span></h1>
-           <p style={sh.subtitle}>Initialize your dedicated management dashboard for Badminton, Table Tennis, or Carrom tournaments.</p>
+           <h1 className="hero-title" style={sh.title}><span style={sh.highlight}>CREATE ADMIN</span> <br/>ACCOUNT</h1>
+           <p style={sh.subtitle}>Set up your administrator account to manage Badminton, Table Tennis, or Carrom tournaments.</p>
            
            <div className="benefit-list" style={sh.benefitList}>
-              {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map(b => (
+              {[
+                 'Strong & Secure Password',
+                 'Select Your Sport / Domain',
+                 'Admin Access Code Required',
+                 'Security Question & Answer'
+              ].map((b, index) => (
                  <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>{CHECK_MARK}</span> {b}
+                    <span style={sh.check}>{index === 0 ? '🔒' : index === 1 ? '🏆' : index === 2 ? '🔑' : '🛡️'}</span> {b}
                  </div>
               ))}
            </div>
@@ -418,7 +427,7 @@ const sh = {
   benefitList: { marginTop: 48, display: 'flex', flexDirection: 'column', gap: 16 },
   benefit: { display: 'flex', alignItems: 'center', gap: 12, fontWeight: 700, fontSize: 15, color: 'var(--text)' },
   check: { color: '#10B981', fontWeight: 950 },
-  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)' },
+  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
   label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1.5px', display: 'block', marginBottom: 12 },
   sportGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
   sportCard: { padding: '16px', borderRadius: '18px', border: '2px solid transparent', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s cubic-bezier(0.2, 1, 0.3, 1)' },
