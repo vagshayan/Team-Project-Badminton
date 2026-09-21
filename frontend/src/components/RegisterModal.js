@@ -465,7 +465,6 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
         </div>
       </div>
     );
-  }
 
   return (
     <div style={{ ...sh.overlay, background: isDarkMode ? 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)' : 'rgba(15, 23, 42, 0.45)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode/cjs/index.js';
 
 const SPORT_META = {
   badminton: { label: 'Badminton', icon: '🏸', color: '#3B82F6', unit: 'Court' },

@@ -16,7 +16,12 @@ const SCORE_CLASSIFICATION_COLORS = {
   'Needs Improvement': { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444', border: '#EF4444' },
 };
 
-export default function PlayerPerformanceDashboard({ initialSport = 'badminton', defaultRollNumber = '', onSportChange }) {
+export default function PlayerPerformanceDashboard({
+  initialSport = 'badminton',
+  defaultRollNumber = '',
+  onSportChange,
+  onNavigateToH2H,
+}) {
   const { isDarkMode } = useTheme();
   const [sport, setSport] = useState(initialSport);
   const [searchQuery, setSearchQuery] = useState(defaultRollNumber);
@@ -373,28 +378,61 @@ export default function PlayerPerformanceDashboard({ initialSport = 'badminton',
               </div>
             </div>
 
-            {/* Performance Score Badge */}
-            <div style={{
-              background: scoreColors.bg,
-              border: `1.5px solid ${scoreColors.border}`,
-              borderRadius: 16,
-              padding: '12px 20px',
-              textAlign: 'center',
-              minWidth: 140,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1 }}>PERFORMANCE SCORE</div>
-              <div style={{ fontSize: 32, fontWeight: 950, color: scoreColors.text, margin: '2px 0' }}>
-                {performanceData.performanceScore.totalScore}
-                <span style={{ fontSize: 16, opacity: 0.6, fontWeight: 600 }}>/100</span>
-              </div>
+            {/* Performance Score Badge & H2H Quick Action */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {onNavigateToH2H && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToH2H(performanceData.player.rollNumber)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: 12,
+                    background: 'rgba(236, 72, 153, 0.12)',
+                    border: '1px solid rgba(236, 72, 153, 0.35)',
+                    color: '#EC4899',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#EC4899';
+                    e.currentTarget.style.color = '#FFFFFF';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(236, 72, 153, 0.12)';
+                    e.currentTarget.style.color = '#EC4899';
+                  }}
+                >
+                  <span>⚔️ Compare with Rival</span>
+                </button>
+              )}
+
               <div style={{
-                fontSize: 12,
-                fontWeight: 900,
-                color: scoreColors.text,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
+                background: scoreColors.bg,
+                border: `1.5px solid ${scoreColors.border}`,
+                borderRadius: 16,
+                padding: '12px 20px',
+                textAlign: 'center',
+                minWidth: 140,
               }}>
-                {scoreClass}
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1 }}>PERFORMANCE SCORE</div>
+                <div style={{ fontSize: 32, fontWeight: 950, color: scoreColors.text, margin: '2px 0' }}>
+                  {performanceData.performanceScore.totalScore}
+                  <span style={{ fontSize: 16, opacity: 0.6, fontWeight: 600 }}>/100</span>
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: scoreColors.text,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}>
+                  {scoreClass}
+                </div>
               </div>
             </div>
           </div>

@@ -722,7 +722,6 @@ async function calculatePlayerPerformance(registrationNumber, sport = 'badminton
   const chartData = buildChartData(
     { ...rawStats, performanceScore },
     processedMatches,
-    benchmarks
   );
 
   return {
@@ -754,8 +753,369 @@ async function calculatePlayerPerformance(registrationNumber, sport = 'badminton
   };
 }
 
+/**
+ * Compares two players side-by-side with Head-to-Head match records,
+ * attribute comparisons, common opponent records, and predictive match analytics.
+ *
+ * @param {string} playerARoll - Roll/registration number of Player A
+ * @param {string} playerBRoll - Roll/registration number of Player B
+ * @param {string} [sport] - Sport name (badminton, table-tennis, carrom)
+ * @returns {Promise<object>}
+ */
+async function compareHeadToHead(playerARoll, playerBRoll, sport = 'badminton') {
+  const cleanRollA = normalizeRollNumber(playerARoll);
+  const cleanRollB = normalizeRollNumber(playerBRoll);
+
+  if (!cleanRollA || !cleanRollB) {
+    throw new Error('Both Player A and Player B registration numbers are required');
+  }
+
+  if (cleanRollA.toLowerCase() === cleanRollB.toLowerCase()) {
+    throw new Error('Cannot compare a player with themselves. Please select two different players.');
+  }
+
+  const cleanSport = normalizeSport(sport);
+  const { Registration } = getModelsForSport(cleanSport);
+
+  // 1. Fetch individual performance profiles for both players
+  const [perfA, perfB] = await Promise.all([
+    calculatePlayerPerformance(cleanRollA, cleanSport),
+    calculatePlayerPerformance(cleanRollB, cleanSport),
+  ]);
+
+  if (!perfA && !perfB) {
+    throw new Error(`Neither player "${cleanRollA}" nor "${cleanRollB}" could be found for ${cleanSport}.`);
+  }
+  if (!perfA) {
+    throw new Error(`Player A with registration number "${cleanRollA}" was not found.`);
+  }
+  if (!perfB) {
+    throw new Error(`Player B with registration number "${cleanRollB}" was not found.`);
+  }
+
+  // 2. Query Registration IDs for both players
+  const regexA = new RegExp(`^${cleanRollA.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  const regexB = new RegExp(`^${cleanRollB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+  const [regsA, regsB] = await Promise.all([
+    Registration.find({ $or: [{ rollNumber: regexA }, { partnerRollNumber: regexA }] }).select('_id').lean(),
+    Registration.find({ $or: [{ rollNumber: regexB }, { partnerRollNumber: regexB }] }).select('_id').lean(),
+  ]);
+
+  const regIdsA = regsA.map((r) => r._id.toString());
+  const regIdsB = regsB.map((r) => r._id.toString());
+
+  // 3. Query Direct Head-to-Head Matches
+  let directMatches = [];
+  if (regIdsA.length > 0 && regIdsB.length > 0) {
+    const rawMatches = await Match.find({
+      $or: [
+        { player1: { $in: regIdsA }, player2: { $in: regIdsB } },
+        { player1: { $in: regIdsB }, player2: { $in: regIdsA } },
+      ],
+      isCompleted: true,
+    })
+      .populate('tournament')
+      .populate('player1')
+      .populate('player2')
+      .populate('winner')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    directMatches = rawMatches.map((m) => {
+      const p1Id = m.player1 ? (m.player1._id ? m.player1._id.toString() : m.player1.toString()) : '';
+      const p2Id = m.player2 ? (m.player2._id ? m.player2._id.toString() : m.player2.toString()) : '';
+      const p1IsA = regIdsA.includes(p1Id);
+
+      const scoreA = p1IsA ? (m.score1 || 0) : (m.score2 || 0);
+      const scoreB = p1IsA ? (m.score2 || 0) : (m.score1 || 0);
+
+      const winnerId = m.winner ? (m.winner._id ? m.winner._id.toString() : m.winner.toString()) : '';
+      const winnerIsA = regIdsA.includes(winnerId);
+      const winnerIsB = regIdsB.includes(winnerId);
+
+      const matchDate = m.tournament?.date || m.updatedAt || m.createdAt;
+
+      return {
+        id: m._id,
+        round: m.round,
+        matchNumber: m.matchNumber,
+        tournamentYear: m.tournament?.year || 'N/A',
+        tournamentCategory: m.tournament?.category || 'Singles',
+        tournamentVenue: m.tournament?.venue || 'Campus Arena',
+        date: matchDate,
+        scoreA,
+        scoreB,
+        scoreText: `${scoreA} - ${scoreB}`,
+        winner: winnerIsA ? 'playerA' : (winnerIsB ? 'playerB' : 'none'),
+        winnerName: winnerIsA ? perfA.player.name : (winnerIsB ? perfB.player.name : 'Draw / Unset'),
+      };
+    });
+  }
+
+  // Calculate direct H2H tally
+  const totalEncounters = directMatches.length;
+  const playerAWins = directMatches.filter((m) => m.winner === 'playerA').length;
+  const playerBWins = directMatches.filter((m) => m.winner === 'playerB').length;
+  const playerATotalPoints = directMatches.reduce((acc, m) => acc + m.scoreA, 0);
+  const playerBTotalPoints = directMatches.reduce((acc, m) => acc + m.scoreB, 0);
+
+  // 4. Calculate Average Points per match from all career matches
+  const calcAvgPoints = (recentMatches) => {
+    if (!recentMatches || recentMatches.length === 0) return 0;
+    const totalPts = recentMatches.reduce((acc, m) => acc + (m.myScore || 0), 0);
+    return Math.round((totalPts / recentMatches.length) * 10) / 10;
+  };
+
+  const avgPointsA = calcAvgPoints(perfA.recentMatches);
+  const avgPointsB = calcAvgPoints(perfB.recentMatches);
+
+  // 5. Common Opponents Analysis
+  const oppMapA = new Map();
+  (perfA.recentMatches || []).forEach((m) => {
+    if (!m.opponentRoll || isRollNumberMatch(m.opponentRoll, cleanRollB)) return;
+    const oppRoll = m.opponentRoll.trim().toUpperCase();
+    if (!oppMapA.has(oppRoll)) {
+      oppMapA.set(oppRoll, { name: m.opponentName, matches: 0, wins: 0, losses: 0 });
+    }
+    const o = oppMapA.get(oppRoll);
+    o.matches += 1;
+    if (m.result === 'W') o.wins += 1;
+    else o.losses += 1;
+  });
+
+  const oppMapB = new Map();
+  (perfB.recentMatches || []).forEach((m) => {
+    if (!m.opponentRoll || isRollNumberMatch(m.opponentRoll, cleanRollA)) return;
+    const oppRoll = m.opponentRoll.trim().toUpperCase();
+    if (!oppMapB.has(oppRoll)) {
+      oppMapB.set(oppRoll, { name: m.opponentName, matches: 0, wins: 0, losses: 0 });
+    }
+    const o = oppMapB.get(oppRoll);
+    o.matches += 1;
+    if (m.result === 'W') o.wins += 1;
+    else o.losses += 1;
+  });
+
+  const commonOpponents = [];
+  oppMapA.forEach((statsA, oppRoll) => {
+    if (oppMapB.has(oppRoll)) {
+      const statsB = oppMapB.get(oppRoll);
+      const winRateA = statsA.matches > 0 ? Math.round((statsA.wins / statsA.matches) * 100) : 0;
+      const winRateB = statsB.matches > 0 ? Math.round((statsB.wins / statsB.matches) * 100) : 0;
+
+      let edge = 'even';
+      if (winRateA > winRateB) edge = 'playerA';
+      else if (winRateB > winRateA) edge = 'playerB';
+
+      commonOpponents.push({
+        opponentRoll,
+        opponentName: statsA.name || statsB.name || oppRoll,
+        playerA: { ...statsA, winRate: winRateA },
+        playerB: { ...statsB, winRate: winRateB },
+        edge,
+      });
+    }
+  });
+
+  // 6. Multi-Attribute Comparison Dataset
+  const recentFormRateA = perfA.statistics.recentResults.length > 0
+    ? Math.round((perfA.statistics.recentResults.filter((r) => r === 'W').length / perfA.statistics.recentResults.length) * 100)
+    : perfA.statistics.winPercentage;
+
+  const recentFormRateB = perfB.statistics.recentResults.length > 0
+    ? Math.round((perfB.statistics.recentResults.filter((r) => r === 'W').length / perfB.statistics.recentResults.length) * 100)
+    : perfB.statistics.winPercentage;
+
+  const scoreA = perfA.performanceScore?.totalScore || 0;
+  const scoreB = perfB.performanceScore?.totalScore || 0;
+
+  const attributes = [
+    {
+      name: 'Performance Score',
+      key: 'score',
+      valA: scoreA,
+      valB: scoreB,
+      maxVal: 100,
+      unit: 'pts',
+      leader: scoreA > scoreB ? 'playerA' : (scoreB > scoreA ? 'playerB' : 'even'),
+    },
+    {
+      name: 'Career Win Rate',
+      key: 'winRate',
+      valA: perfA.statistics.winPercentage,
+      valB: perfB.statistics.winPercentage,
+      maxVal: 100,
+      unit: '%',
+      leader: perfA.statistics.winPercentage > perfB.statistics.winPercentage
+        ? 'playerA'
+        : (perfB.statistics.winPercentage > perfA.statistics.winPercentage ? 'playerB' : 'even'),
+    },
+    {
+      name: 'Recent Form (Last 5)',
+      key: 'recentForm',
+      valA: recentFormRateA,
+      valB: recentFormRateB,
+      maxVal: 100,
+      unit: '%',
+      leader: recentFormRateA > recentFormRateB ? 'playerA' : (recentFormRateB > recentFormRateA ? 'playerB' : 'even'),
+    },
+    {
+      name: 'Win Streak',
+      key: 'streak',
+      valA: perfA.statistics.currentWinningStreak,
+      valB: perfB.statistics.currentWinningStreak,
+      maxVal: Math.max(5, perfA.statistics.currentWinningStreak, perfB.statistics.currentWinningStreak),
+      unit: 'matches',
+      leader: perfA.statistics.currentWinningStreak > perfB.statistics.currentWinningStreak
+        ? 'playerA'
+        : (perfB.statistics.currentWinningStreak > perfA.statistics.currentWinningStreak ? 'playerB' : 'even'),
+    },
+    {
+      name: 'Avg Points / Match',
+      key: 'avgPoints',
+      valA: avgPointsA,
+      valB: avgPointsB,
+      maxVal: Math.max(25, avgPointsA, avgPointsB),
+      unit: 'pts',
+      leader: avgPointsA > avgPointsB ? 'playerA' : (avgPointsB > avgPointsA ? 'playerB' : 'even'),
+    },
+    {
+      name: 'Match Experience',
+      key: 'experience',
+      valA: perfA.statistics.totalMatches,
+      valB: perfB.statistics.totalMatches,
+      maxVal: Math.max(10, perfA.statistics.totalMatches, perfB.statistics.totalMatches),
+      unit: 'played',
+      leader: perfA.statistics.totalMatches > perfB.statistics.totalMatches
+        ? 'playerA'
+        : (perfB.statistics.totalMatches > perfA.statistics.totalMatches ? 'playerB' : 'even'),
+    },
+  ];
+
+  // 7. Predictive Match Engine
+  let rawPowerA = 0;
+  let rawPowerB = 0;
+  const keyFactors = [];
+
+  // Factor 1: Direct H2H (if played)
+  if (totalEncounters > 0) {
+    const h2hRateA = playerAWins / totalEncounters;
+    const h2hRateB = playerBWins / totalEncounters;
+    rawPowerA += h2hRateA * 35;
+    rawPowerB += h2hRateB * 35;
+
+    if (playerAWins > playerBWins) {
+      keyFactors.push(`${perfA.player.name} leads direct H2H rivalry (${playerAWins}-${playerBWins})`);
+    } else if (playerBWins > playerAWins) {
+      keyFactors.push(`${perfB.player.name} leads direct H2H rivalry (${playerBWins}-${playerAWins})`);
+    } else {
+      keyFactors.push(`Direct H2H record is tied (${playerAWins}-${playerBWins})`);
+    }
+  } else {
+    // No direct encounters: redistribute weights
+    keyFactors.push(`First official competitive meeting between both players`);
+  }
+
+  // Factor 2: Performance Score (Weight 30%)
+  const scoreWeight = totalEncounters > 0 ? 30 : 45;
+  rawPowerA += (scoreA / 100) * scoreWeight;
+  rawPowerB += (scoreB / 100) * scoreWeight;
+
+  if (Math.abs(scoreA - scoreB) >= 10) {
+    const leadingPlayer = scoreA > scoreB ? perfA.player.name : perfB.player.name;
+    const higherScore = Math.max(scoreA, scoreB);
+    keyFactors.push(`${leadingPlayer} holds a stronger performance score rating (${higherScore}/100)`);
+  }
+
+  // Factor 3: Recent Form (Weight 20%)
+  const formWeight = totalEncounters > 0 ? 20 : 35;
+  rawPowerA += (recentFormRateA / 100) * formWeight;
+  rawPowerB += (recentFormRateB / 100) * formWeight;
+
+  if (recentFormRateA >= 80) {
+    keyFactors.push(`${perfA.player.name} enters in peak recent form (${recentFormRateA}% recent win rate)`);
+  }
+  if (recentFormRateB >= 80) {
+    keyFactors.push(`${perfB.player.name} enters in peak recent form (${recentFormRateB}% recent win rate)`);
+  }
+
+  // Factor 4: Win Streak bonus
+  if (perfA.statistics.currentWinningStreak >= 3) {
+    keyFactors.push(`${perfA.player.name} is on an active ${perfA.statistics.currentWinningStreak}-game winning streak 🔥`);
+  }
+  if (perfB.statistics.currentWinningStreak >= 3) {
+    keyFactors.push(`${perfB.player.name} is on an active ${perfB.statistics.currentWinningStreak}-game winning streak 🔥`);
+  }
+
+  // Factor 5: Career Win Rate (Weight 15%)
+  const careerWeight = totalEncounters > 0 ? 15 : 20;
+  rawPowerA += (perfA.statistics.winPercentage / 100) * careerWeight;
+  rawPowerB += (perfB.statistics.winPercentage / 100) * careerWeight;
+
+  // Normalize win probability to 100% total
+  const totalPower = rawPowerA + rawPowerB;
+  let winProbA = 50;
+  let winProbB = 50;
+
+  if (totalPower > 0) {
+    winProbA = Math.round((rawPowerA / totalPower) * 100);
+    winProbB = 100 - winProbA;
+  }
+
+  // Formulate Verdict
+  let favoredPlayer = 'even';
+  let verdict = 'This is an evenly balanced matchup with both players holding comparable statistical strengths.';
+
+  if (winProbA >= 55) {
+    favoredPlayer = 'playerA';
+    verdict = `${perfA.player.name} is favored with a ${winProbA}% statistical win probability based on overall rating, form, and match record.`;
+  } else if (winProbB >= 55) {
+    favoredPlayer = 'playerB';
+    verdict = `${perfB.player.name} is favored with a ${winProbB}% statistical win probability based on overall rating, form, and match record.`;
+  }
+
+  return {
+    sport: cleanSport,
+    playerA: {
+      profile: perfA.player,
+      statistics: perfA.statistics,
+      performanceScore: perfA.performanceScore,
+      avgPointsPerMatch: avgPointsA,
+      recentMatches: perfA.recentMatches.slice(0, 5),
+    },
+    playerB: {
+      profile: perfB.player,
+      statistics: perfB.statistics,
+      performanceScore: perfB.performanceScore,
+      avgPointsPerMatch: avgPointsB,
+      recentMatches: perfB.recentMatches.slice(0, 5),
+    },
+    headToHead: {
+      totalEncounters,
+      playerAWins,
+      playerBWins,
+      playerATotalPoints,
+      playerBTotalPoints,
+      playerAWinRate: totalEncounters > 0 ? Math.round((playerAWins / totalEncounters) * 100) : 0,
+      playerBWinRate: totalEncounters > 0 ? Math.round((playerBWins / totalEncounters) * 100) : 0,
+      matches: directMatches,
+    },
+    attributes,
+    commonOpponents,
+    prediction: {
+      favoredPlayer,
+      winProbA,
+      winProbB,
+      verdict,
+      keyFactors,
+    },
+  };
+}
+
 module.exports = {
   calculatePlayerPerformance,
+  compareHeadToHead,
   listPlayersForSport,
   getSportBenchmarks,
   calculatePerformanceScore,
@@ -764,3 +1124,4 @@ module.exports = {
   normalizeSport,
   normalizeRollNumber,
 };
+

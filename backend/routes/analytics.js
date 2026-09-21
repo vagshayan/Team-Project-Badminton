@@ -80,7 +80,44 @@ const getPlayerPerformanceHandler = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/analytics/h2h
+ * GET /api/analytics/compare
+ * Returns head-to-head comparison, direct match history, common opponents, and predictive analysis.
+ * Query params:
+ *  - playerA: string (registration number for Player A)
+ *  - playerB: string (registration number for Player B)
+ *  - sport: 'badminton' | 'table-tennis' | 'carrom' (default: 'badminton')
+ */
+const getHeadToHeadHandler = async (req, res) => {
+  try {
+    const { playerA, playerB, sport } = req.query;
+
+    if (!playerA || !playerA.trim() || !playerB || !playerB.trim()) {
+      return res.status(400).json({
+        message: 'Both playerA and playerB registration numbers are required for comparison.',
+      });
+    }
+
+    const comparison = await analyticsService.compareHeadToHead(
+      decodeURIComponent(playerA),
+      decodeURIComponent(playerB),
+      sport || 'badminton'
+    );
+
+    res.json(comparison);
+  } catch (err) {
+    console.error('[AnalyticsRoute] Error comparing players:', err.message);
+    const statusCode = err.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ message: err.message || 'Failed to compare players' });
+  }
+};
+
+router.get('/h2h', getHeadToHeadHandler);
+router.get('/compare', getHeadToHeadHandler);
+
 router.get('/player/:registrationNumber', getPlayerPerformanceHandler);
 router.get('/:registrationNumber/performance', getPlayerPerformanceHandler);
 
 module.exports = router;
+
