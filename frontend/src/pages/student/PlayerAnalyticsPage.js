@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import PlayerPerformanceDashboard from '../../components/PlayerPerformanceDashboard';
+import HeadToHeadComparison from '../../components/HeadToHeadComparison';
 
 const SPORT_META = {
   badminton: { label: 'BADMINTON', icon: '🏸', color: '#3B82F6' },
@@ -12,20 +13,32 @@ const SPORT_META = {
 export default function PlayerAnalyticsPage() {
   const navigate = useNavigate();
   const params = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isDarkMode, toggleTheme } = useTheme();
 
   const initialSport = params.sport || searchParams.get('sport') || 'badminton';
-  const initialRoll = searchParams.get('roll') || searchParams.get('player') || '';
+  const initialRoll = searchParams.get('roll') || searchParams.get('player') || searchParams.get('playerA') || '';
+  const initialPlayerB = searchParams.get('playerB') || '';
+  const initialTab = searchParams.get('tab') === 'h2h' || window.location.pathname.includes('compare') || window.location.pathname.includes('h2h') ? 'h2h' : 'insights';
 
   const [sport, setSport] = useState(initialSport);
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const meta = SPORT_META[sport] || SPORT_META.badminton;
 
   const handleSportChange = (newSport) => {
     setSport(newSport);
-    navigate(`/${newSport}/analytics`, { replace: true });
+    const query = new URLSearchParams(searchParams);
+    query.set('sport', newSport);
+    navigate(`/${newSport}/analytics?${query.toString()}`, { replace: true });
+  };
+
+  const handleTabSwitch = (tab) => {
+    setActiveTab(tab);
+    const query = new URLSearchParams(searchParams);
+    query.set('tab', tab);
+    navigate(`/${sport}/analytics?${query.toString()}`, { replace: true });
   };
 
   return (
@@ -128,24 +141,90 @@ export default function PlayerAnalyticsPage() {
           <span>{meta.label} ANALYTICS ENGINE</span>
         </div>
         <h1 style={styles.heroTitle} className="mobile-hero-title">
-          PLAYER PERFORMANCE & SMART SUGGESTIONS
+          {activeTab === 'h2h' ? 'HEAD-TO-HEAD & PLAYER COMPARISON' : 'PLAYER PERFORMANCE & SMART SUGGESTIONS'}
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 15, maxWidth: 640, margin: '8px auto 0', lineHeight: 1.5 }}>
-          Real-time statistical evaluation, performance scoring, trend analysis, and rule-based personalized suggestions.
+        <p style={{ color: 'var(--text-muted)', fontSize: 15, maxWidth: 680, margin: '8px auto 0', lineHeight: 1.5 }}>
+          {activeTab === 'h2h'
+            ? 'Compare any two players side-by-side with historical rivalry match records, attribute analysis, and predictive win probability.'
+            : 'Real-time statistical evaluation, performance scoring, trend analysis, and rule-based personalized suggestions.'}
         </p>
+
+        {/* ── SUB-NAV TABS: INDIVIDUAL INSIGHTS vs HEAD-TO-HEAD ──────────────── */}
+        <div style={{
+          display: 'inline-flex',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 999,
+          padding: 5,
+          marginTop: 24,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+        }}>
+          <button
+            onClick={() => handleTabSwitch('insights')}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 999,
+              border: 'none',
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: 'pointer',
+              background: activeTab === 'insights' ? meta.color : 'transparent',
+              color: activeTab === 'insights' ? '#FFFFFF' : 'var(--text-muted)',
+              boxShadow: activeTab === 'insights' ? `0 4px 14px ${meta.color}40` : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            📊 Individual Insights
+          </button>
+          <button
+            onClick={() => handleTabSwitch('h2h')}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 999,
+              border: 'none',
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: 'pointer',
+              background: activeTab === 'h2h' ? meta.color : 'transparent',
+              color: activeTab === 'h2h' ? '#FFFFFF' : 'var(--text-muted)',
+              boxShadow: activeTab === 'h2h' ? `0 4px 14px ${meta.color}40` : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            ⚔️ Head-to-Head (H2H)
+          </button>
+        </div>
       </div>
 
-      {/* ── MAIN DASHBOARD COMPONENT ───────────────────────────────────────── */}
+      {/* ── MAIN CONTENT (SWITCH BETWEEN VIEWS) ─────────────────────────────── */}
       <main style={{ padding: '0 16px' }}>
-        <PlayerPerformanceDashboard
-          initialSport={sport}
-          defaultRollNumber={initialRoll}
-          onSportChange={(newSport) => setSport(newSport)}
-        />
+        {activeTab === 'h2h' ? (
+          <HeadToHeadComparison
+            initialSport={sport}
+            defaultPlayerA={initialRoll}
+            defaultPlayerB={initialPlayerB}
+            onSportChange={(newSport) => setSport(newSport)}
+          />
+        ) : (
+          <PlayerPerformanceDashboard
+            initialSport={sport}
+            defaultRollNumber={initialRoll}
+            onSportChange={(newSport) => setSport(newSport)}
+            onNavigateToH2H={(roll) => {
+              setActiveTab('h2h');
+              const query = new URLSearchParams();
+              query.set('sport', sport);
+              query.set('tab', 'h2h');
+              query.set('playerA', roll);
+              navigate(`/${sport}/analytics?${query.toString()}`, { replace: true });
+            }}
+          />
+        )}
       </main>
     </div>
   );
 }
+
 
 const styles = {
   nav: {

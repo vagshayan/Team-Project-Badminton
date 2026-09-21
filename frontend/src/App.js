@@ -52,6 +52,10 @@ function App() {
             <Route path="/:sport/analytics" element={<PlayerAnalyticsPage />} />
             <Route path="/analytics" element={<PlayerAnalyticsPage />} />
             <Route path="/player-analytics" element={<PlayerAnalyticsPage />} />
+            <Route path="/:sport/compare" element={<PlayerAnalyticsPage />} />
+            <Route path="/:sport/h2h" element={<PlayerAnalyticsPage />} />
+            <Route path="/compare" element={<PlayerAnalyticsPage />} />
+            <Route path="/h2h" element={<PlayerAnalyticsPage />} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
