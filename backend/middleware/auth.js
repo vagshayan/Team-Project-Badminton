@@ -11,8 +11,9 @@ const protect = async (req, res, next) => {
   if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.admin = await Admin.findById(decoded.id).select('-password');
+    req.admin = await Admin.findOne({ _id: decoded.id, isDeleted: { $ne: true } }).select('id username email emailVerified name sport avatarUrl role');
     if (!req.admin) return res.status(401).json({ message: 'Admin not found' });
+    if (req.admin.emailVerified !== true) return res.status(403).json({ message: 'Email verification is required.' });
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Token is invalid or expired' });

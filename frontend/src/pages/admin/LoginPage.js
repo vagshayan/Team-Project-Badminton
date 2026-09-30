@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, TROPHY, WARNING_ROUND } from '../../components/Icons';
+import { SUN, MOON, EYE, LOCK, WARNING_ROUND } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const { login, admin } = useAuth();
@@ -26,11 +27,20 @@ export default function LoginPage() {
     }
   }, [admin, navigate]);
 
+  React.useEffect(() => {
+    const verification = new URLSearchParams(location.search).get('verification');
+    const deleted = new URLSearchParams(location.search).get('deleted');
+    if (verification === 'success') setError('Email verified. You can now log in.');
+    if (verification === 'invalid') setError('This verification link is invalid or expired. Request a new one from registration.');
+    if (deleted === 'success') setSuccessMessage('Your account has been deleted successfully.');
+  }, [location.search]);
+
   if (admin) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setLoading(true);
     try {
       await login(username.trim(), password);
@@ -44,34 +54,37 @@ export default function LoginPage() {
 
   return (
     <div style={sh.container}>
-      <div style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
-      <div style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--text)' }} className="mobile-title-main">UoJ SPORTS</span>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 3, fontWeight: 800 }} className="mobile-title-sub">TOURNAMENT MANAGER</span>
+          <div style={sh.brandMark} className="mobile-logo">
+            <img src="/logo.png" alt="University of Jaffna logo" />
+          </div>
+          <div style={sh.brandName}>
+            <span style={sh.brandUniversity} className="mobile-title-main">University of Jaffna</span>
+            <span style={sh.brandLine} className="mobile-title-sub">Sports Tournament Manager</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 15, alignItems: 'center' }} className="mobile-controls">
           <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
-          <Link to={sportMeta ? `/${sportParam}` : '/'} style={{ ...sh.backLink, color: isDarkMode ? '#FFFFFF' : 'var(--primary)' }}>PUBLIC HUB</Link>
+          <Link to={sportMeta ? `/${sportParam}` : '/'} style={{ ...sh.backLink, color: isDarkMode ? '#FFFFFF' : 'var(--primary)' }} className="mobile-btn">PUBLIC HUB</Link>
         </div>
       </nav>
 
-      <main style={sh.mainContent}>
+      <main style={sh.mainContent} className="mobile-main-content">
         <div style={sh.loginContainer} className="mobile-padding-x">
            <div style={sh.loginPane} className="mobile-card">
-              <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 12, color: 'var(--text)' }}>{pageTitle}</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>
+              <div style={{ textAlign: 'center', marginBottom: 40 }} className="mobile-header-block">
+                <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 12, color: 'var(--text)' }} className="mobile-card-title">{pageTitle}</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: 15 }} className="mobile-card-subtitle">
                   {sportMeta ? `Sign in to manage ${sportMeta.label} tournaments.` : 'Enter your tournament manager credentials.'}
                 </p>
               </div>
+              {successMessage && <div style={sh.successBox}>{successMessage}</div>}
               {error && <div style={sh.errorBox}>{WARNING_ROUND} {error}</div>}
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }} className="mobile-form">
                  <div style={sh.fieldGroup}>
                     <label style={sh.fieldLabel}>USERNAME</label>
                     <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" style={sh.fieldInput} required />
@@ -98,7 +111,7 @@ export default function LoginPage() {
                  </div>
                  <button type="submit" style={sh.submitBtn} disabled={loading}>{loading ? 'Authenticating...' : 'Sign in to Dashboard'}</button>
               </form>
-              <div style={sh.loginFooter}>
+              <div style={sh.loginFooter} className="mobile-footer">
                 <Link to="/admin/forgot-password" style={sh.footerLink}>Forgot password?</Link>
                 <span style={{ margin: '0 10px' }}>•</span>
                 New admin? <Link to="/admin/register" style={sh.footerLink}>Register now</Link>
@@ -121,11 +134,14 @@ export default function LoginPage() {
 }
 
 const sh = {
-  container: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflow: 'hidden' },
+  container: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden' },
   blob: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 20 },
-  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
+  brandMark: { width: 54, height: 54, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
+  brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
+  brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
   themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
   backLink: { color: 'var(--primary)', fontWeight: 900, textDecoration: 'none', padding: '10px 18px', borderRadius: '999px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.24)' },
   adminToggleBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 24px', borderRadius: '40px', fontSize: 12, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer' },
@@ -139,6 +155,7 @@ const sh = {
   cardTitle: { fontSize: 28, fontWeight: 900, marginBottom: 8 },
   cardDesc: { fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 32 },
   cardBtn: { fontSize: 13, fontWeight: 800, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10 },
+  successBox: { background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', padding: '12px 20px', borderRadius: 12, marginBottom: 24, fontSize: 14, fontWeight: 700 },
   loginContainer: { width: '100%', maxWidth: 460 },
   loginPane: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '40px', padding: '60px', boxShadow: 'var(--shadow)' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 10 },

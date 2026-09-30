@@ -290,8 +290,7 @@ body.light-mode .theme-toggle-btn {
   flex-direction: column;
   gap: 40px;
   box-sizing: border-box;
-
-  padding-top: 130px; /* Adjust if your header height changes */
+  padding-top: 130px;
 }
 
 /* Hero Grid spanning full viewport width */
@@ -717,4 +716,63 @@ body.light-mode .tournament-icon {
     margin-bottom: 40px;
   }
 
+}
+
+@media (max-width: 768px) {
+  .landing-header {
+    padding: 12px 16px;
+  }
+
+  .brand-block {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .brand-mark {
+    width: 48px;
+    height: 48px;
+  }
+
+  .brand-divider {
+    display: none;
+  }
+
+  .brand-university {
+    font-size: 16px;
+  }
+
+  .brand-line {
+    font-size: 10px;
+  }
+
+  .landing-main {
+    padding-top: 82px;
+  }
+
+  .hero-visual {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .landing-inner {
+    padding: 0 12px;
+  }
+
+  .landing-header {
+    padding: 10px 12px;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .brand-university {
+    font-size: 14px;
+  }
+
+  .brand-line {
+    font-size: 9px;
+  }
 }

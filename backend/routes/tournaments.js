@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Admin = require('../models/Admin');
 const AuditLog = require('../models/AuditLog');
@@ -8,6 +9,13 @@ const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
 
 const SINGLES = ['singles-men', 'singles-women'];
+const CATEGORY_LABELS = {
+  'singles-men': "Men's Singles",
+  'singles-women': "Women's Singles",
+  'doubles-men': "Men's Doubles",
+  'doubles-women': "Women's Doubles",
+  'mixed-doubles': 'Mixed Doubles',
+};
 
 function nextPowerOf2(n) {
   let p = 1;
@@ -222,6 +230,89 @@ router.get('/stats', protect, async (req, res) => {
   }
 });
 
+// ─── ADMIN DASHBOARD SUMMARY ─────────────────────────────
+router.get('/dashboard-summary', protect, async (req, res) => {
+  try {
+    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const tournaments = await Tournament.find({ createdBy: req.admin._id }).sort({ date: 1 }).lean();
+    const tournamentIds = tournaments.map((tournament) => tournament._id);
+    const registrations = await Registration.find({ tournament: { $in: tournamentIds } }).lean();
+    const matches = await Match.find({ tournament: { $in: tournamentIds } }).sort({ createdAt: 1 }).lean();
+    const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const tournamentById = new Map(tournaments.map((tournament) => [String(tournament._id), tournament]));
+    const registrationsByTournament = new Map();
+    registrations.forEach((registration) => {
+      const key = String(registration.tournament);
+      if (!registrationsByTournament.has(key)) registrationsByTournament.set(key, []);
+      registrationsByTournament.get(key).push(registration);
+    });
+    const matchesByTournament = new Map();
+    matches.forEach((match) => {
+      const key = String(match.tournament);
+      if (!matchesByTournament.has(key)) matchesByTournament.set(key, []);
+      matchesByTournament.get(key).push(match);
+    });
+
+    const tournamentData = tournaments.map((tournament) => {
+      const tournamentMatches = matchesByTournament.get(String(tournament._id)) || [];
+      const tournamentRegistrations = registrationsByTournament.get(String(tournament._id)) || [];
+      const confirmedPlayers = tournamentRegistrations.filter((registration) => registration.status === 'confirmed').length;
+      const completedMatches = tournamentMatches.filter((match) => match.isCompleted).length;
+      const totalMatches = tournamentMatches.length;
+      const progress = totalMatches ? Math.round((completedMatches / totalMatches) * 100) : 0;
+      const currentRound = tournamentMatches.filter((match) => !match.isCompleted).reduce((round, match) => Math.max(round, match.round || 0), 0);
+      const deadline = tournament.registrationDeadline || tournament.date;
+      const status = tournament.isPublished || tournament.isLocked ? 'In Progress' : (new Date(deadline) >= dayStart ? 'Registration Open' : 'Completed');
+      return {
+        ...tournament,
+        confirmedPlayers,
+        totalRegistrations: tournamentRegistrations.length,
+        completedMatches,
+        totalMatches,
+        progress,
+        currentRound,
+        status,
+      };
+    });
+
+    const activeTournaments = tournamentData.filter((tournament) => tournament.isActive && tournament.status !== 'Completed');
+    const pendingApprovals = registrations.filter((registration) => registration.status === 'pending').length;
+    const matchesToday = matches.filter((match) => {
+      const tournament = tournamentById.get(String(match.tournament));
+      return tournament && new Date(tournament.date) >= dayStart && new Date(tournament.date) < dayEnd;
+    });
+    const upcomingMatches = matches.filter((match) => !match.isCompleted && match.player1 && match.player2)
+      .map((match) => ({ ...match, tournament: tournamentById.get(String(match.tournament)) }))
+      .filter((match) => match.tournament)
+      .sort((a, b) => new Date(a.tournament.date) - new Date(b.tournament.date))
+      .slice(0, 5);
+    const auditLogs = await AuditLog.find({ admin: req.admin._id, sport: req.admin.sport })
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .lean();
+
+    res.json({
+      confirmedPlayers: registrations.filter((registration) => registration.status === 'confirmed').length,
+      pendingApprovals,
+      activeTournaments: activeTournaments.length,
+      matchesToday: matchesToday.length,
+      activeTournamentData: activeTournaments,
+      upcomingMatches,
+      attentionItems: [
+        pendingApprovals > 0 ? { type: 'pending', count: pendingApprovals, message: `${pendingApprovals} player approval${pendingApprovals === 1 ? '' : 's'} pending`, tab: 'pending-approvals' } : null,
+        activeTournaments.filter((tournament) => tournament.confirmedPlayers >= 2 && !tournament.isLocked).map((tournament) => ({ type: 'bracket', message: `Generate bracket for ${CATEGORY_LABELS[tournament.category] || tournament.category}`, tab: 'brackets' })),
+      ].flat().filter(Boolean),
+      recentActivity: auditLogs,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ─── PUBLIC — students view tournaments for REGISTRATION ──
 router.get('/public/:sport', async (req, res) => {
   try {
@@ -233,7 +324,9 @@ router.get('/public/:sport', async (req, res) => {
     })
       .populate('createdBy', 'name')
       .sort({ date: 1 });
-    res.json(tournaments);
+
+    const validTournaments = tournaments.filter((tournament) => tournament.createdBy && tournament.createdBy._id);
+    res.json(validTournaments);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -384,11 +477,14 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     const { Tournament } = getModelsForSport(req.admin.sport);
-    const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category, createdBy: req.admin._id });
-    if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
-
     const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+    if (tournament.isPublished || tournament.isLocked) {
+      return res.status(400).json({ message: 'Cannot update a locked or published tournament' });
+    }
+
+    const existing = await Tournament.findOne({ _id: { $ne: req.params.id }, sport: req.admin.sport, year, category, createdBy: req.admin._id });
+    if (existing) return res.status(400).json({ message: `A ${category} tournament already exists for ${year}.` });
 
     const beforeValues = {
       year: tournament.year,
@@ -490,56 +586,59 @@ router.delete('/:id', protect, async (req, res) => {
     const tournament = await Tournament.findOne({ _id: req.params.id, createdBy: req.admin._id });
     if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
 
-    const registrations = await Registration.find({ tournament: req.params.id });
-    const regRollNumbers = registrations.map((reg) => String(reg.rollNumber || '').trim().toUpperCase()).filter(Boolean);
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const registrations = await Registration.find({ tournament: req.params.id }).session(session);
+        const regRollNumbers = registrations.map((reg) => String(reg.rollNumber || '').trim().toUpperCase()).filter(Boolean);
 
-    for (const reg of registrations) {
-      const partnerRoll = String(reg.partnerRollNumber || '').trim().toUpperCase();
-      if (partnerRoll) {
-        await Registration.findOneAndUpdate(
-          { tournament: req.params.id, rollNumber: partnerRoll },
-          {
-            partnerRollNumber: '',
-            partnerName: '',
-            partnerStatus: 'looking',
-            pairStatus: 'incomplete',
-            pairId: null,
+        for (const reg of registrations) {
+          const partnerRoll = String(reg.partnerRollNumber || '').trim().toUpperCase();
+          if (partnerRoll) {
+            await Registration.findOneAndUpdate(
+              { tournament: req.params.id, rollNumber: partnerRoll },
+              {
+                partnerRollNumber: '',
+                partnerName: '',
+                partnerStatus: 'looking',
+                pairStatus: 'incomplete',
+                pairId: null,
+              },
+              { session }
+            );
           }
+        }
+
+        await Player.updateMany(
+          { rollNumber: { $in: regRollNumbers } },
+          { $pull: { tournamentHistory: req.params.id } },
+          { session }
         );
-      }
+        await Player.deleteMany({ rollNumber: { $in: regRollNumbers }, tournamentHistory: { $size: 0 } }, { session });
+
+        const pairIds = registrations.map((reg) => reg.pairId).filter(Boolean).map((id) => id.toString());
+        await Pair.deleteMany({ tournament: req.params.id }, { session });
+        if (pairIds.length > 0) {
+          await Pair.deleteMany({ _id: { $in: pairIds } }, { session });
+        }
+
+        await PartnerRequest.deleteMany({ tournament: req.params.id }, { session });
+        await Match.deleteMany({ tournament: req.params.id }, { session });
+        await Registration.deleteMany({ tournament: req.params.id }, { session });
+        await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id }, { session });
+        await logAdminAction({
+          adminId: req.admin._id,
+          action: 'DELETE_TOURNAMENT',
+          targetId: tournament._id,
+          targetModel: 'Tournament',
+          details: { category: tournament.category, year: tournament.year },
+          req,
+          session,
+        });
+      });
+    } finally {
+      await session.endSession();
     }
-
-    await Player.updateMany(
-      { rollNumber: { $in: regRollNumbers } },
-      { $pull: { tournamentHistory: req.params.id } }
-    );
-
-    for (const rollNumber of regRollNumbers) {
-      const player = await Player.findOne({ rollNumber });
-      if (player && player.tournamentHistory.length === 0) {
-        await Player.deleteOne({ rollNumber });
-      }
-    }
-
-    const pairIds = registrations.map((reg) => reg.pairId).filter(Boolean).map((id) => id.toString());
-    await Pair.deleteMany({ tournament: req.params.id });
-    if (pairIds.length > 0) {
-      await Pair.deleteMany({ _id: { $in: pairIds } });
-    }
-
-    await PartnerRequest.deleteMany({ tournament: req.params.id });
-    await Match.deleteMany({ tournament: req.params.id });
-    await Registration.deleteMany({ tournament: req.params.id });
-    await Tournament.findOneAndDelete({ _id: req.params.id, createdBy: req.admin._id });
-    // Log Audit action
-    await logAdminAction({
-      adminId: req.admin._id,
-      action: 'DELETE_TOURNAMENT',
-      targetId: tournament._id,
-      targetModel: 'Tournament',
-      details: { category: tournament.category, year: tournament.year },
-      req
-    });
     res.json({ message: 'Tournament deleted successfully. All registrations have been cancelled.' });
   } catch (err) {
     res.status(500).json({ message: err.message });

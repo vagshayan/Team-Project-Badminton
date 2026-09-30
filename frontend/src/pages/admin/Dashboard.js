@@ -26,11 +26,13 @@ const STATUS_STYLE = {
   cancelled: { bg: 'rgba(156, 163, 175, 0.15)', color: '#6B7280', label: 'Cancelled' },
 };
 
-const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtDeadline = (d, fallback) => {
+const formatDatePreference = (value, dateFormat = 'DD/MM/YYYY') => new Date(value).toLocaleDateString(dateFormat === 'MM/DD/YYYY' ? 'en-US' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const formatTimePreference = (value, timeFormat = '12-hour') => new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: timeFormat === '12-hour' });
+const fmtDate = (d, dateFormat) => formatDatePreference(d, dateFormat);
+const fmtDeadline = (d, fallback, dateFormat) => {
   const target = d || fallback;
   if (!target) return 'N/A';
-  return new Date(target).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDatePreference(target, dateFormat);
 };
 
 const AUDIT_ACTION_LABELS = {
@@ -114,7 +116,7 @@ const formatGenericAuditDetails = (details) => Object.entries(details)
   .map(([key, value]) => `${formatAuditFieldName(key)}: ${typeof value === 'object' ? formatGenericAuditDetails(value) : value}`)
   .join(', ') || '—';
 
-const formatAuditDetails = (log) => {
+const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
   if (!log?.details) return '—';
   const details = log.details;
   if (typeof details === 'string') return details;
@@ -135,8 +137,8 @@ const formatAuditDetails = (log) => {
           const value = fields[key];
           if (key === 'category') return `Category to ${lbl(value)}`;
           if (key === 'year') return `Year to ${value}`;
-          if (key === 'date') return `Date to ${new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-          if (key === 'registrationDeadline') return `Registration deadline to ${new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+          if (key === 'date') return `Date to ${formatDatePreference(value, dateFormat)}`;
+          if (key === 'registrationDeadline') return `Registration deadline to ${formatDatePreference(value, dateFormat)}`;
           return `${key} to ${value}`;
         }).join(', ');
         return `Updated tournament — ${updated}`;
@@ -178,6 +180,37 @@ const formatAuditDetails = (log) => {
     default:
       return formatGenericAuditDetails(details);
   }
+};
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return `${SUN} GOOD MORNING`;
+  if (hour < 18) return `${SUN} GOOD AFTERNOON`;
+  return `${MOON} GOOD EVENING`;
+};
+
+const formatActivityTime = (date) => {
+  if (!date) return '';
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return `${Math.floor(hours / 24)} day${hours < 48 ? '' : 's'} ago`;
+};
+
+const statusTone = {
+  'In Progress': { color: '#10B981', background: 'rgba(16,185,129,0.14)' },
+  'Registration Open': { color: '#3B82F6', background: 'rgba(59,130,246,0.14)' },
+  Upcoming: { color: '#F59E0B', background: 'rgba(245,158,11,0.14)' },
+  Completed: { color: '#10B981', background: 'rgba(16,185,129,0.14)' },
+};
+
+const getTournamentProgressStatus = (tournament) => {
+  const progress = Math.min(100, Math.max(0, Number(tournament?.progress) || 0));
+  if (progress === 0) return 'Registration Open';
+  if (progress === 100) return 'Completed';
+  return 'In Progress';
 };
 
 const FILTER_CATEGORIES = [
@@ -240,11 +273,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(getTabFromSearch(location.search));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarToggleHovered, setSidebarToggleHovered] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [stats, setStats] = useState({ totalPlayers: 0, pendingApprovals: 0, activeCategories: 0 });
+  const [dashboardSummary, setDashboardSummary] = useState(null);
+  const [dashboardError, setDashboardError] = useState('');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [toastType, setToastType] = useState('success');
@@ -257,6 +293,7 @@ export default function Dashboard() {
   const [removePairLoading, setRemovePairLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [playerPage, setPlayerPage] = useState(1);
   const removePairModalRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -275,13 +312,15 @@ export default function Dashboard() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState(admin?.name || '');
   const [profileUsername, setProfileUsername] = useState(admin?.username || '');
+  const [profileEmail, setProfileEmail] = useState(admin?.email || '');
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(admin?.avatarUrl || '');
+  const [securityQuestion, setSecurityQuestion] = useState(admin?.securityQuestion || '');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
+  const [securityMessage, setSecurityMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordFocus, setPasswordFocus] = useState(false);
@@ -289,6 +328,14 @@ export default function Dashboard() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [savingSecurity, setSavingSecurity] = useState(false);
+  const [showPasswordEditor, setShowPasswordEditor] = useState(false);
+  const [showSecurityEditor, setShowSecurityEditor] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
+  const [timeFormat, setTimeFormat] = useState('12-hour');
+  const [itemsPerPage, setItemsPerPage] = useState('25');
+  const skipPreferenceSaveRef = useRef(false);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropSource, setCropSource] = useState('');
   const [cropImage, setCropImage] = useState('');
@@ -314,9 +361,11 @@ export default function Dashboard() {
     }
   }, [location.search, activeTab, navigate]);
 
-  const changeTab = (tabId) => {
+  const changeTab = (tabId, tournamentId = null) => {
     const normalizedTab = VALID_ADMIN_TABS.has(tabId) ? tabId : DEFAULT_ADMIN_TAB;
-    navigate(`?tab=${normalizedTab}`, { replace: false });
+    const params = new URLSearchParams({ tab: normalizedTab });
+    if (tournamentId) params.set('tournamentId', tournamentId);
+    navigate(`?${params.toString()}`, { replace: false });
     if (isMobile) setMobileSidebarOpen(false);
   };
   const [auditDate, setAuditDate] = useState('');
@@ -387,7 +436,7 @@ export default function Dashboard() {
     || profileAvatarUrl !== (admin?.avatarUrl || '');
   const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
   const showPasswordRequirements = passwordFocus && newPassword.length > 0;
-  const showPasswordMatchMessage = confirmFocus && confirmPassword.length > 0;
+  const showPasswordMatchMessage = confirmPassword.length > 0;
 
   const getApiBase = () => {
     if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.startsWith('http')) {
@@ -526,14 +575,46 @@ export default function Dashboard() {
   useEffect(() => {
     setProfileName(admin?.name || '');
     setProfileUsername(admin?.username || '');
+    setProfileEmail(admin?.email || '');
     setProfileAvatarUrl(admin?.avatarUrl || '');
+    setSecurityQuestion(admin?.securityQuestion || '');
   }, [admin]);
+
+  const adminPreferencesKey = admin ? `adminPreferences:${admin.id || admin._id || admin.username}` : null;
+
+  useEffect(() => {
+    if (!adminPreferencesKey) return;
+    skipPreferenceSaveRef.current = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem(adminPreferencesKey) || '{}');
+      setDateFormat(saved.dateFormat || 'DD/MM/YYYY');
+      setTimeFormat(saved.timeFormat || '12-hour');
+      setItemsPerPage(String(saved.itemsPerPage || '25'));
+    } catch {
+      setDateFormat('DD/MM/YYYY');
+      setTimeFormat('12-hour');
+      setItemsPerPage('25');
+    }
+  }, [adminPreferencesKey]);
+
+  useEffect(() => {
+    if (!adminPreferencesKey) return;
+    if (skipPreferenceSaveRef.current) {
+      skipPreferenceSaveRef.current = false;
+      return;
+    }
+    localStorage.setItem(adminPreferencesKey, JSON.stringify({
+      dateFormat,
+      timeFormat,
+      itemsPerPage,
+    }));
+  }, [adminPreferencesKey, dateFormat, timeFormat, itemsPerPage]);
 
   const normalizedSport = admin?.sport ? String(admin.sport).trim().toLowerCase() : '';
   const meta = getSportMeta(normalizedSport, isDarkMode) || { label: admin?.sport ? String(admin.sport).trim().toUpperCase() : 'ADMIN', icon: TROPHY, color: '#2563EB' };
   const safeMetaLabel = meta.label || 'ADMIN';
 
-  const loginTimeFormatted = new Date(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now()).toLocaleString('en-IN', { hour12: true });
+  const loginTimeFormatted = `${formatDatePreference(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now(), dateFormat)} ${formatTimePreference(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now(), timeFormat)}`;
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -578,7 +659,7 @@ export default function Dashboard() {
     ? sortedLoginEvents.map((timestamp) => ({
         id: timestamp,
         title: 'Admin login',
-        description: `Logged in at ${new Date(timestamp).toLocaleString('en-IN', { hour12: true })}`,
+        description: `Logged in at ${formatDatePreference(timestamp, dateFormat)} ${formatTimePreference(timestamp, timeFormat)}`,
       }))
     : [{ id: 'none', title: 'No login notifications yet', description: 'Your recent login history will appear here.' }];
 
@@ -606,20 +687,50 @@ export default function Dashboard() {
 
   const pendingRegistrations = registrations.filter(r => r.status === 'pending');
 
+  const registrationChartData = FILTER_CATEGORIES.map((category) => ({
+    id: category.id,
+    label: CAT_LABELS[category.id],
+    ...(() => {
+      const categoryRegistrations = registrations.filter((registration) => registration.tournament?.category === category.id);
+      const total = categoryRegistrations.length;
+      const approved = categoryRegistrations.filter((registration) => registration.status === 'confirmed').length;
+      return { approved, total, percentage: total ? Math.round((approved / total) * 100) : 0 };
+    })(),
+  }));
+  const activeTournamentData = dashboardSummary?.activeTournamentData || [];
+  const chartTournaments = activeTournamentData;
+  const tournamentStatusChartData = [
+    { id: 'open', label: 'Registration Open', color: '#3B82F6', count: chartTournaments.filter((tournament) => getTournamentProgressStatus(tournament) === 'Registration Open').length },
+    { id: 'progress', label: 'In Progress', color: '#F59E0B', count: chartTournaments.filter((tournament) => getTournamentProgressStatus(tournament) === 'In Progress').length },
+    { id: 'completed', label: 'Completed', color: '#22C55E', count: chartTournaments.filter((tournament) => getTournamentProgressStatus(tournament) === 'Completed').length },
+  ];
+  const tournamentStatusTotal = tournamentStatusChartData.reduce((total, item) => total + item.count, 0);
+  const tournamentStatusGradient = tournamentStatusTotal
+    ? tournamentStatusChartData.reduce((gradient, item, index) => {
+      const start = tournamentStatusChartData.slice(0, index).reduce((total, current) => total + current.count, 0) / tournamentStatusTotal * 100;
+      const end = (tournamentStatusChartData.slice(0, index + 1).reduce((total, current) => total + current.count, 0) / tournamentStatusTotal) * 100;
+      return `${gradient}${index ? ', ' : ''}${item.color} ${start}% ${end}%`;
+    }, '')
+    : 'var(--border) 0% 100%';
+
   const fetchData = useCallback(async () => {
     if (!admin) return;
     setLoading(true);
+    setDashboardError('');
     try {
-      const [tRes, sRes, rRes] = await Promise.all([
+      const [tRes, sRes, rRes, dRes] = await Promise.all([
         axios.get('/api/tournaments/admin'),
         axios.get('/api/tournaments/stats'),
-        axios.get('/api/registrations/admin')
+        axios.get('/api/registrations/admin'),
+        axios.get('/api/tournaments/dashboard-summary')
       ]);
       setTournaments(tRes.data);
       setStats(sRes.data);
       setRegistrations(rRes.data);
+      setDashboardSummary(dRes.data);
     } catch (err) {
       console.error(err);
+      setDashboardError(err.response?.data?.message || 'Unable to load dashboard summary.');
     } finally {
       setLoading(false);
     }
@@ -645,7 +756,9 @@ export default function Dashboard() {
   }, [admin, auditDate]);
 
   useEffect(() => { if (admin) fetchData(); }, [admin, fetchData]);
-  useEffect(() => { if (admin && activeTab === 'audit-log') fetchAuditLogs(); }, [admin, activeTab, fetchAuditLogs]);
+  useEffect(() => {
+    if (admin && (activeTab === 'audit-log' || activeTab === 'profile')) fetchAuditLogs();
+  }, [admin, activeTab, fetchAuditLogs]);
   useEffect(() => {
     if (!removePairTarget) return;
     const handleKeyDown = (e) => {
@@ -805,6 +918,38 @@ export default function Dashboard() {
     return groups;
   }, [filteredRegistrations, pairCandidates]);
 
+  const playerPageSize = Math.max(1, Number(itemsPerPage) || 25);
+  const playerPages = useMemo(() => {
+    const pages = [];
+    let page = [];
+    let playerCount = 0;
+
+    groupedRegistrations.forEach((entry) => {
+      const entryPlayerCount = entry.kind === 'pair' && entry.players[1] ? 2 : 1;
+      if (page.length > 0 && playerCount + entryPlayerCount > playerPageSize) {
+        pages.push(page);
+        page = [];
+        playerCount = 0;
+      }
+      page.push(entry);
+      playerCount += entryPlayerCount;
+    });
+
+    if (page.length > 0) pages.push(page);
+    return pages;
+  }, [groupedRegistrations, playerPageSize]);
+
+  const playerTotalPages = Math.max(1, playerPages.length);
+  const paginatedRegistrations = playerPages[playerPage - 1] || [];
+
+  useEffect(() => {
+    setPlayerPage(1);
+  }, [searchTerm, statusFilter, itemsPerPage]);
+
+  useEffect(() => {
+    setPlayerPage((page) => Math.min(page, playerTotalPages));
+  }, [playerTotalPages]);
+
   const handleCreate = async (data) => {
     try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast(`${SUCCESS} Tournament created!`); }
     catch (err) { alert(err.response?.data?.message || 'Error creating tournament'); }
@@ -816,6 +961,13 @@ export default function Dashboard() {
   const handleDelete = async (password) => {
     try { await axios.delete(`/api/tournaments/${deleteTarget._id}`, { data: { password } }); setDeleteTarget(null); fetchData(); showToast('🗑 Deleted.'); }
     catch (err) { alert(err.response?.data?.message || 'Invalid password.'); }
+  };
+
+  const handleDeleteAccount = async (password) => {
+    await axios.delete('/api/auth/me', { data: { password } });
+    setShowDeleteAccountModal(false);
+    logout();
+    navigate('/admin/login?deleted=success', { replace: true });
   };
 
   const handleClearAllAuditLogs = async () => {
@@ -835,6 +987,45 @@ export default function Dashboard() {
   const safeAdminFirstName = (safeAdminName.split(' ')[0] || admin.username || 'ADMIN').toUpperCase();
   const avatarSrc = profileAvatarUrl || admin?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeAdminName)}&background=random&size=128`;
   const desktopSidebarW = sidebarCollapsed ? 72 : 340;
+  const renderProfileMenu = (menuStyle = {}) => (
+    <div style={{
+      position: 'absolute',
+      left: 0,
+      bottom: 'calc(100% + 12px)',
+      width: 280,
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      borderRadius: 20,
+      boxShadow: '0 30px 70px rgba(0,0,0,0.14)',
+      padding: 14,
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      backdropFilter: 'blur(25px)',
+      ...menuStyle,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+        <img src={avatarSrc} alt="Profile" style={{ width: 40, height: 40, borderRadius: 14, objectFit: 'cover' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 950 }}>{safeAdminName}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
+        </div>
+      </div>
+      <button onClick={() => { changeTab('profile'); setProfileMenuOpen(false); }} style={ds.profileMenuItem}>
+        <span style={{ fontSize: 16 }}>👤</span>
+        <span style={{ flex: 1, fontWeight: 800 }}>Profile Settings</span>
+      </button>
+      <button onClick={() => { toggleTheme(); setProfileMenuOpen(false); }} style={ds.profileMenuItem}>
+        <span style={{ fontSize: 16 }}>{isDarkMode ? SUN : MOON}</span>
+        <span style={{ flex: 1, fontWeight: 800 }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+      </button>
+      <button onClick={() => { logout(); setProfileMenuOpen(false); }} style={{ ...ds.profileMenuItem, color: '#EF4444' }}>
+        <span style={{ fontSize: 16 }}>{LOGOUT}</span>
+        <span style={{ flex: 1, fontWeight: 800 }}>Sign Out</span>
+      </button>
+    </div>
+  );
 
   return (
     <div style={ds.container}>
@@ -855,19 +1046,61 @@ export default function Dashboard() {
         transition: isMobile
           ? 'transform 0.3s cubic-bezier(0.4,0,0.2,1)'
           : 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
-        overflowY: 'auto',
-        overflowX: 'hidden',
+        overflowY: (!isMobile && sidebarCollapsed) ? 'visible' : 'auto',
+        overflowX: (!isMobile && sidebarCollapsed) ? 'visible' : 'hidden',
           //overflow: 'hidden',
         zIndex: isMobile ? 200 : 20,
       }}>
         {/* Brand / Toggle Row */}
         <div style={{ ...ds.sidebarBrand, justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'flex-start', padding: (!isMobile && sidebarCollapsed) ? '0 14px' : '0 32px', gap: 12, overflow: 'hidden' }}>
-          <div style={{ ...ds.logoBox, background: meta.color, flexShrink: 0 }}>{meta.icon}</div>
+          {(!isMobile && sidebarCollapsed) ? (
+            <div
+              onMouseEnter={() => setSidebarToggleHovered(true)}
+              onMouseLeave={() => setSidebarToggleHovered(false)}
+              style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}
+            >
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(false)}
+                aria-label="Open sidebar"
+                style={{ ...ds.logoBox, position: 'relative', background: meta.color, border: 'none', color: 'inherit', cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}
+              >
+                <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: sidebarToggleHovered ? 0 : 1, transition: 'opacity 0.2s ease' }}>{meta.icon}</span>
+                <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: sidebarToggleHovered ? 1 : 0, transition: 'opacity 0.2s ease' }}>{MENU_OPEN}</span>
+              </button>
+              <span
+                role="tooltip"
+                style={{
+                  position: 'absolute',
+                  left: 'calc(100% + 10px)',
+                  top: '50%',
+                  transform: `translateY(-50%) translateX(${sidebarToggleHovered ? '0' : '-4px'})`,
+                  opacity: sidebarToggleHovered ? 1 : 0,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  boxShadow: 'var(--shadow)',
+                  transition: 'opacity 0.2s ease, transform 0.2s ease',
+                  zIndex: 1100,
+                }}
+              >
+                Open sidebar
+              </span>
+            </div>
+          ) : (
+            <div style={{ ...ds.logoBox, background: meta.color, flexShrink: 0 }}>{meta.icon}</div>
+          )}
           {!((!isMobile) && sidebarCollapsed) && <div style={{ fontWeight: 950, fontSize: 16, letterSpacing: -0.5, whiteSpace: 'nowrap' }}>ADMIN PANEL</div>}
           <button
             onClick={() => isMobile ? setMobileSidebarOpen(false) : setSidebarCollapsed(c => !c)}
             title={(!isMobile && sidebarCollapsed) ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 8, borderRadius: 10, flexShrink: 0, transition: 'color 0.2s' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 8, borderRadius: 10, flexShrink: 0, transition: 'color 0.2s', display: (!isMobile && sidebarCollapsed) ? 'none' : undefined }}
           >
             {(!isMobile && sidebarCollapsed) ? MENU_OPEN : CLOSE}
           </button>
@@ -896,16 +1129,6 @@ export default function Dashboard() {
             <div style={{ textAlign: 'center' }}>
               <div style={{ ...ds.pName, color: isDarkMode ? 'var(--text)' : '#111827' }}>{safeAdminName.toUpperCase()}</div>
               <div style={{ ...ds.pRole, color: isDarkMode ? 'var(--text-muted)' : '#6b7280' }}>{safeMetaLabel.toUpperCase()} MANAGER</div>
-            </div>
-          </div>
-        )}
-
-        {/* Collapsed avatar (icon only, desktop only) */}
-        {!isMobile && sidebarCollapsed && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ position: 'relative', width: 42, height: 42 }}>
-              <img src={avatarSrc} alt="Admin" style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'cover', border: '2px solid var(--border)' }} />
-              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, background: '#10B981', border: '2px solid var(--bg-card)', borderRadius: '50%' }} />
             </div>
           </div>
         )}
@@ -939,17 +1162,18 @@ export default function Dashboard() {
           ))}
         </nav>
 
-        <div style={{ padding: (!isMobile && sidebarCollapsed) ? '24px 8px' : '24px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: (!isMobile && sidebarCollapsed) ? 'center' : 'stretch' }}>
-          <div ref={sidebarProfileMenuRef} style={{ position: 'relative', width: '100%' }}>
+        <div style={{ padding: (!isMobile && sidebarCollapsed) ? '20px 8px 32px' : '24px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: (!isMobile && sidebarCollapsed) ? 'center' : 'stretch' }}>
+          <div ref={sidebarProfileMenuRef} style={{ position: 'relative', width: (!isMobile && sidebarCollapsed) ? 56 : '100%', height: (!isMobile && sidebarCollapsed) ? 56 : 'auto', borderRadius: (!isMobile && sidebarCollapsed) ? 16 : 0, background: (!isMobile && sidebarCollapsed) ? 'var(--bg-input)' : 'transparent', border: (!isMobile && sidebarCollapsed) ? '1px solid var(--border)' : 'none', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <button
               type="button"
               onClick={() => setProfileMenuOpen((open) => !open)}
               style={{
                 width: '100%',
+                height: (!isMobile && sidebarCollapsed) ? '100%' : 'auto',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: '14px 18px',
+                padding: (!isMobile && sidebarCollapsed) ? 0 : '14px 18px',
                 borderRadius: 18,
                 border: '1px solid var(--border)',
                 background: 'var(--bg-input)',
@@ -975,7 +1199,9 @@ export default function Dashboard() {
               )}
             </button>
 
-            {profileMenuOpen && (
+            {profileMenuOpen && !isMobile && sidebarCollapsed && renderProfileMenu({ left: 'calc(100% + 12px)', bottom: 0 })}
+
+            {profileMenuOpen && !(!isMobile && sidebarCollapsed) && (
               <div style={{
                 position: 'absolute',
                 left: 0,
@@ -1141,34 +1367,160 @@ export default function Dashboard() {
 
           {activeTab === 'dashboard' && (
             <div>
-              <h1 style={{ ...ds.title, fontSize: isMobile ? 28 : 56 }}>DASHBOARD OVERVIEW</h1>
-              <p style={{ ...ds.subtitle, fontSize: isMobile ? 14 : 18, marginBottom: isMobile ? 24 : 60 }}>Track your tournament progress and activity.</p>
-
-              <div className="responsive-grid-3" style={{ marginBottom: isMobile ? 32 : 70 }}>
-                {[
-                  { label: 'Confirmed Players', val: stats.totalPlayers || 0, color: '#3B82F6', icon: PEOPLE, target: 'confirmed-summary' },
-                  { label: 'Awaiting Approvals', val: stats.pendingApprovals || 0, color: '#EF4444', icon: HOURGLASS, target: 'pending-approvals' },
-                  { label: 'Active Domains', val: stats.activeCategories || 0, color: '#9333EA', icon: MEDAL, target: 'tournament-setup' },
-                ].map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => changeTab(s.target)}
-                    style={{ ...ds.statCard, padding: isMobile ? '24px 20px' : '48px 32px', borderRadius: isMobile ? 24 : 40, cursor: 'pointer', textAlign: 'left' }}
-                    className="mobile-card"
-                  >
-                    <div style={{ ...ds.cardSymbol, color: s.color, background: `${s.color}15` }}>{s.icon}</div>
-                    <div style={{ fontSize: isMobile ? 42 : 64, fontWeight: 950, color: 'var(--text)' }}>{s.val}</div>
-                    <div style={{ fontSize: isMobile ? 11 : 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 2 }}>{s.label.toUpperCase()}</div>
-                  </button>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, marginBottom: 30 }}>
+                {/* <div>
+                  <p style={{ ...ds.subtitle, fontSize: 15, margin: 0 }}>Here's what's happening with your {safeMetaLabel.toLowerCase()} tournaments today.</p>
+                </div> */}
+                <div style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap' }}>{formatDatePreference(new Date(), dateFormat)}</div>
               </div>
+
+              {dashboardError && <div className="alert alert-error" style={{ marginBottom: 20 }}>{dashboardError}</div>}
+              {loading && !dashboardSummary ? (
+                <div style={{ ...ds.tableBox, padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading dashboard data...</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 22 }}>
+                    {[
+                      { label: 'CONFIRMED PLAYERS', value: dashboardSummary?.confirmedPlayers ?? stats.totalPlayers ?? 0, detail: 'Total registered and approved', icon: PEOPLE, color: '#3B82F6', target: 'confirmed-summary' },
+                      { label: 'PENDING APPROVALS', value: dashboardSummary?.pendingApprovals ?? stats.pendingApprovals ?? 0, detail: 'Players awaiting approval', icon: HOURGLASS, color: '#F59E0B', target: 'pending-approvals' },
+                      { label: 'ACTIVE TOURNAMENTS', value: dashboardSummary?.activeTournaments ?? 0, detail: 'Currently in progress', icon: TROPHY, color: meta.color, target: 'tournament-setup' },
+                    ].map((stat) => (
+                      <button key={stat.label} type="button" onClick={() => changeTab(stat.target)} style={{ ...ds.statCard, padding: '22px 20px', borderRadius: 20, cursor: 'pointer', textAlign: 'left' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ ...ds.cardSymbol, color: stat.color, background: `${stat.color}18`, width: 38, height: 38 }}>{stat.icon}</div>
+                          <span style={{ color: stat.color, fontSize: 28, fontWeight: 950 }}>{stat.value}</span>
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text)', letterSpacing: 1.1, marginTop: 18 }}>{stat.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{stat.detail}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: 18, marginBottom: 18 }}>
+                    <section style={ds.dashboardPanel}>
+                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>QUICK ACTIONS</h3><p style={ds.dashboardPanelSubtitle}>Jump into the work that matters.</p></div></div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                        {[
+                          { label: 'Create Tournament', detail: 'Set up a new tournament', icon: '+', action: () => setShowCreate(true), primary: true },
+                          { label: 'Manage Players', detail: 'View and approve registrations', icon: PEOPLE, action: () => changeTab('player-approvals') },
+                          { label: 'Generate Bracket', detail: 'Create tournament draws', icon: TREE, action: () => changeTab('brackets') },
+                          { label: 'Enter Match Result', detail: 'Update match scores', icon: MEDAL, action: () => changeTab('brackets') },
+                        ].map((action) => <button key={action.label} type="button" onClick={action.action} style={{ ...ds.quickAction, ...(action.primary ? { background: `color-mix(in srgb, ${meta.color} 76%, #000)`, color: '#fff', borderColor: `color-mix(in srgb, ${meta.color} 76%, #000)` } : {}) }}>
+                          <span style={{ ...ds.quickActionIcon, color: action.primary ? '#fff' : meta.color }}>{action.icon}</span>
+                          <span style={ds.quickActionText}><strong style={{ ...ds.quickActionTitle, color: action.primary ? '#fff' : 'var(--text)' }}>{action.label}</strong><small style={{ ...ds.quickActionDetail, color: action.primary ? 'rgba(255,255,255,0.9)' : 'var(--text-muted)' }}>{action.detail}</small></span>
+                          <span style={{ ...ds.quickActionArrow, color: action.primary ? '#fff' : 'var(--text)' }}>{ARROW_RIGHT}</span>
+                        </button>)}
+                      </div>
+                    </section>
+                    <section style={ds.dashboardPanel}>
+                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>⚠ NEEDS ATTENTION</h3><p style={ds.dashboardPanelSubtitle}>Items requiring a decision.</p></div></div>
+                      {dashboardSummary?.attentionItems?.length ? dashboardSummary.attentionItems.slice(0, 4).map((item, index) => <button key={`${item.message}-${index}`} type="button" onClick={() => changeTab(item.tab)} style={ds.attentionItem}><span style={{ color: '#F59E0B', fontSize: 18 }}>!</span><span><strong>{item.message}</strong><small>   Review and take action</small></span><span style={{ marginLeft: 'auto' }}>{ARROW_RIGHT}</span></button>) : <div style={ds.emptyPanel}><span style={{ color: '#10B981', fontSize: 20 }}>{CHECK_MARK}</span> Everything is up to date</div>}
+                    </section>
+                  </div>
+
+                  <div>
+                    <section style={ds.dashboardPanel}>
+                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>🏆 ACTIVE TOURNAMENTS</h3><p style={ds.dashboardPanelSubtitle}>Current {safeMetaLabel.toLowerCase()} tournament progress.</p></div><button type="button" onClick={() => changeTab('tournament-setup')} style={ds.textAction}>View all {ARROW_RIGHT}</button></div>
+                      {activeTournamentData.length ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
+                          {activeTournamentData.map((tournament) => {
+                            const cardStatus = getTournamentProgressStatus(tournament);
+                            const isCompleted = cardStatus === 'Completed';
+                            const tone = statusTone[cardStatus] || statusTone.Upcoming;
+                            const isTeamCategory = !['singles-men', 'singles-women'].includes(tournament.category);
+                            const progress = Math.min(100, Math.max(0, tournament.progress || 0));
+                            return (
+                              <article key={tournament._id} style={{ ...ds.tournamentCard, ...(isCompleted ? ds.completedTournamentCard : {}) }}>
+                                <div style={ds.tournamentCardTop}>
+                                  <div style={{ ...ds.tournamentIcon, color: isCompleted ? '#10B981' : meta.color, background: isCompleted ? 'rgba(16,185,129,0.14)' : `${meta.color}18` }}>{isCompleted ? CHECK_MARK : (isTeamCategory ? PEOPLE : TROPHY)}</div>
+                                  <span style={{ ...ds.statusBadge, ...(isCompleted ? ds.completedStatusBadge : { color: tone.color, background: tone.background }) }}>{isCompleted ? 'Completed ✓' : cardStatus}</span>
+                                </div>
+                                <div>
+                                  <h4 style={ds.tournamentCardTitle}>{CAT_LABELS[tournament.category] || tournament.category}</h4>
+                                  <div style={ds.tournamentCardType}>{isTeamCategory ? 'Team Category' : 'Individual Category'} · {tournament.year}</div>
+                                </div>
+                                <div style={ds.tournamentMetricGrid}>
+                                  <div style={{ ...ds.tournamentMetric, ...(isCompleted ? ds.completedTournamentMetric : {}) }}><strong>{tournament.confirmedPlayers || 0} / {tournament.totalRegistrations || 0}</strong><span> Players</span></div>
+                                  <div style={{ ...ds.tournamentMetric, ...(isCompleted ? ds.completedTournamentMetric : {}) }}><strong>{tournament.completedMatches || 0} / {tournament.totalMatches || 0}</strong><span> Matches</span></div>
+                                </div>
+                                <div style={ds.tournamentProgressBlock}>
+                                  <div style={{ ...ds.tournamentProgressHeader, ...(isCompleted ? ds.completedProgressHeader : {}) }}><span>{isCompleted ? 'Tournament Completed' : 'Progress'}</span><strong>{isCompleted ? 100 : progress}%</strong></div>
+                                  <div style={ds.progressTrack}><div style={{ ...ds.progressFill, width: isCompleted ? '100%' : `${progress}%`, background: isCompleted ? '#22C55E' : (cardStatus === 'In Progress' ? '#10B981' : tone.color) }} /></div>
+                                </div>
+                                <button type="button" onClick={() => changeTab('brackets', isCompleted ? tournament._id : null)} style={{ ...ds.manageTournamentButton, ...(isCompleted ? ds.completedTournamentButton : {}) }}>{isCompleted ? 'View Results' : 'Manage Tournament'} {ARROW_RIGHT}</button>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      ) : <div style={ds.emptyPanel}>No active tournaments.</div>}
+                    </section>
+                  </div>
+
+                  <div style={{ ...ds.dashboardChartsGrid, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
+                    <section style={ds.dashboardPanel}>
+                      <div style={ds.dashboardPanelHeader}>
+                        <div>
+                          <h3 style={ds.dashboardPanelTitle}>PLAYER REGISTRATIONS BY CATEGORY</h3>
+                          <p style={ds.dashboardPanelSubtitle}>Registered players across tournament categories.</p>
+                        </div>
+                      </div>
+                      <div style={ds.registrationChart}>
+                        {registrationChartData.map((item, index) => (
+                          <div
+                            key={item.id}
+                            style={{
+                              ...ds.registrationChartRow,
+                              gridTemplateColumns: isMobile ? '1fr' : 'minmax(116px, 0.9fr) minmax(100px, 1.5fr) 82px',
+                              gap: isMobile ? 8 : 10,
+                            }}
+                          >
+                            <div style={{ ...ds.registrationChartLabel, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                              <span style={{ ...ds.chartLegendDot, background: ['#3B82F6', '#EC4899', '#F59E0B', '#8B5CF6', '#10B981'][index] }} />
+                              {item.label}
+                            </div>
+                            <div style={{ ...ds.registrationChartTrack, minWidth: 0 }}>
+                              <div style={{ ...ds.registrationChartBar, width: `${item.percentage}%`, background: ['#3B82F6', '#EC4899', '#F59E0B', '#8B5CF6', '#10B981'][index] }} />
+                            </div>
+                            <strong style={{ ...ds.registrationChartValue, fontSize: isMobile ? 12 : 13, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+                              {item.approved} / {item.total} <span style={ds.registrationChartPercentage}>({item.percentage}%)</span>
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section style={ds.dashboardPanel}>
+                      <div style={ds.dashboardPanelHeader}>
+                        <div>
+                          <h3 style={ds.dashboardPanelTitle}>TOURNAMENT STATUS</h3>
+                          <p style={ds.dashboardPanelSubtitle}>Current status across all tournaments.</p>
+                        </div>
+                      </div>
+                      <div style={{ ...ds.statusChartLayout, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 18 : 28 }}>
+                        <div style={{ ...ds.statusDonut, background: `conic-gradient(${tournamentStatusGradient})` }}>
+                          <div style={ds.statusDonutCenter}><strong>{tournamentStatusTotal}</strong><span>Total tournaments</span></div>
+                        </div>
+                        <div style={ds.statusLegend}>
+                          {tournamentStatusChartData.map((item) => (
+                            <div key={item.id} style={ds.statusLegendRow}>
+                              <span style={{ ...ds.chartLegendDot, background: item.color }} />
+                              <span>{item.label}</span>
+                              <strong>{item.count}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+
+                </>
+              )}
             </div>
           )}
 
           {activeTab === 'confirmed-summary' && (
             <div style={ds.section}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: 16, marginBottom: 32 }}>
                 <div>
                   <h2 style={ds.sectionTitle}>CONFIRMED PLAYERS SUMMARY</h2>
                   <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Details by category for registered and approved players.</p>
@@ -1298,9 +1650,9 @@ export default function Dashboard() {
                   </label>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 15, alignItems: isMobile ? 'stretch' : 'center', flex: 1, justifyContent: isMobile ? 'flex-start' : 'flex-end', width: '100%' }}>
                 {/* Custom Nested Filter Dropdown (Windows Context Menu Style) */}
-                  <div ref={filterRef} style={{ position: 'relative', width: 350, zIndex: 50 }}>
+                  <div ref={filterRef} style={{ position: 'relative', width: isMobile ? '100%' : 350, zIndex: 50 }}>
                     <div
                       onClick={() => {
                         setFilterOpen(!filterOpen);
@@ -1342,7 +1694,8 @@ export default function Dashboard() {
                           boxShadow: 'var(--shadow)',
                           zIndex: 1000,
                           padding: '6px 0',
-                          width: 240
+                          width: isMobile ? '100%' : 240,
+                          maxWidth: '100%'
                         }}
                       >
                         {FILTER_CATEGORIES.map((cat) => {
@@ -1377,8 +1730,8 @@ export default function Dashboard() {
                                 <div
                                   style={{
                                     position: 'absolute',
-                                    left: '98%',
-                                    top: 0,
+                                    left: isMobile ? 0 : '98%',
+                                    top: isMobile ? '100%' : 0,
                                     background: 'var(--bg-card)',
                                     backdropFilter: 'blur(25px)',
                                     border: '1px solid var(--border)',
@@ -1386,7 +1739,8 @@ export default function Dashboard() {
                                     boxShadow: 'var(--shadow)',
                                     zIndex: 1001,
                                     padding: '6px 0',
-                                    width: 200
+                                    width: isMobile ? '100%' : 200,
+                                    maxWidth: '100%'
                                   }}
                                 >
                                   {cat.options.map((opt) => {
@@ -1455,7 +1809,7 @@ export default function Dashboard() {
                     {filteredRegistrations.length === 0 ? (
                       <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', fontSize: 18, color: 'var(--text-muted)' }}>No matching registrations found for current filters.</td></tr>
                     ) : (
-                      groupedRegistrations.map((entry, index) => {
+                      paginatedRegistrations.map((entry, index) => {
                         if (entry.kind === 'single') {
                           const r = entry.player;
                           return (
@@ -1738,6 +2092,31 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              {groupedRegistrations.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPlayerPage((page) => Math.max(1, page - 1))}
+                    disabled={playerPage === 1}
+                    style={{ ...ds.paginationButton, opacity: playerPage === 1 ? 0.45 : 1, cursor: playerPage === 1 ? 'not-allowed' : 'pointer' }}
+                  >Previous</button>
+                  {Array.from({ length: playerTotalPages }, (_, index) => index + 1).map((page) => (
+                    <button
+                      type="button"
+                      key={page}
+                      onClick={() => setPlayerPage(page)}
+                      aria-current={playerPage === page ? 'page' : undefined}
+                      style={{ ...ds.paginationButton, minWidth: 38, background: playerPage === page ? 'var(--primary)' : 'var(--bg-input)', color: playerPage === page ? '#fff' : 'var(--text)' }}
+                    >{page}</button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPlayerPage((page) => Math.min(playerTotalPages, page + 1))}
+                    disabled={playerPage === playerTotalPages}
+                    style={{ ...ds.paginationButton, opacity: playerPage === playerTotalPages ? 0.45 : 1, cursor: playerPage === playerTotalPages ? 'not-allowed' : 'pointer' }}
+                  >Next</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1755,8 +2134,8 @@ export default function Dashboard() {
                       <div style={{ ...ds.catBadge, color: 'var(--primary)' }}>{CAT_LABELS[t.category]}</div>
                     </div>
                     <div style={ds.tournInfo}>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{CALENDAR} <span>Event: {fmtDate(t.date)}</span></div>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{HOURGLASS} <span>Closing date: {fmtDeadline(t.registrationDeadline, t.date)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{CALENDAR} <span>Event: {fmtDate(t.date, dateFormat)}</span></div>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{HOURGLASS} <span>Closing date: {fmtDeadline(t.registrationDeadline, t.date, dateFormat)}</span></div>
                       <div style={{ display: 'flex', gap: 10, fontSize: 16 }}>{LOCATION} <span>{t.venue}</span></div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -1779,8 +2158,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: 24, marginBottom: 32 }}>
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gridTemplateAreas: isMobile ? '"profile" "security" "preferences"' : '"profile profile" "security security" "preferences preferences"', gap: 24, marginBottom: 32 }}>
+                <div style={{ gridArea: 'profile', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, padding: 28, boxShadow: 'var(--shadow)' }}>
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ color: 'var(--primary)', fontSize: 12, fontWeight: 950, letterSpacing: 1.4 }}>PROFILE INFORMATION</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 6 }}>Manage the details shown on your administrator account.</div>
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 28 }}>
                     <div style={{ position: 'relative', width: 88, height: 88 }}>
                       <img
@@ -1807,7 +2190,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 950 }}>{safeAdminName}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{admin.username}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>@{profileUsername}</div>
                       <button type="button" onClick={handleAvatarUploadClick} disabled={uploadingAvatar} style={{ ...ds.uploadButton, marginTop: 12, padding: '9px 14px', fontSize: 12 }}>
                         {uploadingAvatar ? 'Uploading...' : 'Change Photo'}
                       </button>
@@ -1888,17 +2271,28 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div style={{ position: 'relative' }}>
-                      <label style={ds.fieldLabel}>Email Address</label>
+                      <label style={ds.fieldLabel}>Username</label>
                       <div style={ds.inputIconWrapper}>
-                        <span style={ds.inputIcon}>{EMAIL}</span>
+                        <span style={ds.inputIcon}>@</span>
                         <input
                           type="text"
                           value={profileUsername}
                           onChange={(e) => setProfileUsername(e.target.value)}
-                          placeholder="badminton@gmail.com"
+                          placeholder="admin-username"
                           style={{ ...ds.input, paddingLeft: 48 }}
                         />
                       </div>
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <label style={ds.fieldLabel}>Email Address</label>
+                      <div style={ds.inputIconWrapper}>
+                        <span style={ds.inputIcon}>{EMAIL}</span>
+                        <input type="email" value={profileEmail} readOnly style={{ ...ds.input, paddingLeft: 48, opacity: 0.75 }} />
+                      </div>
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <label style={ds.fieldLabel}>Role</label>
+                      <input type="text" value={admin?.role === 'super_admin' ? 'Super Administrator' : 'Administrator'} readOnly style={{ ...ds.input, opacity: 0.75 }} />
                     </div>
                     {profileMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{profileMessage}</div>}
                     <button
@@ -1910,7 +2304,6 @@ export default function Dashboard() {
                           const res = await axios.put(`${apiBase}/api/auth/me`, {
                             username: profileUsername,
                             name: profileName,
-                            avatarUrl: profileAvatarUrl,
                           });
 
                           if (res?.status >= 200 && res?.status < 300 && res?.data) {
@@ -1934,7 +2327,7 @@ export default function Dashboard() {
                       style={{ ...ds.createBtn, width: '100%', padding: '18px 20px', fontSize: 13, borderRadius: 18, opacity: savingProfile || !profileDirty ? 0.55 : 1, cursor: savingProfile || !profileDirty ? 'not-allowed' : 'pointer' }}
                       disabled={savingProfile || !profileDirty}
                     >
-                      {savingProfile ? 'Saving...' : 'Save Profile'}
+                      {savingProfile ? 'Saving...' : 'Save Changes'}
                     </button>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12 }}>
                       <span style={{ fontSize: 14 }}>{LOCK}</span>
@@ -1943,25 +2336,140 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 28, padding: 28, boxShadow: 'var(--shadow)' }}>
+                <div style={{ gridArea: 'security', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, padding: 28, boxShadow: 'var(--shadow)' }}>
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ color: 'var(--primary)', fontSize: 12, fontWeight: 950, letterSpacing: 1.4 }}>SECURITY</div>
+                    <div style={{ fontSize: 22, fontWeight: 950, marginTop: 8 }}>Keep your account protected</div>
+                  </div>
+                  <div style={{ padding: 18, border: '1px solid var(--border)', borderRadius: 18, background: 'var(--bg-panel)', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 16 }}>🔐 Password</div>
+                        <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 13 }}>Password: ••••••••••••</div>
+                        <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 12 }}>Last changed: {admin?.passwordChangedAt ? formatDatePreference(admin.passwordChangedAt, dateFormat) : 'Not available'}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const opening = !showPasswordEditor;
+                          if (opening) {
+                            setNewPassword('');
+                            setConfirmPassword('');
+                            setPasswordMessage('');
+                            setShowNewPassword(false);
+                            setShowConfirmPassword(false);
+                          }
+                          setShowPasswordEditor(opening);
+                        }}
+                        style={{ ...ds.textAction, whiteSpace: 'nowrap' }}
+                      >
+                        {showPasswordEditor ? 'Cancel' : 'Change Password'} →
+                      </button>
+                    </div>
+                  </div>
+                  {showPasswordEditor && <div autoComplete="off" style={{ display: 'grid', gap: 18, padding: 18, border: '1px solid var(--border)', borderRadius: 18, marginBottom: 16 }}>
+                    <div>
+                      <label style={ds.fieldLabel}>New Password</label>
+                      <div style={{ position: 'relative' }}><input name="newPassword" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} onFocus={() => setPasswordFocus(true)} onBlur={() => setPasswordFocus(false)} placeholder="New password" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46 }} />{renderPasswordToggle('New', showNewPassword, () => setShowNewPassword((v) => !v))}</div>
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>Confirm New Password</label>
+                      <div style={{ position: 'relative' }}><input name="confirmNewPassword" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} onFocus={() => setConfirmFocus(true)} onBlur={() => setConfirmFocus(false)} placeholder="Confirm new password" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46, borderColor: confirmPassword.length > 0 ? (passwordsMatch ? '#10B981' : '#EF4444') : 'var(--border)' }} />{renderPasswordToggle('Confirm', showConfirmPassword, () => setShowConfirmPassword((v) => !v))}</div>
+                      {showPasswordMatchMessage && <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>{passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`}</div>}
+                    </div>
+                    {newPassword.length > 0 && <div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3, 4, 5].map((level) => <div key={level} style={{ height: 4, flex: 1, borderRadius: 99, background: level <= passwordStrength ? (passwordStrength >= 5 ? '#10B981' : passwordStrength >= 3 ? '#F59E0B' : '#EF4444') : 'var(--border)' }} />)}</div>}
+                    {passwordMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(239, 68, 68, 0.12)', color: '#B91C1C', fontWeight: 700 }}>{passwordMessage}</div>}
+                    <button onClick={async () => {
+                        setSavingSecurity(true);
+                        setPasswordMessage('');
+                        if (!passwordValid || !confirmPassword || !passwordsMatch) {
+                          const message = 'Enter a valid matching new password.';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
+                          setSavingSecurity(false);
+                          return;
+                        }
+                        try {
+                          const apiBase = getApiBase();
+                          const res = await axios.put(`${apiBase}/api/auth/me/password`, { newPassword, confirmPassword });
+                          const message = res.data?.message || 'Password changed successfully';
+                          setPasswordMessage(message);
+                          setAdmin((prev) => prev ? { ...prev, passwordChangedAt: new Date().toISOString() } : prev);
+                          setNewPassword(''); setConfirmPassword('');
+                          showToast(`${SUCCESS} ${message}`);
+                        } catch (err) {
+                          const message = err.response?.data?.message || 'Unable to update password';
+                          setPasswordMessage(message);
+                          showToast(message, 'error');
+                        } finally {
+                          setSavingSecurity(false);
+                        }
+                      }} style={{ ...ds.actionBtn, width: '100%', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '14px 20px', borderRadius: 14, fontWeight: 900 }} disabled={savingSecurity || !passwordValid || !passwordsMatch}>
+                      {savingSecurity ? 'Saving...' : 'Save New Password'}
+                    </button>
+                  </div>}
+
+                  <div style={{ padding: 18, border: '1px solid var(--border)', borderRadius: 18, background: 'var(--bg-panel)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 16 }}>🛡️ Security Question</div>
+                        <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 13 }}>{admin?.securityQuestion || 'No security question set'}</div>
+                        <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 13 }}>Security answer: ••••••••</div>
+                      </div>
+                      <button type="button" onClick={() => setShowSecurityEditor((value) => !value)} style={{ ...ds.textAction, whiteSpace: 'nowrap' }}>{showSecurityEditor ? 'Cancel' : 'Change Security Question'} →</button>
+                    </div>
+                  </div>
+                  {showSecurityEditor && <div style={{ display: 'grid', gap: 18, padding: 18, border: '1px solid var(--border)', borderRadius: 18, marginTop: 16 }}>
+                    <div>
+                      <label style={ds.fieldLabel}>Select New Security Question</label>
+                      <select value={securityQuestion} onChange={(e) => setSecurityQuestion(e.target.value)} style={ds.input}><option value="">Select a question</option><option value="What is your favorite sport?">What is your favorite sport?</option><option value="What was the name of your first school?">What was the name of your first school?</option><option value="What city were you born in?">What city were you born in?</option><option value="What is your favorite team?">What is your favorite team?</option></select>
+                    </div>
+                    <div>
+                      <label style={ds.fieldLabel}>New Security Answer</label>
+                      <div style={{ position: 'relative' }}><input type={showNewPassword ? 'text' : 'password'} value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="Enter a new answer" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46 }} />{renderPasswordToggle('Answer', showNewPassword, () => setShowNewPassword((v) => !v))}</div>
+                    </div>
+                    {securityMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{securityMessage}</div>}
+                    <button onClick={async () => {
+                        setSavingSecurity(true);
+                        setSecurityMessage('');
+                        if (!securityQuestion.trim() || !securityAnswer.trim()) {
+                          const message = 'Security question and answer are required.';
+                          setSecurityMessage(message);
+                          showToast(message, 'error');
+                          setSavingSecurity(false);
+                          return;
+                        }
+                        try {
+                          const apiBase = getApiBase();
+                          const res = await axios.post(`${apiBase}/api/auth/update-security-question`, {
+                            securityQuestion: securityQuestion.trim(),
+                            securityAnswer: securityAnswer.trim(),
+                          });
+                          const message = res.data?.message || 'Security question updated successfully';
+                          setSecurityMessage(message);
+                          setSecurityAnswer('');
+                          setAdmin((prev) => prev ? { ...prev, securityQuestion: securityQuestion.trim() } : prev);
+                          showToast(`${SUCCESS} ${message}`);
+                        } catch (err) {
+                          const message = err.response?.data?.message || 'Unable to update security question';
+                          setSecurityMessage(message);
+                          showToast(message, 'error');
+                        } finally {
+                          setSavingSecurity(false);
+                        }
+                      }}
+                      style={{ ...ds.actionBtn, width: '100%', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '14px 20px', borderRadius: 14, fontWeight: 900 }} disabled={savingSecurity}>
+                      {savingSecurity ? 'Saving...' : 'Save Security Question'}
+                    </button>
+                  </div>}
+                </div>
+
+                <div style={{ display: 'none' }}>
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Change Password</div>
                     <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Keep your account secure by updating your password regularly.</p>
                   </div>
                   <div style={{ display: 'grid', gap: 18 }}>
-                    <div>
-                      <label style={ds.fieldLabel}>Current Password</label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type={showCurrentPassword ? 'text' : 'password'}
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="Current password"
-                          style={{ ...ds.input, paddingRight: 46 }}
-                        />
-                        {renderPasswordToggle('Current', showCurrentPassword, () => setShowCurrentPassword((v) => !v))}
-                      </div>
-                    </div>
                     <div>
                       <label style={ds.fieldLabel}>New Password</label>
                       <div style={{ position: 'relative' }}>
@@ -2024,22 +2532,8 @@ export default function Dashboard() {
                       onClick={async () => {
                         setChangingPassword(true);
                         setPasswordMessage('');
-                        if (!currentPassword) {
-                          const message = 'Current password is required to change your password.';
-                          setPasswordMessage(message);
-                          showToast(message, 'error');
-                          setChangingPassword(false);
-                          return;
-                        }
                         if (!passwordValid) {
                           const message = 'New password must be at least 8 characters and include uppercase, lowercase, number, and special character.';
-                          setPasswordMessage(message);
-                          showToast(message, 'error');
-                          setChangingPassword(false);
-                          return;
-                        }
-                        if (currentPassword === newPassword) {
-                          const message = 'New password must be different from the current password.';
                           setPasswordMessage(message);
                           showToast(message, 'error');
                           setChangingPassword(false);
@@ -2061,15 +2555,10 @@ export default function Dashboard() {
                         }
                         try {
                           const apiBase = getApiBase();
-                          const res = await axios.put(`${apiBase}/api/auth/me/password`, {
-                            currentPassword,
-                            newPassword,
-                            confirmPassword,
-                          });
+                          const res = await axios.put(`${apiBase}/api/auth/me/password`, { newPassword, confirmPassword });
                           const message = res.data?.message || 'Password updated successfully';
                           setPasswordMessage(message);
                           showToast(`${SUCCESS} ${message}`);
-                          setCurrentPassword('');
                           setNewPassword('');
                           setConfirmPassword('');
                         } catch (err) {
@@ -2086,6 +2575,51 @@ export default function Dashboard() {
                       {changingPassword ? 'Updating...' : 'Update Password'}
                     </button>
                   </div>
+                </div>
+
+                <div style={{ gridArea: 'preferences', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, padding: 28, boxShadow: 'var(--shadow)' }}>
+                  <div style={{ color: 'var(--primary)', fontSize: 12, fontWeight: 950, letterSpacing: 1.4, marginBottom: 18 }}>PREFERENCES</div>
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                      <div><div style={{ fontWeight: 850 }}>Dark Mode</div><div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Use the dashboard theme.</div></div>
+                      <button type="button" role="switch" aria-checked={isDarkMode} onClick={toggleTheme} style={{ ...ds.toggle, background: isDarkMode ? 'var(--primary)' : 'var(--border)' }}><span style={{ ...ds.toggleKnob, transform: isDarkMode ? 'translateX(18px)' : 'translateX(0)' }} /></button>
+                    </div>
+                    <div style={ds.preferenceRow}>
+                      <span style={ds.preferenceLabel}>Date Format</span>
+                      <select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)} style={ds.preferenceSelect}>
+                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      </select>
+                    </div>
+                    <div style={ds.preferenceRow}>
+                      <span style={ds.preferenceLabel}>Time Format</span>
+                      <select value={timeFormat} onChange={(e) => setTimeFormat(e.target.value)} style={ds.preferenceSelect}>
+                        <option value="12-hour">12-hour</option>
+                        <option value="24-hour">24-hour</option>
+                      </select>
+                    </div>
+                    <div style={ds.preferenceRow}>
+                      <span style={ds.preferenceLabel}>Items Per Page</span>
+                      <select value={itemsPerPage} onChange={(e) => setItemsPerPage(e.target.value)} style={ds.preferenceSelect}>
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(239, 68, 68, 0.45)', borderRadius: 24, padding: 28, boxShadow: 'var(--shadow)' }}>
+                <div style={{ color: '#EF4444', fontSize: 12, fontWeight: 950, letterSpacing: 1.4 }}>DANGER ZONE</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 18, marginTop: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 950 }}>🗑️ Delete Account</div>
+                    <div style={{ marginTop: 8, color: 'var(--text-muted)', fontSize: 13 }}>Permanently delete your administrator account.</div>
+                  </div>
+                  <button type="button" onClick={() => setShowDeleteAccountModal(true)} style={{ ...ds.actionBtn, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '13px 20px', borderRadius: 14, fontWeight: 900, whiteSpace: 'nowrap' }}>
+                    {TRASH} Delete Account
+                  </button>
                 </div>
               </div>
             </div>
@@ -2133,11 +2667,11 @@ export default function Dashboard() {
                     ) : (
                       auditLogs.map((log) => (
                         <tr key={log._id} style={ds.tr}>
-                          <td style={ds.td}>{new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}<br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span></td>
+                          <td style={ds.td}>{formatDatePreference(log.createdAt, dateFormat)}<br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatTimePreference(log.createdAt, timeFormat)}</span></td>
                           <td style={ds.td}>{log.admin?.name || log.admin?.username || 'System'}</td>
                           <td style={ds.td}><strong>{formatAuditAction(log.action)}</strong></td>
                           <td style={ds.td}>{formatAuditModule(log)}</td>
-                          <td style={{ ...ds.td, maxWidth: 320, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.5 }}>{formatAuditDetails(log)}</td>
+                          <td style={{ ...ds.td, maxWidth: 320, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.5 }}>{formatAuditDetails(log, dateFormat)}</td>
                         </tr>
                       ))
                     )}
@@ -2152,7 +2686,7 @@ export default function Dashboard() {
           )}
 
           {activeTab === 'brackets' && (
-            <BracketsView admin={admin} color={meta.color} />
+            <BracketsView admin={admin} color={meta.color} initialTournamentId={new URLSearchParams(location.search).get('tournamentId')} />
           )}
         </main>
       </div>
@@ -2161,6 +2695,7 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+      {showDeleteAccountModal && <PasswordConfirmModal title="⚠️ Delete your account?" message="This action cannot be undone." confirmLabel="Delete Account" danger showPasswordToggle onConfirm={handleDeleteAccount} onClose={() => setShowDeleteAccountModal(false)} />}
 
       {removePairTarget && (
         <div
@@ -2445,6 +2980,12 @@ const ds = {
   headerActions: { display: 'flex', alignItems: 'center', gap: 18 },
   domainBadge: { padding: '10px 24px', borderRadius: 40, fontSize: 11, fontWeight: 900, border: '1px solid' },
   themeBtn: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px', borderRadius: '14px', fontSize: 12, fontWeight: 900, cursor: 'pointer' },
+  toggle: { width: 42, height: 24, padding: 2, border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0 },
+  toggleKnob: { display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s ease', boxShadow: '0 2px 5px rgba(0,0,0,0.18)' },
+  preferenceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, minHeight: 42, padding: '8px 0', borderBottom: '1px solid var(--border)' },
+  paginationButton: { minHeight: 38, padding: '0 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 12, fontWeight: 850, cursor: 'pointer' },
+  preferenceLabel: { fontSize: 13, fontWeight: 850 },
+  preferenceSelect: { minWidth: 132, padding: '9px 12px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 12, fontWeight: 750, outline: 'none' },
   logoutBtn: { color: '#EF4444', fontWeight: 950, border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, letterSpacing: 1 },
   notificationBtn: { position: 'relative', border: 'none', background: 'var(--bg-input)', color: 'var(--text)', width: 48, height: 48, borderRadius: 16, fontSize: 18, cursor: 'pointer', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'grid', placeItems: 'center' },
   notificationBadge: { position: 'absolute', top: 8, right: 8, minWidth: 18, height: 18, borderRadius: 999, background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' },
@@ -2458,6 +2999,57 @@ const ds = {
   subtitle: { color: 'var(--text-muted)', marginBottom: 60, fontSize: 18, fontWeight: 500 },
   statCard: { background: 'var(--bg-card)', padding: '48px 32px', borderRadius: 40, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', position: 'relative' },
   cardSymbol: { width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, marginBottom: 24 },
+  dashboardPanel: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, padding: 20, boxShadow: 'var(--shadow)', minWidth: 0 },
+  dashboardChartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 18, marginTop: 18 },
+  registrationChart: { display: 'grid', gap: 16, paddingTop: 4, minWidth: 0 },
+  registrationChartRow: { display: 'grid', gridTemplateColumns: 'minmax(116px, 0.9fr) minmax(100px, 1.5fr) 82px', alignItems: 'center', gap: 10, minWidth: 0 },
+  registrationChartLabel: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, color: 'var(--text)', fontSize: 12, fontWeight: 800, overflowWrap: 'anywhere' },
+  chartLegendDot: { width: 9, height: 9, borderRadius: '50%', flexShrink: 0 },
+  registrationChartTrack: { height: 10, borderRadius: 999, background: 'var(--bg-input)', overflow: 'hidden', minWidth: 0 },
+  registrationChartBar: { height: '100%', minWidth: 4, borderRadius: 999, transition: 'width 0.3s ease' },
+  registrationChartValue: { color: 'var(--text)', fontSize: 13, textAlign: 'right', minWidth: 0 },
+  registrationChartPercentage: { color: 'var(--text-muted)', fontSize: 11, fontWeight: 700 },
+  statusChartLayout: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28, minHeight: 194 },
+  statusDonut: { width: 156, height: 156, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0 },
+  statusDonutCenter: { width: 106, height: 106, borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
+  statusDonutCenterStrong: { color: 'var(--text)', fontSize: 27, fontWeight: 950, lineHeight: 1 },
+  statusLegend: { display: 'grid', gap: 14, minWidth: 150 },
+  statusLegendRow: { display: 'grid', gridTemplateColumns: '9px 1fr auto', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12, fontWeight: 700 },
+  dashboardPanelHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
+  dashboardPanelTitle: { margin: 0, fontSize: 13, fontWeight: 950, letterSpacing: 1.2 },
+  dashboardPanelSubtitle: { margin: '5px 0 0', color: 'var(--text-muted)', fontSize: 12 },
+  tournamentCard: { minHeight: 265, display: 'flex', flexDirection: 'column', gap: 14, padding: 18, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--bg-input)', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' },
+  completedTournamentCard: { borderColor: 'rgba(34,197,94,0.65)', background: 'rgba(20,83,45,0.28)', boxShadow: '0 8px 24px rgba(34,197,94,0.16)' },
+  completedStatusBadge: { color: '#86EFAC', background: 'rgba(34,197,94,0.2)' },
+  tournamentCardTop: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  tournamentIcon: { width: 42, height: 42, display: 'grid', placeItems: 'center', borderRadius: 13, fontSize: 22 },
+  tournamentCardTitle: { margin: 0, fontSize: 16, fontWeight: 950, lineHeight: 1.25, color: 'var(--text)' },
+  tournamentCardType: { marginTop: 5, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' },
+  tournamentMetricGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 2 },
+  tournamentMetric: { padding: 10, borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
+  tournamentProgressBlock: { marginTop: 'auto' },
+  tournamentProgressHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-muted)', fontSize: 11, fontWeight: 800, marginBottom: 7 },
+  manageTournamentButton: { width: '100%', marginTop: 2, padding: '11px 12px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', fontSize: 11, fontWeight: 900, cursor: 'pointer', textAlign: 'center' },
+  completedTournamentMetric: { background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.28)' },
+  completedProgressHeader: { color: '#86EFAC' },
+  completedTournamentButton: { borderColor: '#22C55E', background: '#15803D', color: '#F0FDF4', boxShadow: '0 4px 14px rgba(34,197,94,0.18)' },
+  quickAction: { display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', minWidth: 0, padding: '14px 12px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer' },
+  quickActionIcon: { width: 30, height: 30, display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 950, flexShrink: 0 },
+  quickActionText: { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0, lineHeight: 1.2 },
+  quickActionTitle: { display: 'block', fontSize: 13, fontWeight: 950, lineHeight: 1.25, overflowWrap: 'anywhere' },
+  quickActionDetail: { display: 'block', fontSize: 11, fontWeight: 650, lineHeight: 1.3, overflowWrap: 'anywhere' },
+  quickActionArrow: { marginLeft: 'auto', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 16 },
+  attentionItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', textAlign: 'left', cursor: 'pointer' },
+  emptyPanel: { display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: 'var(--text-muted)', fontSize: 13 },
+  tournamentRow: { display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid var(--border)' },
+  statusBadge: { padding: '5px 9px', borderRadius: 999, fontSize: 10, fontWeight: 900, whiteSpace: 'nowrap' },
+  progressTrack: { height: 6, marginTop: 10, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 999, transition: 'width 0.3s ease' },
+  smallAction: { border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', borderRadius: 10, padding: '8px 10px', fontSize: 11, fontWeight: 900, cursor: 'pointer', flexShrink: 0 },
+  textAction: { border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: 11, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' },
+  matchRow: { display: 'flex', gap: 10, padding: '13px 0', borderBottom: '1px solid var(--border)' },
+  matchTime: { color: 'var(--text)', fontSize: 12, fontWeight: 900, minWidth: 66 },
+  activityRow: { display: 'flex', gap: 10, padding: '10px 0' },
   section: { animation: 'fadeIn 0.5s ease' },
   sectionTitle: { fontSize: 36, fontWeight: 950, marginBottom: 32, letterSpacing: -1, textTransform: 'uppercase' },
   tableBox: { borderRadius: 24, border: '1px solid var(--border)', boxShadow: 'var(--shadow)', background: 'var(--bg-card)' },
@@ -2502,8 +3094,9 @@ async function getCroppedImg(imageSrc, pixelCrop) {
   });
 
   const canvas = document.createElement('canvas');
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  const scale = Math.min(1, 512 / Math.max(pixelCrop.width, pixelCrop.height));
+  canvas.width = Math.max(1, Math.round(pixelCrop.width * scale));
+  canvas.height = Math.max(1, Math.round(pixelCrop.height * scale));
   const ctx = canvas.getContext('2d');
 
   ctx.drawImage(
@@ -2514,8 +3107,8 @@ async function getCroppedImg(imageSrc, pixelCrop) {
     pixelCrop.height,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    canvas.width,
+    canvas.height
   );
 
   return new Promise((resolve) => {

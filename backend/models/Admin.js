@@ -16,13 +16,24 @@ const validatePasswordRequirements = (password) => {
 const adminSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true },
+    email: { type: String, trim: true, lowercase: true, index: true },
+    emailVerified: { type: Boolean, default: false },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
+    passwordResetOtpHash: { type: String, select: false },
+    passwordResetOtpExpiresAt: { type: Date, select: false },
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetTokenExpiresAt: { type: Date, select: false },
     password: { type: String, required: true },
+    passwordChangedAt: { type: Date },
     sport: { type: String, required: true, enum: ['badminton', 'table-tennis', 'carrom'] },
     name: { type: String, required: true },
     role: { type: String, enum: ['admin', 'super_admin'], default: 'admin', required: true },
     avatarUrl: { type: String },
     securityQuestion: { type: String },
     securityAnswer: { type: String },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -34,7 +45,7 @@ adminSchema.pre('save', async function (next) {
     }
     this.password = await bcrypt.hash(this.password, 12);
   }
-  if (this.isModified('securityAnswer')) {
+  if (this.isModified('securityAnswer') && this.securityAnswer) {
     this.securityAnswer = await bcrypt.hash(this.securityAnswer, 12);
   }
   next();

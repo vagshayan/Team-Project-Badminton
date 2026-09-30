@@ -15,7 +15,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "dev": "react-scripts start",
+    "dev": "cross-env HTTPS=true react-scripts start",
     "build": "react-scripts build"
   },
   "proxy": "http://localhost:5000",
@@ -30,6 +30,7 @@
     ]
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "nodemon": "^3.1.14"
   }
 }

@@ -111,7 +111,7 @@ function getMatchLabel(roundIdx, positionInRound) {
   return `Match ${roundIdx + 1}.${positionInRound + 1}`;
 }
 
-export default function BracketsView({ admin, color }) {
+export default function BracketsView({ admin, color, initialTournamentId }) {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [matches, setMatches] = useState([]);
@@ -186,6 +186,12 @@ export default function BracketsView({ admin, color }) {
   }, [activePlayerInfo]);
 
   useEffect(() => { fetchTournaments(); }, []);
+
+  useEffect(() => {
+    if (!initialTournamentId || !tournaments.length) return;
+    const tournament = tournaments.find(t => String(t._id) === String(initialTournamentId));
+    if (tournament && selectedTournament?._id !== tournament._id) handleSelectTournament(tournament);
+  }, [initialTournamentId, tournaments]);
 
   const showToast = (msg) => {
     setToast(msg);

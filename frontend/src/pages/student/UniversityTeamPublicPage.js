@@ -129,7 +129,7 @@ export default function UniversityTeamPublicPage() {
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }} className="mobile-controls">
           <button
             onClick={toggleTheme}
             style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', fontSize: 18 }}
@@ -141,7 +141,8 @@ export default function UniversityTeamPublicPage() {
             onClick={() => navigate('/admin/login')}
             style={{ padding: '9px 18px', borderRadius: 12, border: 'none', background: activeSportMeta.color, color: '#FFF', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
           >
-            ADMIN LOGIN
+            <span className="admin-full-text">ADMIN LOGIN</span>
+            <span className="admin-short-text">ADMIN</span>
           </button>
 
           {/* Mobile menu trigger */}
@@ -244,7 +245,7 @@ export default function UniversityTeamPublicPage() {
           border: '1px solid var(--border)',
         }}>
           {/* Search Box */}
-          <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ flex: '1 1 260px', minWidth: 0 }}>
             <input
               type="text"
               placeholder={`🔍 Search ${activeSportMeta.label} member name, reg. number, faculty, or role...`}

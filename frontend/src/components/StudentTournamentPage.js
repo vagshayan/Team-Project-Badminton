@@ -386,12 +386,17 @@ export default function StudentTournamentPage({ sport }) {
   const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
+    <div className="student-tournament-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
-          <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
+          <div style={sh.brandMark} className="mobile-logo">
+            <img src="/logo.png" alt="University of Jaffna logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          </div>
+          <div style={sh.brandName} className="mobile-title-main">
+            <span className="mobile-title-main" style={sh.brandUniversity}>University of Jaffna</span>
+            <span className="mobile-title-sub" style={sh.brandLine}>Sports Tournament Manager</span>
+          </div>
         </div>
 
         {/* Desktop inline tabs */}
@@ -451,7 +456,7 @@ export default function StudentTournamentPage({ sport }) {
         </div>
       )}
 
-      <div style={sh.hero}>
+      <div className="student-results-hero" style={sh.hero}>
         <div style={{ ...sh.heroBlob, background: meta.color }} />
         <h1 style={sh.heroTitle} className="mobile-hero-title">{meta.label} RESULTS</h1>
 
@@ -459,7 +464,7 @@ export default function StudentTournamentPage({ sport }) {
         <div style={{ ...sh.liveIndicator, flexDirection: 'column', gap: 14, alignItems: 'center', margin: '24px 0 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="live-dot" style={{ background: '#10B981' }} />
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+            <span className="student-live-indicator-text" style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
           </div>
 
           {/* Centered UNIVERSITY TEAM MEMBERS Button inside Official Live Tournament Board */}
@@ -903,8 +908,10 @@ const bh = {
 const sh = {
   nav: { height: 100, background: 'var(--nav-bg)', backdropFilter: 'blur(30px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 60px', position: 'sticky', top: 0, zIndex: 1000 },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
-  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
-  brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5 },
+  brandMark: { width: 54, height: 54, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
+  brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
+  brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
   sportSwitcher: { display: 'flex', gap: 10, height: '100%' },
   sportBtn: { background: 'none', border: 'none', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.3s' },
   themeToggle: { background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 20, padding: '10px', borderRadius: 14, cursor: 'pointer' },

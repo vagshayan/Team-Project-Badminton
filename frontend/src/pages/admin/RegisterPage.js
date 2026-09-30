@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { SUN, MOON, EYE, LOCK, TROPHY, CHECK_MARK, CROSS, KEY, SHIELD } from '../../components/Icons';
 import axios from 'axios';
@@ -15,7 +14,7 @@ const SparklesIcon = (props) => (
 );
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({ name: '', username: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
+  const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +23,8 @@ export default function RegisterPage() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isConfirmPasswordFocused, setIsConfirmPasswordFocused] = useState(false);
   const [accessCodeStatus, setAccessCodeStatus] = useState('idle');
-  const { loginFromData } = useAuth();
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
   const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -113,7 +113,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const { name, username, password, confirmPassword, sport, securityQuestion, securityAnswer } = formData;
+    const { name, username, email, password, confirmPassword, sport, securityQuestion, securityAnswer } = formData;
     if (!passwordValid) return setError('Password does not meet all requirements');
     if (password !== confirmPassword) return setError('Passwords do not match');
     if (!sport) return setError('Please select your arena domain');
@@ -122,10 +122,10 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await axios.post('/api/auth/register', { name, username, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
+      await axios.post('/api/auth/register', { name, username, email, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
       setAccessCodeStatus('verified');
-      loginFromData(res.data.token, res.data.admin);
-      navigate('/admin/dashboard', { replace: true });
+      setVerificationEmail(email.trim());
+      setVerificationSent(true);
     } catch (err) {
       if (err.response?.status === 403) {
         setAccessCodeStatus('invalid');
@@ -139,10 +139,20 @@ export default function RegisterPage() {
     }
   };
 
+  const resendVerification = async () => {
+    setError('');
+    try {
+      const res = await axios.post('/api/auth/resend-verification', { email: verificationEmail });
+      setError(res.data?.message || 'If the account is pending verification, a new email will be sent.');
+    } catch {
+      setError('If the account is pending verification, a new email will be sent.');
+    }
+  };
+
   return (
     <div style={sh.container}>
-      <div style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
-      <div style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
 
       <style>{`
         input[type="password"]::-ms-reveal { display: none; }
@@ -229,7 +239,16 @@ export default function RegisterPage() {
           <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
-            <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            {verificationSent && (
+              <div style={sh.verificationBox}>
+                <h2 style={sh.title}>Verify your email</h2>
+                <p style={sh.subtitle}>Your account is pending. Check your email for a verification link before logging in.</p>
+                <button type="button" onClick={resendVerification} style={sh.secondaryBtn}>Resend Verification Email</button>
+                <p style={sh.smallText}>The verification link expires after 15 minutes.</p>
+              </div>
+            )}
+
+            {!verificationSent && <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
               <div style={sh.section}>
                 <label style={sh.label}>CHOOSE DOMAIN</label>
                 <div className="sport-grid" style={sh.sportGrid}>
@@ -262,9 +281,13 @@ export default function RegisterPage() {
                    <label style={sh.label}>USERNAME</label>
                    <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} autoComplete="off" required />
                 </div>
+                 <div style={{ ...sh.field, gridColumn: '1 / -1' }}>
+                   <label style={sh.label}>EMAIL ADDRESS</label>
+                   <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="admin@example.com" style={sh.input} autoComplete="email" required />
+                 </div>
               </div>
 
-              <div className="field-group" style={sh.fieldGroup}>
+              <div className="field-group" style={{ ...sh.fieldGroup, gridTemplateColumns: '1fr' }}>
                 <div style={sh.field}>
                    <label style={sh.label}>PASSWORD</label>
                    <div style={sh.passwordInputWrapper}>
@@ -397,7 +420,7 @@ export default function RegisterPage() {
               <button type="submit" style={sh.submitBtn} disabled={loading}>
                 {loading ? 'INITIALIZING ARENA...' : 'CREATE ACCOUNT'}
               </button>
-            </form>
+            </form>}
 
             <p style={sh.footerLinkWrap}>
               Existing Manager? <Link to="/admin/login" style={sh.footerLink}>Login here</Link>
@@ -453,6 +476,9 @@ const sh = {
   validationRowConfirmed: { color: '#10B981' },
   validationRowInvalid: { color: '#EF4444' },
   submitBtn: { background: 'var(--primary)', border: 'none', color: '#FFF', padding: '20px', borderRadius: '16px', fontWeight: 900, fontSize: '14px', letterSpacing: '1px', cursor: 'pointer', marginTop: '10px', boxShadow: '0 12px 25px -5px rgba(59, 130, 246, 0.4)' },
+  verificationBox: { textAlign: 'center', padding: '24px 0' },
+  secondaryBtn: { background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '14px 18px', borderRadius: '14px', fontWeight: 800, cursor: 'pointer' },
+  smallText: { color: 'var(--text-muted)', fontSize: 12, marginTop: 18 },
   errorBox: { background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '16px', borderRadius: '16px', fontSize: 13, marginBottom: 32, textAlign: 'center' },
   footerLinkWrap: { textAlign: 'center', marginTop: 32, fontSize: 14, color: 'var(--text-muted)' },
   footerLink: { color: 'var(--primary)', fontWeight: 800, textDecoration: 'none', marginLeft: 5 },

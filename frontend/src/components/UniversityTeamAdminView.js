@@ -596,7 +596,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
         </div>
 
         {/* Search Input */}
-        <div style={{ width: 280 }}>
+        <div style={{ width: '100%', maxWidth: 280 }}>
           <input
             type="text"
             placeholder={`🔍 Search ${activeSportMeta.label} roster...`}
