@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { SPORT_META, getSportMeta } from '../constants/sports';
-import { CLOSE, LOCATION, CLOCK, WARNING, WARNING_ROUND, SUCCESS } from './Icons';
+import { CLOSE, LOCATION, CLOCK, WARNING, SUCCESS } from './Icons';
 
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
 const CAT_LABELS = {
@@ -103,7 +102,6 @@ const validateField = (field, value) => {
 };
 
 export default function RegisterModal({ tournament, onClose, initialData = null }) {
-  const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const isDoubles = DOUBLES.includes(tournament.category);
   const isMixedDoubles = tournament.category === 'mixed-doubles';
@@ -124,9 +122,8 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [registeredData, setRegisteredData] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [partnerLookup, setPartnerLookup] = useState(null);
   const [partnerLookupError, setPartnerLookupError] = useState('');
   const [partnerLookupLoading, setPartnerLookupLoading] = useState(false);
@@ -310,17 +307,13 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
       };
       if (isMixedDoubles) requestPayload.gender = form.gender;
 
-      let res;
       if (initialData) {
-        res = await axios.put(`/api/registrations/${initialData._id}`, requestPayload);
+        await axios.put(`/api/registrations/${initialData._id}`, requestPayload);
       } else {
-        res = await axios.post('/api/registrations', {
+        await axios.post('/api/registrations', {
           tournament: tournament._id,
           ...requestPayload,
         });
-      }
-      if (res && res.data) {
-        setRegisteredData(res.data);
       }
       setSuccess(true);
     } catch (err) {
@@ -331,7 +324,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   };
 
   if (success) return (
-    <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" style={{ ...sh.overlay, background: isDarkMode ? 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)' : 'rgba(15, 23, 42, 0.45)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ ...sh.card, maxWidth: 450, padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 72, marginBottom: 24, animation: 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>{SUCCESS}</div>
           <h2 style={{ fontSize: 28, fontWeight: 950, color: '#10B981', letterSpacing: -1, marginBottom: 12 }}>{initialData ? 'UPDATED!' : 'VERIFIED!'}</h2>
@@ -343,128 +336,35 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                </>
              )}
           </p>
-
-          {token && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))',
-              border: '1.5px solid rgba(59, 130, 246, 0.25)',
-              borderRadius: 18,
-              padding: '18px 20px',
-              marginBottom: 24,
-              textAlign: 'left',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 900, color: '#3B82F6', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                  📱 Digital Player Pass Ready
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#10B981', background: 'rgba(16, 185, 129, 0.12)', padding: '3px 8px', borderRadius: 999 }}>
-                  QR ACTIVATED
-                </span>
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
-                {playerDisplayName}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                Reg No: <strong>{playerRoll}</strong> · {sport.label}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  navigate(`/player/qr/${token}`);
-                }}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #3B82F6, #6366F1)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '14px',
-                  borderRadius: 12,
-                  fontWeight: 900,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  boxShadow: '0 8px 20px rgba(59, 130, 246, 0.35)',
-                }}
-              >
-                <span>🎫</span>
-                <span>VIEW MY DIGITAL PASS & QR CODE</span>
-                <span>→</span>
-              </button>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            {token && (
-              <button
-                type="button"
-                onClick={() => {
-                  window.open(`/player/qr/${token}`, '_blank');
-                }}
-                style={{
-                  flex: 1,
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text)',
-                  padding: '14px',
-                  borderRadius: 14,
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                📥 Open in New Tab
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                background: '#10B981',
-                color: '#FFF',
-                border: 'none',
-                padding: '14px',
-                borderRadius: 14,
-                fontWeight: 900,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              DONE
-            </button>
-          </div>
-          <style>{`
-            @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-            @media (max-width: 600px) {
-              .modal-overlay {
-                padding: 12px !important;
-              }
-              .modal-card {
-                padding: 22px 18px !important;
-                border-radius: 22px !important;
-                margin: 12px 0 !important;
-                width: 100% !important;
-              }
-              .modal-header {
-                flex-direction: column !important;
-                align-items: stretch !important;
-                padding-bottom: 0 !important;
-              }
-              .modal-title {
-                font-size: 20px !important;
-              }
-              .modal-close-btn {
-                align-self: flex-end !important;
-              }
-            }
-          `}</style>
-        </div>
+          <button onClick={onClose} style={{ ...sh.submitBtn, background: '#10B981', color: '#FFF', width: '100%', borderRadius: 16 }}>DONE</button>
       </div>
-    );
+      <style>{`
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @media (max-width: 600px) {
+          .modal-overlay {
+            padding: 12px !important;
+          }
+          .modal-card {
+            padding: 22px 18px !important;
+            border-radius: 22px !important;
+            margin: 12px 0 !important;
+            width: 100% !important;
+          }
+          .modal-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding-bottom: 0 !important;
+          }
+          .modal-title {
+            font-size: 20px !important;
+          }
+          .modal-close-btn {
+            align-self: flex-end !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
 
   return (
     <div style={{ ...sh.overlay, background: isDarkMode ? 'linear-gradient(180deg, rgba(3, 37, 86, 0.96) 0%, rgba(15, 23, 42, 0.90) 45%, rgba(15, 23, 42, 0.98) 100%)' : 'rgba(15, 23, 42, 0.45)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>

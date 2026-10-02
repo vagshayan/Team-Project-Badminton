@@ -162,38 +162,10 @@ export default function StudentTournamentPage({ sport }) {
   const [teamMembers, setTeamMembers] = useState([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [teamSearchQuery, setTeamSearchQuery] = useState('');
-  const [showPassLookupModal, setShowPassLookupModal] = useState(false);
-  const [passRollNumber, setPassRollNumber] = useState('');
-  const [passLookupLoading, setPassLookupLoading] = useState(false);
-  const [passLookupError, setPassLookupError] = useState('');
   const pollingRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
-
-  const handlePassLookup = async (e) => {
-    if (e) e.preventDefault();
-    const roll = passRollNumber.trim().toUpperCase();
-    if (!roll) {
-      setPassLookupError('Please enter your registration number.');
-      return;
-    }
-    setPassLookupLoading(true);
-    setPassLookupError('');
-    try {
-      const res = await axios.get(`/api/player-qr/lookup/${encodeURIComponent(roll)}?sport=${sport}`);
-      if (res.data && res.data.player && res.data.player.qrToken) {
-        setShowPassLookupModal(false);
-        navigate(`/player/qr/${res.data.player.qrToken}`);
-      } else {
-        setPassLookupError('No player pass found for this registration number.');
-      }
-    } catch (err) {
-      setPassLookupError(err.response?.data?.message || 'Player pass not found. Make sure you have registered.');
-    } finally {
-      setPassLookupLoading(false);
-    }
-  };
 
   const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
 
@@ -490,73 +462,43 @@ export default function StudentTournamentPage({ sport }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button
-              onClick={() => navigate(`/${sport}/team`)}
-              style={{
-                padding: '10px 22px',
-                borderRadius: 999,
-                background: `linear-gradient(135deg, ${meta.color}22, rgba(255,255,255,0.06))`,
-                border: `1.5px solid ${meta.color}60`,
-                color: 'var(--text)',
-                fontWeight: 900,
-                fontSize: 12,
-                letterSpacing: 0.5,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                boxShadow: `0 8px 24px ${meta.color}25`,
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.25s ease',
-              }}
-              className="team-members-live-board-btn"
-            >
-              <span style={{ fontSize: 16 }}>🎓</span>
-              <span>UNIVERSITY TEAM MEMBERS</span>
-              <span style={{
-                background: meta.color,
-                color: '#000',
-                padding: '2px 8px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 950,
-                marginLeft: 4,
-              }}>
-                {teamMembers.length}
-              </span>
-              <span style={{ fontSize: 13 }}>→</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setPassLookupError('');
-                setPassRollNumber('');
-                setShowPassLookupModal(true);
-              }}
-              style={{
-                padding: '10px 22px',
-                borderRadius: 999,
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.18))',
-                border: '1.5px solid rgba(59, 130, 246, 0.5)',
-                color: 'var(--text)',
-                fontWeight: 900,
-                fontSize: 12,
-                letterSpacing: 0.5,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.25)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.25s ease',
-              }}
-            >
-              <span style={{ fontSize: 16 }}>📱</span>
-              <span>FIND MY PLAYER PASS & QR</span>
-              <span style={{ fontSize: 13 }}>→</span>
-            </button>
-          </div>
+          {/* Centered UNIVERSITY TEAM MEMBERS Button inside Official Live Tournament Board */}
+          <button
+            onClick={() => navigate(`/${sport}/team`)}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 999,
+              background: `linear-gradient(135deg, ${meta.color}22, rgba(255,255,255,0.06))`,
+              border: `1.5px solid ${meta.color}60`,
+              color: 'var(--text)',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: `0 8px 24px ${meta.color}25`,
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.25s ease',
+            }}
+            className="team-members-live-board-btn"
+          >
+            <span style={{ fontSize: 16 }}>🎓</span>
+            <span>UNIVERSITY TEAM MEMBERS</span>
+            <span style={{
+              background: meta.color,
+              color: '#000',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 950,
+              marginLeft: 4,
+            }}>
+              {teamMembers.length}
+            </span>
+            <span style={{ fontSize: 13 }}>→</span>
+          </button>
         </div>
       </div>
 
@@ -624,103 +566,6 @@ export default function StudentTournamentPage({ sport }) {
       `}</style>
 
       {registerFor && <RegisterModal tournament={registerFor} onClose={() => setRegisterFor(null)} />}
-
-      {showPassLookupModal && (
-        <div className="modal-overlay" style={bh.overlay} onClick={(e) => e.target === e.currentTarget && setShowPassLookupModal(false)}>
-          <div className="modal-card" style={{ ...bh.card, maxWidth: 480, padding: 32 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 28 }}>📱</span>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: 'var(--text)' }}>Find Player Pass</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Enter your registration number to access your QR pass & match schedule</p>
-                </div>
-              </div>
-              <button onClick={() => setShowPassLookupModal(false)} style={bh.close}>{CLOSE}</button>
-            </div>
-
-            <form onSubmit={handlePassLookup} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
-                  Student Registration Number
-                </label>
-                <input
-                  type="text"
-                  value={passRollNumber}
-                  onChange={(e) => setPassRollNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g. 2021/EG/001 or EG/2021/4101"
-                  style={{
-                    width: '100%',
-                    background: 'var(--bg-input, #F8FAFC)',
-                    border: '1.5px solid var(--border, rgba(148, 163, 184, 0.3))',
-                    color: 'var(--text, #0F172A)',
-                    padding: '14px 18px',
-                    borderRadius: 12,
-                    fontSize: 15,
-                    fontWeight: 700,
-                    outline: 'none',
-                    letterSpacing: 0.5,
-                  }}
-                  autoFocus
-                />
-              </div>
-
-              {passLookupError && (
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#EF4444',
-                  padding: '10px 14px',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textAlign: 'center',
-                }}>
-                  ⚠️ {passLookupError}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowPassLookupModal(false)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text)',
-                    padding: '12px',
-                    borderRadius: 12,
-                    fontWeight: 800,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  CANCEL
-                </button>
-                <button
-                  type="submit"
-                  disabled={passLookupLoading}
-                  style={{
-                    flex: 2,
-                    background: 'linear-gradient(135deg, #3B82F6, #6366F1)',
-                    color: '#FFF',
-                    border: 'none',
-                    padding: '12px',
-                    borderRadius: 12,
-                    fontWeight: 900,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                  }}
-                >
-                  {passLookupLoading ? 'SEARCHING...' : 'VIEW MY PASS →'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {viewBracketsFor && (
         <div className="modal-overlay" style={bh.overlay} onClick={(e) => {

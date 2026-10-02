@@ -11,8 +11,6 @@ import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
 import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
-import PlayerPerformanceDashboard from '../../components/PlayerPerformanceDashboard';
-import AdminQRScannerView from '../../components/AdminQRScannerView';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 import { SPORT_META, getSportMeta } from '../../constants/sports';
 
@@ -69,8 +67,6 @@ const VALID_ADMIN_TABS = new Set([
   'tournament-setup',
   'university-team',
   'brackets',
-  'player-analytics',
-  'qr-scanner',
   'audit-log',
   'profile',
   'confirmed-summary',
@@ -902,8 +898,6 @@ export default function Dashboard() {
               { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TROPHY },
               { id: 'university-team', label: 'UNIVERSITY TEAM', icon: PEOPLE },
               { id: 'brackets', label: 'BRACKETS & DRAWS', icon: TREE },
-              { id: 'player-analytics', label: 'PLAYER ANALYTICS', icon: '📊' },
-              { id: 'qr-scanner', label: 'QR PASS SCANNER', icon: '📷' },
               { id: 'audit-log', label: 'AUDIT LOG', icon: FOLDER },
             ].map((tab) => (
             <button
@@ -2124,22 +2118,6 @@ export default function Dashboard() {
 
           {activeTab === 'brackets' && (
             <BracketsView admin={admin} color={meta.color} />
-          )}
-
-          {activeTab === 'player-analytics' && (
-            <div style={ds.section}>
-              <div style={{ marginBottom: 32 }}>
-                <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 24 : 36 }}>PLAYER PERFORMANCE & ANALYTICS</h2>
-                <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Real-time match metrics, graphical trends, dynamic scoring, and rule-based suggestions.</p>
-              </div>
-              <PlayerPerformanceDashboard initialSport={normalizedSport || 'badminton'} />
-            </div>
-          )}
-
-          {activeTab === 'qr-scanner' && (
-            <div style={ds.section}>
-              <AdminQRScannerView adminSport={normalizedSport || admin?.sport} />
-            </div>
           )}
         </main>
       </div>

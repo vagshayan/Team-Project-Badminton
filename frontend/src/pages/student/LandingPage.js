@@ -112,15 +112,9 @@ export default function LandingPage() {
                 Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> — all in one clean tournament hub.
               </p>
 
-              <div className="hero-actions" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <div className="hero-actions">
                 <button className="button-primary" onClick={() => navigate('/brackets')}>
                   View live brackets {ARROW_RIGHT}
-                </button>
-                <button className="button-secondary" onClick={() => navigate('/analytics')}>
-                  Player Analytics {ARROW_RIGHT}
-                </button>
-                <button className="button-secondary" onClick={() => navigate('/compare')}>
-                  ⚔️ H2H Compare {ARROW_RIGHT}
                 </button>
               </div>
             </div>

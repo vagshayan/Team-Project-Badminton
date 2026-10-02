@@ -680,14 +680,3 @@ body.light-mode .context-menu-item:hover {
 
 /* Make images scale */
 img { max-width: 100%; height: auto; }
-
-/* Head-to-Head Responsive Layouts */
-@media (max-width: 768px) {
-  .h2h-selector-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .h2h-profiles-grid {
-    grid-template-columns: 1fr !important;
-    gap: 16px !important;
-  }
-}

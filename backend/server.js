@@ -67,20 +67,11 @@ const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
 const universityTeamRoutes = require('./routes/universityTeam');
-const playerQrRoutes = require('./routes/playerQr');
-const analyticsRoutes = require('./routes/analytics');
-const emailTestRoutes = require('./routes/emailTest');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/university-team', universityTeamRoutes);
-app.use('/api/player-qr', playerQrRoutes);
-app.use('/api/analytics', analyticsRoutes);
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/email-test', emailTestRoutes);
-  app.use('/api/notifications', emailTestRoutes);
-}
 
 // Lightweight auth/me fallback: respond safely without touching DB
 // This prevents front-end 500 responses while the DB or models may be initializing.

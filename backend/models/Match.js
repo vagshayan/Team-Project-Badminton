@@ -11,26 +11,6 @@ const matchSchema = new mongoose.Schema(
     score1: { type: Number, default: 0 },
     score2: { type: Number, default: 0 },
     isCompleted: { type: Boolean, default: false },
-    status: { type: String, enum: ['scheduled', 'in-progress', 'completed', 'cancelled', 'postponed'], default: 'scheduled' },
-    court: { type: String, trim: true, default: 'Court 1' },
-    venue: { type: String, trim: true, default: 'Indoor Stadium' },
-    scheduledDate: { type: Date },
-    scheduledTime: { type: String, default: '' },
-    checkIns: [
-      {
-        registrationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },
-        rollNumber: { type: String },
-        checkedInAt: { type: Date, default: Date.now },
-        checkedInBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
-      }
-    ],
-    timeline: [
-      {
-        message: { type: String, required: true },
-        timestamp: { type: Date, default: Date.now },
-        type: { type: String, enum: ['info', 'start', 'update', 'end', 'checkin'], default: 'info' },
-      }
-    ],
     nextMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' }, // Reference to the next match in the bracket
     positionInNextMatch: { type: Number, enum: [1, 2] }, // Whether winner goes to player1 or player2
   },
