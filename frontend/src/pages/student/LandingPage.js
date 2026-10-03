@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './LandingPage.css';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
+import { ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openTournamentCounts, setOpenTournamentCounts] = useState({});
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -24,39 +27,46 @@ export default function LandingPage() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all(
+      SPORTS.map((sport) => axios.get(`/api/tournaments/public/${sport.id}`)
+        .then((response) => ({ sport: sport.id, count: Array.isArray(response.data) ? response.data.length : 0 }))
+        .catch(() => ({ sport: sport.id, count: 0 })))
+    ).then((results) => {
+      if (!mounted) return;
+      const counts = {};
+      results.forEach((result) => { counts[result.sport] = result.count; });
+      setOpenTournamentCounts(counts);
+    });
+
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <div className="landing-hero-page">
       <div className="landing-inner">
         <header className="landing-header">
           <div className="brand-block">
             <div className="brand-mark">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M6 3H14V8C14 10.2 12.2 12 10 12C7.8 12 6 10.2 6 8V3Z" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M6 4H3.5C3.5 6.5 4.5 8 6 8" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M14 4H16.5C16.5 6.5 15.5 8 14 8" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M10 12V15" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M7 17H13" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M10 15V17" stroke="#0a0e17" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <img src="/logo.png" alt="Sports Tournament Manager logo" />
             </div>
+            <span className="brand-divider" aria-hidden="true" />
             <div>
               <div className="brand-name">
-                <span className="brand-line">Sports Tournament</span>
-                <span className="brand-line">Manager</span>
+                <span className="brand-university">University of Jaffna</span>
+                <span className="brand-line">Sports Tournament Manager</span>
               </div>
               {/* <div className="brand-subtitle">University Tournaments</div> */}
             </div>
           </div>
 
           <div className="header-actions-desktop">
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDarkMode ? SUN : MOON}
-            </button>
+            <div className="app-header-control-group">
+              <HomeButton />
+              <ThemeToggleButton />
+            </div>
             <button className="admin-login-btn" onClick={() => navigate('/admin/login')}>
               Admin login
             </button>
@@ -77,6 +87,7 @@ export default function LandingPage() {
 
             {menuOpen && (
               <div className="menu-popover" role="menu">
+                <HomeButton variant="menu" onNavigate={() => setMenuOpen(false)} />
                 <button
                   className="menu-item"
                   onClick={() => {
@@ -88,16 +99,7 @@ export default function LandingPage() {
                   Admin login
                 </button>
 
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    toggleTheme();
-                  }}
-                  role="menuitem"
-                >
-                  {isDarkMode ? SUN : MOON} &nbsp; {isDarkMode ? 'Light mode' : 'Dark mode'}
-                </button>
+                <ThemeToggleButton variant="menu" onToggle={() => setMenuOpen(false)} />
               </div>
             )}
           </div>
@@ -142,6 +144,9 @@ export default function LandingPage() {
                     <div className="tournament-icon">{sportMeta.icon}</div>
                     <div className="tournament-card-body">
                       <div className="tournament-title">{sportMeta.label}</div>
+                      <div className="tournament-count">
+                        {openTournamentCounts[sport.id] || 0} Open Tournament{openTournamentCounts[sport.id] === 1 ? '' : 's'}
+                      </div>
                       <div className="tournament-link" style={{ color: sportMeta.color }}>
                         View Tournaments {ARROW_RIGHT}
                       </div>

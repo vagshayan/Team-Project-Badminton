@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const TOURNAMENT_CATEGORIES = [
+  'singles-men',
+  'singles-women',
+  'doubles-men',
+  'doubles-women',
+  'mixed-doubles',
+];
+
 // --- SCHEMAS ---
 const tournamentSchema = new mongoose.Schema({
   sport: { type: String, required: true },
@@ -8,13 +16,15 @@ const tournamentSchema = new mongoose.Schema({
   time: { type: String, required: true },
   venue: { type: String, required: true },
   registrationDeadline: { type: Date, required: true, default: Date.now },
-  category: { type: String, required: true },
+  category: { type: String, required: true, enum: TOURNAMENT_CATEGORIES },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
   isLocked: { type: Boolean, default: false },
   winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },
   isActive: { type: Boolean, default: true },
   isPublished: { type: Boolean, default: false },
 }, { timestamps: true });
+
+tournamentSchema.index({ sport: 1, year: 1, category: 1, createdBy: 1 }, { unique: true });
 
 const registrationSchema = new mongoose.Schema({
   tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament', required: true },

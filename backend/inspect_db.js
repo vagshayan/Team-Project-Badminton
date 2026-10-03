@@ -7,7 +7,7 @@ async function inspect() {
     console.log('--- SYNCING WITH DATABASE ---');
     await mongoose.connect(process.env.MONGODB_URI);
     
-    const admins = await Admin.find().select('-password');
+    const admins = await Admin.find().select('id username name sport avatarUrl role securityQuestion');
     
     if (admins.length === 0) {
       console.log('❗ No admin accounts found in the database.');

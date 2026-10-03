@@ -2,9 +2,10 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { SUN, MOON, TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE, STADIUM} from '../components/Icons';
+import { TROPHY, CHECK_MARK, MENU_OPEN, MENU_CLOSE, CALENDAR, HOURGLASS, CLOCK, LOCATION, CLOSE, STADIUM, GRADUATION_CAP, MEDAL, CROWN, STAR, SHIRT_ICON, USER_ROUND, USERS_ROUND, ID_CARD, ARROW_RIGHT } from '../components/Icons';
 import RegisterModal from './RegisterModal';
 import { SPORT_META, getSportMeta } from '../constants/sports';
+import { HomeButton, ThemeToggleButton } from './HeaderControls';
 
 const CAT_LABELS = {
   'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
@@ -165,7 +166,7 @@ export default function StudentTournamentPage({ sport }) {
   const pollingRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
 
   const meta = getSportMeta(sport, isDarkMode) || SPORT_META['badminton'];
 
@@ -386,12 +387,17 @@ export default function StudentTournamentPage({ sport }) {
   const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
+    <div className="student-tournament-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
-          <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
-          <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
+          <div style={sh.brandMark} className="mobile-logo">
+            <img src="/logo.png" alt="University of Jaffna logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          </div>
+          <div style={sh.brandName} className="mobile-title-main">
+            <span className="mobile-title-main" style={sh.brandUniversity}>University of Jaffna</span>
+            <span className="mobile-title-sub" style={sh.brandLine}>Sports Tournament Manager</span>
+          </div>
         </div>
 
         {/* Desktop inline tabs */}
@@ -412,7 +418,10 @@ export default function StudentTournamentPage({ sport }) {
         </div>
 
           <div style={{ display: 'flex', gap: 20, alignItems: 'center' }} className="mobile-controls">
-          <button onClick={toggleTheme} style={sh.themeToggle} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
+          <div className="app-header-control-group">
+            <HomeButton />
+            <ThemeToggleButton />
+          </div>
           <button onClick={() => navigate(`/admin/login?sport=${encodeURIComponent(sport)}`)} style={sh.adminBtn} className="mobile-btn">
             <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
@@ -451,7 +460,7 @@ export default function StudentTournamentPage({ sport }) {
         </div>
       )}
 
-      <div style={sh.hero}>
+      <div className="student-results-hero" style={sh.hero}>
         <div style={{ ...sh.heroBlob, background: meta.color }} />
         <h1 style={sh.heroTitle} className="mobile-hero-title">{meta.label} RESULTS</h1>
 
@@ -459,7 +468,7 @@ export default function StudentTournamentPage({ sport }) {
         <div style={{ ...sh.liveIndicator, flexDirection: 'column', gap: 14, alignItems: 'center', margin: '24px 0 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="live-dot" style={{ background: '#10B981' }} />
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
+            <span className="student-live-indicator-text" style={{ fontSize: 12, fontWeight: 800, color: '#10B981', letterSpacing: 2 }}>OFFICIAL LIVE TOURNAMENT BOARD</span>
           </div>
 
           {/* Centered UNIVERSITY TEAM MEMBERS Button inside Official Live Tournament Board */}
@@ -484,7 +493,7 @@ export default function StudentTournamentPage({ sport }) {
             }}
             className="team-members-live-board-btn"
           >
-            <span style={{ fontSize: 16 }}>🎓</span>
+            <span style={{ fontSize: 16 }}>{GRADUATION_CAP}</span>
             <span>UNIVERSITY TEAM MEMBERS</span>
             <span style={{
               background: meta.color,
@@ -497,7 +506,7 @@ export default function StudentTournamentPage({ sport }) {
             }}>
               {teamMembers.length}
             </span>
-            <span style={{ fontSize: 13 }}>→</span>
+            <span style={{ fontSize: 13 }}>{ARROW_RIGHT}</span>
           </button>
         </div>
       </div>
@@ -649,14 +658,14 @@ export default function StudentTournamentPage({ sport }) {
                           <div style={bh.pRow}>
                             {renderPlayerName(m, m.player1, 'p1', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player1) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
-                              {m.isCompleted && isMatchWinner(m, m.player1) ? '🥇 W' : (m.isCompleted && m.player1 ? 'L' : '')}
+                              {m.isCompleted && isMatchWinner(m, m.player1) ? <>{MEDAL} W</> : (m.isCompleted && m.player1 ? 'L' : '')}
                             </span>
                           </div>
                           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                           <div style={bh.pRow}>
                             {renderPlayerName(m, m.player2, 'p2', getDisplayName, expandedName, setExpandedName)}
                             <span style={{ ...bh.score, color: isMatchWinner(m, m.player2) ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: 900 }}>
-                              {m.isCompleted && isMatchWinner(m, m.player2) ? '🥇 W' : (m.isCompleted && m.player2 ? 'L' : '')}
+                              {m.isCompleted && isMatchWinner(m, m.player2) ? <>{MEDAL} W</> : (m.isCompleted && m.player2 ? 'L' : '')}
                             </span>
                           </div>
                         </div>
@@ -725,7 +734,7 @@ export default function StudentTournamentPage({ sport }) {
                   fontWeight: 900,
                 }}
               >
-                ✕
+                {CLOSE}
               </button>
             </div>
 
@@ -733,7 +742,7 @@ export default function StudentTournamentPage({ sport }) {
             <div style={{ marginBottom: 24 }}>
               <input
                 type="text"
-                placeholder={`🔍 Search ${meta.label.toLowerCase()} team member name, reg. no, faculty, role...`}
+                placeholder={`Search ${meta.label.toLowerCase()} team member name, reg. no, faculty, role...`}
                 value={teamSearchQuery}
                 onChange={(e) => setTeamSearchQuery(e.target.value)}
                 style={{
@@ -751,7 +760,7 @@ export default function StudentTournamentPage({ sport }) {
 
             {teamMembers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>🎓</div>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>{GRADUATION_CAP}</div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>No Team Members Found</h3>
                 <p style={{ fontSize: 14, marginTop: 6 }}>No official university team members are currently registered for the {meta.label} tournament.</p>
               </div>
@@ -771,10 +780,10 @@ export default function StudentTournamentPage({ sport }) {
               const renderCard = (member) => {
                 const badge = (pos) => {
                   const p = (pos || '').toLowerCase();
-                  if (p.includes('captain') && !p.includes('vice')) return { bg: 'linear-gradient(135deg, #F59E0B, #D97706)', icon: '👑' };
-                  if (p.includes('vice captain') || p.includes('vice-captain')) return { bg: 'linear-gradient(135deg, #06B6D4, #0284C7)', icon: '⭐' };
-                  if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) return { bg: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', icon: '🛡️' };
-                  return { bg: 'rgba(59, 130, 246, 0.2)', icon: '🎽' };
+                  if (p.includes('captain') && !p.includes('vice')) return { bg: 'linear-gradient(135deg, #F59E0B, #D97706)', icon: CROWN };
+                  if (p.includes('vice captain') || p.includes('vice-captain')) return { bg: 'linear-gradient(135deg, #06B6D4, #0284C7)', icon: STAR };
+                  if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) return { bg: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', icon: SHIELD };
+                  return { bg: 'rgba(59, 130, 246, 0.2)', icon: SHIRT_ICON };
                 };
                 const b = badge(member.position);
                 const avatarSrc = member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
@@ -833,17 +842,17 @@ export default function StudentTournamentPage({ sport }) {
                         color: isGirl ? '#EC4899' : '#3B82F6',
                         border: `1px solid ${isGirl ? '#EC4899' : '#3B82F6'}60`,
                       }}>
-                        {isGirl ? '👧 Girls' : '👦 Boys'}
+                        {isGirl ? <>{USER_ROUND} Girls</> : <>{USER_ROUND} Boys</>}
                       </div>
                     </div>
 
                     <div style={{ padding: 18 }}>
                       <h4 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 900, color: 'var(--text)' }}>{member.fullName}</h4>
                       <div style={{ fontSize: 13, fontWeight: 800, color: isGirl ? '#EC4899' : meta.color, marginBottom: 8 }}>
-                        🪪 {member.registrationNumber}
+                        {ID_CARD} {member.registrationNumber}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, padding: '8px 12px', borderRadius: 10, background: 'var(--bg-input)' }}>
-                        🎓 <strong>Faculty:</strong><br />{member.faculty}
+                        {GRADUATION_CAP} <strong>Faculty:</strong><br />{member.faculty}
                       </div>
                     </div>
                   </div>
@@ -855,7 +864,7 @@ export default function StudentTournamentPage({ sport }) {
                   {/* Boys Team Section */}
                   <div>
                     <h4 style={{ fontSize: 16, fontWeight: 950, color: '#3B82F6', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(59, 130, 246, 0.2)', paddingBottom: 8 }}>
-                      👦 BOYS TEAM ({boys.length})
+                      {USERS_ROUND} BOYS TEAM ({boys.length})
                     </h4>
                     {boys.length === 0 ? (
                       <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Boys Team members listed.</div>
@@ -869,7 +878,7 @@ export default function StudentTournamentPage({ sport }) {
                   {/* Girls Team Section */}
                   <div>
                     <h4 style={{ fontSize: 16, fontWeight: 950, color: '#EC4899', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid rgba(236, 72, 153, 0.2)', paddingBottom: 8 }}>
-                      👧 GIRLS TEAM ({girls.length})
+                      {USERS_ROUND} GIRLS TEAM ({girls.length})
                     </h4>
                     {girls.length === 0 ? (
                       <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No Girls Team members listed.</div>
@@ -903,11 +912,12 @@ const bh = {
 const sh = {
   nav: { height: 100, background: 'var(--nav-bg)', backdropFilter: 'blur(30px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 60px', position: 'sticky', top: 0, zIndex: 1000 },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
-  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
-  brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5 },
+  brandMark: { width: 54, height: 54, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
+  brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
+  brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
   sportSwitcher: { display: 'flex', gap: 10, height: '100%' },
   sportBtn: { background: 'none', border: 'none', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.3s' },
-  themeToggle: { background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 20, padding: '10px', borderRadius: 14, cursor: 'pointer' },
   adminBtn: { background: 'var(--primary)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: 12, fontWeight: 900, fontSize: 13, cursor: 'pointer' },
   hero: { padding: '100px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' },
   heroBlob: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 600, height: 400, filter: 'blur(150px)', opacity: 0.1, borderRadius: '50%', pointerEvents: 'none' },

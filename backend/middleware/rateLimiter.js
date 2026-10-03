@@ -28,7 +28,7 @@ const loginLimiter = rateLimit({
 
 /**
  * Forgot-password rate limiter
- * 5 attempts per 30 minutes per IP
+ * 5 attempts per 30 minutes per IP and email
  * Prevents username enumeration and brute force
  */
 const forgotPasswordLimiter = rateLimit({
@@ -39,10 +39,10 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req, res) => {
     // Rate limit per IP + username
-    return `${req.ip}-${(req.body?.username || 'unknown').toLowerCase()}`;
+    return `${req.ip}-${String(req.body?.email || 'unknown').toLowerCase()}`;
   },
   skip: (req, res) => {
-    return !req.body?.username;
+    return !req.body?.email;
   },
   handler: (req, res) => {
     res.status(429).json({
@@ -53,8 +53,8 @@ const forgotPasswordLimiter = rateLimit({
 
 /**
  * Reset-password rate limiter
- * 3 attempts per 30 minutes per IP
- * Prevents brute-force security answer guessing
+ * 3 attempts per 30 minutes per IP and email
+ * Prevents brute-force OTP/reset attempts
  * Stricter than forgot-password since it involves sensitive action
  */
 const resetPasswordLimiter = rateLimit({
@@ -65,15 +65,38 @@ const resetPasswordLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req, res) => {
     // Rate limit per IP + username + attempt to reset specific account
-    return `${req.ip}-${(req.body?.username || 'unknown').toLowerCase()}`;
+    return `${req.ip}-${String(req.body?.email || 'unknown').toLowerCase()}`;
   },
   skip: (req, res) => {
-    return !req.body?.username;
+    return !req.body?.email;
   },
   handler: (req, res) => {
     res.status(429).json({
       message: 'Too many reset attempts. Please try again after 30 minutes.',
     });
+  },
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}-${String(req.body?.email || 'unknown').toLowerCase()}`,
+  handler: (req, res) => {
+    res.status(429).json({ message: 'Too many verification email requests. Please try again later.' });
+  },
+});
+
+const passwordResetResendLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}-${String(req.body?.email || 'unknown').toLowerCase()}`,
+  skip: (req) => !req.body?.email,
+  handler: (req, res) => {
+    res.status(429).json({ message: 'Too many code requests. Please try again later.' });
   },
 });
 
@@ -107,6 +130,8 @@ module.exports = {
   loginLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  resendVerificationLimiter,
+  passwordResetResendLimiter,
   publicRegistrationLimiter,
   publicPartnerLookupLimiter,
 };

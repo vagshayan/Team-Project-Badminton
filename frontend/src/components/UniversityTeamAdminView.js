@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { BADMINTON, TABLE_TENNIS, CARROM, CROWN, STAR, SHIELD, SHIRT_ICON, USER_ROUND, USERS_ROUND, ID_CARD, GRADUATION_CAP, PENCIL, TRASH, WARNING_ROUND, CLOSE } from './Icons';
 
 const STANDARD_FACULTIES = [
   'Faculty of Arts',
@@ -18,9 +19,9 @@ const STANDARD_FACULTIES = [
 const STANDARD_POSITIONS = ['Captain', 'Vice Captain', 'Game Admin', 'Player'];
 
 const SPORTS = [
-  { id: 'badminton', label: 'Badminton', icon: '🏸', color: '#3B82F6' },
-  { id: 'table-tennis', label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
-  { id: 'carrom', label: 'Carrom', icon: '🎯', color: '#EC4899' },
+  { id: 'badminton', label: 'Badminton', icon: BADMINTON, color: '#3B82F6' },
+  { id: 'table-tennis', label: 'Table Tennis', icon: TABLE_TENNIS, color: '#8B5CF6' },
+  { id: 'carrom', label: 'Carrom', icon: CARROM, color: '#EC4899' },
 ];
 
 export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
@@ -255,7 +256,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       await axios.delete(`/api/university-team/${deleteTarget._id}`, { headers });
-      showToast('🗑 Team member removed.');
+      showToast('Team member removed.');
       setDeleteTarget(null);
       fetchMembers();
     } catch (err) {
@@ -283,19 +284,20 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
   const getBadgeStyle = (pos) => {
     const p = (pos || '').toLowerCase();
     if (p.includes('captain') && !p.includes('vice')) {
-      return { background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#FFF', icon: '👑' };
+      return { background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#FFF', icon: CROWN };
     }
     if (p.includes('vice captain') || p.includes('vice-captain')) {
-      return { background: 'linear-gradient(135deg, #06B6D4, #0284C7)', color: '#FFF', icon: '⭐' };
+      return { background: 'linear-gradient(135deg, #06B6D4, #0284C7)', color: '#FFF', icon: STAR };
     }
     if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) {
-      return { background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', color: '#FFF', icon: '🛡️' };
+      return { background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', color: '#FFF', icon: SHIELD };
     }
-    return { background: 'rgba(59, 130, 246, 0.15)', color: activeSportMeta.color, icon: '🎽' };
+    return { background: 'rgba(59, 130, 246, 0.15)', color: activeSportMeta.color, icon: SHIRT_ICON };
   };
 
   const renderMemberCard = (member) => {
     const badge = getBadgeStyle(member.position);
+    const { icon: badgeIcon, ...badgeStyle } = badge;
     const avatarSrc = member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
     const isGirls = member.teamGender === 'Women';
 
@@ -348,9 +350,9 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
             alignItems: 'center',
             gap: 6,
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            ...badge,
+            ...badgeStyle,
           }}>
-            <span>{badge.icon}</span> {member.position.toUpperCase()}
+            <span>{badgeIcon}</span> {member.position.toUpperCase()}
           </div>
 
           {/* Team Gender Badge */}
@@ -367,7 +369,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
             color: isGirls ? '#EC4899' : '#3B82F6',
             border: `1px solid ${isGirls ? '#EC4899' : '#3B82F6'}60`,
           }}>
-            {isGirls ? '👧 Girls Team' : '👦 Boys Team'}
+            {isGirls ? <>{USER_ROUND} Girls Team</> : <>{USER_ROUND} Boys Team</>}
           </div>
         </div>
 
@@ -387,11 +389,11 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               alignItems: 'center',
               gap: 6
             }}>
-              <span>🪪</span> {member.registrationNumber}
+              <span>{ID_CARD}</span> {member.registrationNumber}
             </div>
 
             <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-              🎓 {member.faculty}
+              {GRADUATION_CAP} {member.faculty}
             </div>
           </div>
 
@@ -417,7 +419,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                 cursor: 'pointer',
               }}
             >
-              ✏️ Edit
+              {PENCIL} Edit
             </button>
             <button
               onClick={() => setDeleteTarget(member)}
@@ -432,7 +434,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                 cursor: 'pointer',
               }}
             >
-              🗑️ Delete
+              {TRASH} Delete
             </button>
           </div>
         </div>
@@ -572,7 +574,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               gap: 6,
             }}
           >
-            👦 Boys Team ({members.filter((m) => (m.teamGender || 'Men') === 'Men').length})
+            {USER_ROUND} Boys Team ({members.filter((m) => (m.teamGender || 'Men') === 'Men').length})
           </button>
 
           <button
@@ -591,15 +593,15 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               gap: 6,
             }}
           >
-            👧 Girls Team ({members.filter((m) => m.teamGender === 'Women').length})
+            {USER_ROUND} Girls Team ({members.filter((m) => m.teamGender === 'Women').length})
           </button>
         </div>
 
         {/* Search Input */}
-        <div style={{ width: 280 }}>
+        <div style={{ width: '100%', maxWidth: 280 }}>
           <input
             type="text"
-            placeholder={`🔍 Search ${activeSportMeta.label} roster...`}
+            placeholder={`Search ${activeSportMeta.label} roster...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -651,7 +653,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                 paddingBottom: 10,
                 borderBottom: '2px solid rgba(59, 130, 246, 0.3)'
               }}>
-                <span style={{ fontSize: 24 }}>👦</span>
+                <span style={{ fontSize: 24 }}>{USERS_ROUND}</span>
                 <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, color: '#3B82F6', letterSpacing: 0.5 }}>
                   BOYS TEAM (MEN) — {boysMembers.length} MEMBERS
                 </h3>
@@ -684,7 +686,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                 paddingBottom: 10,
                 borderBottom: '2px solid rgba(236, 72, 153, 0.3)'
               }}>
-                <span style={{ fontSize: 24 }}>👧</span>
+                <span style={{ fontSize: 24 }}>{USERS_ROUND}</span>
                 <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, color: '#EC4899', letterSpacing: 0.5 }}>
                   GIRLS TEAM (WOMEN) — {girlsMembers.length} MEMBERS
                 </h3>
@@ -754,7 +756,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                {CLOSE}
               </button>
             </div>
 
@@ -769,7 +771,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                 fontWeight: 700,
                 marginBottom: 18,
               }}>
-                ⚠️ {errorMessage}
+                {WARNING_ROUND} {errorMessage}
               </div>
             )}
 
@@ -799,7 +801,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                       gap: 8,
                     }}
                   >
-                    👦 Boys Team (Men)
+                    {USER_ROUND} Boys Team (Men)
                   </button>
                   <button
                     type="button"
@@ -820,7 +822,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                       gap: 8,
                     }}
                   >
-                    👧 Girls Team (Women)
+                    {USER_ROUND} Girls Team (Women)
                   </button>
                 </div>
               </div>
@@ -848,7 +850,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
                     {photoPreview ? (
                       <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: 30, opacity: 0.5 }}>{teamGender === 'Women' ? '👧' : '👦'}</span>
+                      <span style={{ fontSize: 30, opacity: 0.5 }}>{USER_ROUND}</span>
                     )}
                   </div>
 
@@ -1074,7 +1076,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
             padding: 24,
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 44, marginBottom: 12 }}>{WARNING_ROUND}</div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 950 }}>REMOVE TEAM MEMBER?</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '10px 0 20px' }}>
               Are you sure you want to remove <strong>{deleteTarget.fullName}</strong> ({deleteTarget.registrationNumber}) from the {activeSportMeta.label} {deleteTarget.teamGender === 'Women' ? 'Girls' : 'Boys'} team roster?

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, TROPHY, CHECK_MARK, CROSS, KEY, SHIELD } from '../../components/Icons';
+import { EYE, EYE_OFF, LOCK, CHECK_MARK, CROSS, KEY, SHIELD, TROPHY } from '../../components/Icons';
 import axios from 'axios';
 import { SPORTS as SPORT_OPTIONS, getSportMeta } from '../../constants/sports';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 const SparklesIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -15,7 +15,7 @@ const SparklesIcon = (props) => (
 );
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({ name: '', username: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
+  const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,8 +24,9 @@ export default function RegisterPage() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isConfirmPasswordFocused, setIsConfirmPasswordFocused] = useState(false);
   const [accessCodeStatus, setAccessCodeStatus] = useState('idle');
-  const { loginFromData } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const { isDarkMode } = useTheme();
   const navigate = useNavigate();
 
   // Password validation - AWS Moderate Policy
@@ -42,7 +43,7 @@ export default function RegisterPage() {
   const showPasswordRequirements = isPasswordFocused && formData.password.length > 0 && !passwordValid;
   const showPasswordMatchMessage = isConfirmPasswordFocused && formData.confirmPassword.length > 0;
   const passwordsMatch = showPasswordMatchMessage && formData.password === formData.confirmPassword;
-  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`;
+  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match</>;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -113,7 +114,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const { name, username, password, confirmPassword, sport, securityQuestion, securityAnswer } = formData;
+    const { name, username, email, password, confirmPassword, sport, securityQuestion, securityAnswer } = formData;
     if (!passwordValid) return setError('Password does not meet all requirements');
     if (password !== confirmPassword) return setError('Passwords do not match');
     if (!sport) return setError('Please select your arena domain');
@@ -122,10 +123,10 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await axios.post('/api/auth/register', { name, username, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
+      await axios.post('/api/auth/register', { name, username, email, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
       setAccessCodeStatus('verified');
-      loginFromData(res.data.token, res.data.admin);
-      navigate('/admin/dashboard', { replace: true });
+      setVerificationEmail(email.trim());
+      setVerificationSent(true);
     } catch (err) {
       if (err.response?.status === 403) {
         setAccessCodeStatus('invalid');
@@ -139,10 +140,20 @@ export default function RegisterPage() {
     }
   };
 
+  const resendVerification = async () => {
+    setError('');
+    try {
+      const res = await axios.post('/api/auth/resend-verification', { email: verificationEmail });
+      setError(res.data?.message || 'If the account is pending verification, a new email will be sent.');
+    } catch {
+      setError('If the account is pending verification, a new email will be sent.');
+    }
+  };
+
   return (
     <div style={sh.container}>
-      <div style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
-      <div style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
+      <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--accent)', bottom: '-10%', right: '10%', opacity: 0.08 }} />
 
       <style>{`
         input[type="password"]::-ms-reveal { display: none; }
@@ -180,6 +191,10 @@ export default function RegisterPage() {
           .form-card {
             padding: 30px !important;
             border-radius: 24px !important;
+            max-height: 82vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
           }
           .field-group {
             grid-template-columns: 1fr !important;
@@ -187,30 +202,68 @@ export default function RegisterPage() {
           .nav-container {
             padding: 0 20px !important;
           }
+          .register-brand {
+            gap: 10px !important;
+          }
+          .register-brand-mark {
+            width: 48px !important;
+            height: 48px !important;
+          }
+          .register-brand-university {
+            font-size: 17px !important;
+          }
+          .register-brand-line {
+            font-size: 10px !important;
+          }
           .sport-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 380px) {
+          .register-brand-mark {
+            width: 40px !important;
+            height: 40px !important;
+          }
+          .register-brand-university {
+            font-size: 15px !important;
+          }
+          .register-brand-line {
+            font-size: 9px !important;
           }
         }
       `}</style>
 
       <nav className="nav-container" style={sh.nav}>
-        <div style={sh.brand} onClick={() => navigate('/')}>
-          <div style={sh.logoCircle}>{TROPHY}</div>
-          <span style={sh.brandName}>UoJ SPORTS</span>
+        <div style={sh.brand} className="register-brand" onClick={() => navigate('/')}>
+          <div style={sh.brandMark} className="register-brand-mark">
+            <img src="/logo.png" alt="University of Jaffna logo" />
+          </div>
+          <div style={sh.brandName}>
+            <span style={sh.brandUniversity} className="register-brand-university">University of Jaffna</span>
+            <span style={sh.brandLine} className="register-brand-line">Sports Tournament Manager</span>
+          </div>
         </div>
-        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? SUN : MOON}</button>
+        <div className="app-header-control-group">
+          <HomeButton />
+          <ThemeToggleButton />
+        </div>
       </nav>
 
       <div className="content-container" style={sh.content}>
         <div className="hero-side" style={sh.heroSide}>
            <div style={sh.badge}>OFFICIAL ACCESS</div>
-           <h1 className="hero-title" style={sh.title}>CREATE YOUR <br/><span style={sh.highlight}>ARENA HUB</span></h1>
-           <p style={sh.subtitle}>Initialize your dedicated management dashboard for Badminton, Table Tennis, or Carrom tournaments.</p>
+           <h1 className="hero-title" style={sh.title}><span style={sh.highlight}>CREATE ADMIN</span> <br/>ACCOUNT</h1>
+           <p style={sh.subtitle}>Set up your administrator account to manage Badminton, Table Tennis, or Carrom tournaments.</p>
            
            <div className="benefit-list" style={sh.benefitList}>
-              {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map(b => (
+              {[
+                 'Strong & Secure Password',
+                 'Select Your Sport / Domain',
+                 'Admin Access Code Required',
+                 'Security Question & Answer'
+              ].map((b, index) => (
                  <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>{CHECK_MARK}</span> {b}
+                    <span style={sh.check}>{index === 0 ? LOCK : index === 1 ? TROPHY : index === 2 ? KEY : SHIELD}</span> {b}
                  </div>
               ))}
            </div>
@@ -220,7 +273,16 @@ export default function RegisterPage() {
           <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
-            <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            {verificationSent && (
+              <div style={sh.verificationBox}>
+                <h2 style={sh.title}>Verify your email</h2>
+                <p style={sh.subtitle}>Your account is pending. Check your email for a verification link before logging in.</p>
+                <button type="button" onClick={resendVerification} style={sh.secondaryBtn}>Resend Verification Email</button>
+                <p style={sh.smallText}>The verification link expires after 15 minutes.</p>
+              </div>
+            )}
+
+            {!verificationSent && <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
               <div style={sh.section}>
                 <label style={sh.label}>CHOOSE DOMAIN</label>
                 <div className="sport-grid" style={sh.sportGrid}>
@@ -253,9 +315,13 @@ export default function RegisterPage() {
                    <label style={sh.label}>USERNAME</label>
                    <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} autoComplete="off" required />
                 </div>
+                 <div style={{ ...sh.field, gridColumn: '1 / -1' }}>
+                   <label style={sh.label}>EMAIL ADDRESS</label>
+                   <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="admin@example.com" style={sh.input} autoComplete="email" required />
+                 </div>
               </div>
 
-              <div className="field-group" style={sh.fieldGroup}>
+              <div className="field-group" style={{ ...sh.fieldGroup, gridTemplateColumns: '1fr' }}>
                 <div style={sh.field}>
                    <label style={sh.label}>PASSWORD</label>
                    <div style={sh.passwordInputWrapper}>
@@ -264,7 +330,7 @@ export default function RegisterPage() {
                        <SparklesIcon style={sh.suggestPasswordIcon} />
                      </button>
                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? EYE : LOCK}
+                       {showPassword ? EYE : EYE_OFF}
                      </button>
                    </div>
                    {showPasswordRequirements && (
@@ -297,7 +363,7 @@ export default function RegisterPage() {
                    <div style={sh.passwordInputWrapper}>
                      <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} autoComplete="new-password" required />
                      <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? EYE : LOCK}
+                       {showConfirmPassword ? EYE : EYE_OFF}
                      </button>
                    </div>
                    {showPasswordMatchMessage && (
@@ -356,7 +422,7 @@ export default function RegisterPage() {
                         aria-label="Show access code"
                         aria-pressed={false}
                       >
-                        {LOCK}
+                        {EYE_OFF}
                       </button>
                     )}
                   </div>
@@ -388,7 +454,7 @@ export default function RegisterPage() {
               <button type="submit" style={sh.submitBtn} disabled={loading}>
                 {loading ? 'INITIALIZING ARENA...' : 'CREATE ACCOUNT'}
               </button>
-            </form>
+            </form>}
 
             <p style={sh.footerLinkWrap}>
               Existing Manager? <Link to="/admin/login" style={sh.footerLink}>Login here</Link>
@@ -405,9 +471,10 @@ const sh = {
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
-  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
-  brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5 },
-  themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
+  brandMark: { width: 54, height: 54, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
+  brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
+  brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
   content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', padding: '0 60px' },
   heroSide: { flex: 1, paddingRight: 60 },
   formSide: { flex: 1, maxWidth: 500 },
@@ -418,7 +485,7 @@ const sh = {
   benefitList: { marginTop: 48, display: 'flex', flexDirection: 'column', gap: 16 },
   benefit: { display: 'flex', alignItems: 'center', gap: 12, fontWeight: 700, fontSize: 15, color: 'var(--text)' },
   check: { color: '#10B981', fontWeight: 950 },
-  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)' },
+  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
   label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1.5px', display: 'block', marginBottom: 12 },
   sportGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
   sportCard: { padding: '16px', borderRadius: '18px', border: '2px solid transparent', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s cubic-bezier(0.2, 1, 0.3, 1)' },
@@ -444,6 +511,9 @@ const sh = {
   validationRowConfirmed: { color: '#10B981' },
   validationRowInvalid: { color: '#EF4444' },
   submitBtn: { background: 'var(--primary)', border: 'none', color: '#FFF', padding: '20px', borderRadius: '16px', fontWeight: 900, fontSize: '14px', letterSpacing: '1px', cursor: 'pointer', marginTop: '10px', boxShadow: '0 12px 25px -5px rgba(59, 130, 246, 0.4)' },
+  verificationBox: { textAlign: 'center', padding: '24px 0' },
+  secondaryBtn: { background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '14px 18px', borderRadius: '14px', fontWeight: 800, cursor: 'pointer' },
+  smallText: { color: 'var(--text-muted)', fontSize: 12, marginTop: 18 },
   errorBox: { background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '16px', borderRadius: '16px', fontSize: 13, marginBottom: 32, textAlign: 'center' },
   footerLinkWrap: { textAlign: 'center', marginTop: 32, fontSize: 14, color: 'var(--text-muted)' },
   footerLink: { color: 'var(--primary)', fontWeight: 800, textDecoration: 'none', marginLeft: 5 },

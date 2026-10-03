@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { SHIELD, KEY, WARNING } from './Icons';
+import { SHIELD, KEY, WARNING, EYE, EYE_OFF } from './Icons';
 
-export default function PasswordConfirmModal({ title, message, confirmLabel = 'CONFIRM', danger = false, onConfirm, onClose }) {
+export default function PasswordConfirmModal({ title, message, confirmLabel = 'CONFIRM', danger = false, showPasswordToggle = true, onConfirm, onClose }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +19,7 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
   return (
     <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={sh.card}>
-        <div style={sh.badge}>{danger ? 'DANGER ZONE 🛡️' : 'VERIFICATION 🔑'}</div>
+        <div style={sh.badge}>{danger ? <>DANGER ZONE {SHIELD}</> : <>VERIFICATION {KEY}</>}</div>
         <h2 style={{ ...sh.title, color: danger ? '#EF4444' : 'var(--primary)' }}>{title}</h2>
         <p style={sh.subtitle}>{message}</p>
         
@@ -27,7 +28,10 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
         <form onSubmit={handleSubmit} style={sh.form}>
            <div style={sh.field}>
               <label style={sh.label}>ADMIN PASSWORD</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type password here..." style={sh.input} autoFocus required />
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type password here..." style={{ ...sh.input, width: '100%', paddingRight: showPasswordToggle ? 48 : 16 }} autoFocus required />
+                {showPasswordToggle && <button type="button" onClick={() => setShowPassword((visible) => !visible)} title={showPassword ? 'Hide password' : 'Show password'} aria-label={showPassword ? 'Hide password' : 'Show password'} style={sh.toggle}>{showPassword ? EYE : EYE_OFF}</button>}
+              </div>
            </div>
 
            <div style={sh.footer}>
@@ -53,6 +57,7 @@ const sh = {
   field: { display: 'flex', flexDirection: 'column', gap: 10 },
   label: { fontSize: 11, fontWeight: 950, color: 'var(--text-muted)', letterSpacing: 1 },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 14, fontSize: 16, outline: 'none' },
+  toggle: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 0 },
   footer: { display: 'flex', gap: 16, marginTop: 8 },
   cancelBtn: { flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '16px', borderRadius: 16, fontWeight: 900, cursor: 'pointer' },
   submitBtn: { flex: 2, border: 'none', padding: '16px', borderRadius: 16, fontWeight: 950, cursor: 'pointer', letterSpacing: 1 }

@@ -6,10 +6,12 @@ frontend/node_modules/
 # Environment variables
 .env
 backend/.env
+backend/uploads/
 
 # Build folders
 frontend/build/
 frontend/dist/
+
 
 # OS files
 .DS_Store

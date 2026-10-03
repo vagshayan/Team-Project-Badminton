@@ -565,9 +565,15 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
 // Admin — view registrations for a tournament
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
-    const { Registration } = getModelsForSport(req.admin.sport);
+    const { Tournament, Registration } = getModelsForSport(req.admin.sport);
+    const tournament = await Tournament.findOne({
+      _id: req.params.tournamentId,
+      createdBy: req.admin._id,
+    }).select('_id');
+    if (!tournament) return res.status(404).json({ message: 'Tournament not found' });
+
     const registrations = await Registration.find({
-      tournament: req.params.tournamentId,
+      tournament: tournament._id,
     }).sort({ createdAt: -1 });
     res.json(registrations);
   } catch (err) {
