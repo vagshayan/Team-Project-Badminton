@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, CHECK_MARK, CROSS, TROPHY } from '../../components/Icons';
+import { EYE, EYE_OFF, CHECK_MARK, CROSS, TROPHY } from '../../components/Icons';
 import axios from 'axios';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState(1); // 1: enter email, 2: verify OTP, 3: reset password, 4: success
@@ -20,7 +20,6 @@ export default function ForgotPasswordPage() {
   const [isConfirmPasswordFocused, setIsConfirmPasswordFocused] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const validatePassword = (password) => ({
@@ -125,7 +124,10 @@ export default function ForgotPasswordPage() {
           <div style={sh.logoCircle} className="mobile-logo">{TROPHY}</div>
           <span style={sh.brandName} className="mobile-title-main">UoJ SPORTS</span>
         </div>
-        <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
+        <div className="app-header-control-group">
+          <HomeButton />
+          <ThemeToggleButton />
+        </div>
       </nav>
 
       <div style={sh.content} className="mobile-main-content">
@@ -204,7 +206,7 @@ export default function ForgotPasswordPage() {
                       required
                     />
                     <button type="button" onClick={() => setShowPassword((visible) => !visible)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                      {showPassword ? EYE : LOCK}
+                      {showPassword ? EYE : EYE_OFF}
                     </button>
                   </div>
                   {showPasswordRequirements && (
@@ -232,10 +234,10 @@ export default function ForgotPasswordPage() {
                       required
                     />
                     <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                      {showConfirmPassword ? EYE : LOCK}
+                      {showConfirmPassword ? EYE : EYE_OFF}
                     </button>
                   </div>
-                  {showPasswordMatchMessage && <div style={{ ...sh.passwordHint, color: passwordsMatch ? '#10B981' : '#EF4444' }} aria-live="polite">{passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`}</div>}
+                  {showPasswordMatchMessage && <div style={{ ...sh.passwordHint, color: passwordsMatch ? '#10B981' : '#EF4444' }} aria-live="polite">{passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match</>}</div>}
                 </div>
                 <button type="submit" style={sh.submitBtn} disabled={loading}>
                   {loading ? 'Resetting...' : 'Reset Password'}
@@ -270,7 +272,6 @@ const sh = {
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
   logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
   brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5 },
-  themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
   content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', justifyContent: 'center', padding: '0 60px' },
   formSide: { flex: 1, maxWidth: 500 },
   card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)' },

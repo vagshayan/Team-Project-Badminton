@@ -25,6 +25,8 @@ npm install
 node server.js
 ```
 
+All team members must configure the backend with the same `MONGODB_URI` and database name to share admins, tournaments, and profile photos. The `.env` file is intentionally gitignored and should be configured locally without committing credentials. New admin photos are stored in MongoDB, not in the repository; older photos saved under `backend/uploads/` are local-only and must be uploaded again from the machine that has the original file.
+
 For Gmail, enable 2-Step Verification and create an App Password. Put the Gmail address in `SMTP_USER` and the 16-character App Password in `SMTP_PASS`. Do not use the normal Gmail account password.
 
 ### 3. Setup Frontend

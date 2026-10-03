@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, TROPHY, CHECK_MARK, CROSS, KEY, SHIELD } from '../../components/Icons';
+import { EYE, EYE_OFF, LOCK, CHECK_MARK, CROSS, KEY, SHIELD, TROPHY } from '../../components/Icons';
 import axios from 'axios';
 import { SPORTS as SPORT_OPTIONS, getSportMeta } from '../../constants/sports';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 const SparklesIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -25,7 +26,7 @@ export default function RegisterPage() {
   const [accessCodeStatus, setAccessCodeStatus] = useState('idle');
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const navigate = useNavigate();
 
   // Password validation - AWS Moderate Policy
@@ -42,7 +43,7 @@ export default function RegisterPage() {
   const showPasswordRequirements = isPasswordFocused && formData.password.length > 0 && !passwordValid;
   const showPasswordMatchMessage = isConfirmPasswordFocused && formData.confirmPassword.length > 0;
   const passwordsMatch = showPasswordMatchMessage && formData.password === formData.confirmPassword;
-  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`;
+  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match</>;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -201,18 +202,51 @@ export default function RegisterPage() {
           .nav-container {
             padding: 0 20px !important;
           }
+          .register-brand {
+            gap: 10px !important;
+          }
+          .register-brand-mark {
+            width: 48px !important;
+            height: 48px !important;
+          }
+          .register-brand-university {
+            font-size: 17px !important;
+          }
+          .register-brand-line {
+            font-size: 10px !important;
+          }
           .sport-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 380px) {
+          .register-brand-mark {
+            width: 40px !important;
+            height: 40px !important;
+          }
+          .register-brand-university {
+            font-size: 15px !important;
+          }
+          .register-brand-line {
+            font-size: 9px !important;
           }
         }
       `}</style>
 
       <nav className="nav-container" style={sh.nav}>
-        <div style={sh.brand} onClick={() => navigate('/')}>
-          <div style={sh.logoCircle}>{TROPHY}</div>
-          <span style={sh.brandName}>UoJ SPORTS</span>
+        <div style={sh.brand} className="register-brand" onClick={() => navigate('/')}>
+          <div style={sh.brandMark} className="register-brand-mark">
+            <img src="/logo.png" alt="University of Jaffna logo" />
+          </div>
+          <div style={sh.brandName}>
+            <span style={sh.brandUniversity} className="register-brand-university">University of Jaffna</span>
+            <span style={sh.brandLine} className="register-brand-line">Sports Tournament Manager</span>
+          </div>
         </div>
-        <button onClick={toggleTheme} style={sh.themeBtn}>{isDarkMode ? SUN : MOON}</button>
+        <div className="app-header-control-group">
+          <HomeButton />
+          <ThemeToggleButton />
+        </div>
       </nav>
 
       <div className="content-container" style={sh.content}>
@@ -229,7 +263,7 @@ export default function RegisterPage() {
                  'Security Question & Answer'
               ].map((b, index) => (
                  <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>{index === 0 ? '🔒' : index === 1 ? '🏆' : index === 2 ? '🔑' : '🛡️'}</span> {b}
+                    <span style={sh.check}>{index === 0 ? LOCK : index === 1 ? TROPHY : index === 2 ? KEY : SHIELD}</span> {b}
                  </div>
               ))}
            </div>
@@ -296,7 +330,7 @@ export default function RegisterPage() {
                        <SparklesIcon style={sh.suggestPasswordIcon} />
                      </button>
                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? EYE : LOCK}
+                       {showPassword ? EYE : EYE_OFF}
                      </button>
                    </div>
                    {showPasswordRequirements && (
@@ -329,7 +363,7 @@ export default function RegisterPage() {
                    <div style={sh.passwordInputWrapper}>
                      <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} autoComplete="new-password" required />
                      <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? EYE : LOCK}
+                       {showConfirmPassword ? EYE : EYE_OFF}
                      </button>
                    </div>
                    {showPasswordMatchMessage && (
@@ -388,7 +422,7 @@ export default function RegisterPage() {
                         aria-label="Show access code"
                         aria-pressed={false}
                       >
-                        {LOCK}
+                        {EYE_OFF}
                       </button>
                     )}
                   </div>
@@ -437,9 +471,10 @@ const sh = {
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
-  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
-  brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5 },
-  themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
+  brandMark: { width: 54, height: 54, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
+  brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
+  brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
   content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', padding: '0 60px' },
   heroSide: { flex: 1, paddingRight: 60 },
   formSide: { flex: 1, maxWidth: 500 },

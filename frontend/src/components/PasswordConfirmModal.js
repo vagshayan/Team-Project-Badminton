@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { SHIELD, KEY, WARNING, EYE, LOCK } from './Icons';
+import { SHIELD, KEY, WARNING, EYE, EYE_OFF } from './Icons';
 
-export default function PasswordConfirmModal({ title, message, confirmLabel = 'CONFIRM', danger = false, showPasswordToggle = false, onConfirm, onClose }) {
+export default function PasswordConfirmModal({ title, message, confirmLabel = 'CONFIRM', danger = false, showPasswordToggle = true, onConfirm, onClose }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
   return (
     <div className="modal-overlay" style={sh.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={sh.card}>
-        <div style={sh.badge}>{danger ? 'DANGER ZONE 🛡️' : 'VERIFICATION 🔑'}</div>
+        <div style={sh.badge}>{danger ? <>DANGER ZONE {SHIELD}</> : <>VERIFICATION {KEY}</>}</div>
         <h2 style={{ ...sh.title, color: danger ? '#EF4444' : 'var(--primary)' }}>{title}</h2>
         <p style={sh.subtitle}>{message}</p>
         
@@ -30,7 +30,7 @@ export default function PasswordConfirmModal({ title, message, confirmLabel = 'C
               <label style={sh.label}>ADMIN PASSWORD</label>
               <div style={{ position: 'relative' }}>
                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type password here..." style={{ ...sh.input, width: '100%', paddingRight: showPasswordToggle ? 48 : 16 }} autoFocus required />
-                {showPasswordToggle && <button type="button" onClick={() => setShowPassword((visible) => !visible)} title={showPassword ? 'Hide password' : 'Show password'} style={sh.toggle}>{showPassword ? EYE : LOCK}</button>}
+                {showPasswordToggle && <button type="button" onClick={() => setShowPassword((visible) => !visible)} title={showPassword ? 'Hide password' : 'Show password'} aria-label={showPassword ? 'Hide password' : 'Show password'} style={sh.toggle}>{showPassword ? EYE : EYE_OFF}</button>}
               </div>
            </div>
 

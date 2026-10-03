@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, WARNING_ROUND } from '../../components/Icons';
+import { EYE, EYE_OFF, WARNING_ROUND } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,7 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const { login, admin } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -58,7 +59,7 @@ export default function LoginPage() {
       <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
 
       <nav style={sh.nav} className="mobile-nav">
-        <div style={sh.brand} className="mobile-brand">
+        <Link to="/" aria-label="Go to the landing page" style={{ ...sh.brand, color: 'inherit', textDecoration: 'none' }} className="mobile-brand">
           <div style={sh.brandMark} className="mobile-logo">
             <img src="/logo.png" alt="University of Jaffna logo" />
           </div>
@@ -66,10 +67,10 @@ export default function LoginPage() {
             <span style={sh.brandUniversity} className="mobile-title-main">University of Jaffna</span>
             <span style={sh.brandLine} className="mobile-title-sub">Sports Tournament Manager</span>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 15, alignItems: 'center' }} className="mobile-controls">
-          <button onClick={toggleTheme} style={sh.themeBtn} className="mobile-btn">{isDarkMode ? SUN : MOON}</button>
-          <Link to={sportMeta ? `/${sportParam}` : '/'} style={{ ...sh.backLink, color: isDarkMode ? '#FFFFFF' : 'var(--primary)' }} className="mobile-btn">PUBLIC HUB</Link>
+        </Link>
+        <div className="app-header-control-group mobile-controls">
+          <HomeButton />
+          <ThemeToggleButton />
         </div>
       </nav>
 
@@ -105,7 +106,7 @@ export default function LoginPage() {
                         onClick={() => setShowPass(!showPass)} 
                         style={{ position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
                       >
-                        {showPass ? EYE : LOCK}
+                        {showPass ? EYE : EYE_OFF}
                       </button>
                     </div>
                  </div>
@@ -142,7 +143,6 @@ const sh = {
   brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
   brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
   brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
-  themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
   backLink: { color: 'var(--primary)', fontWeight: 900, textDecoration: 'none', padding: '10px 18px', borderRadius: '999px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.24)' },
   adminToggleBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 24px', borderRadius: '40px', fontSize: 12, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer' },
   mainContent: { minHeight: 'calc(100vh - 100px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', position: 'relative', zIndex: 10 },

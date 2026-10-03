@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useTheme } from '../../context/ThemeContext';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
+import { BADMINTON, TABLE_TENNIS, CARROM, CROWN, STAR, SHIELD, SHIRT_ICON, GRADUATION_CAP, USER_ROUND, USERS_ROUND, ID_CARD, MENU_OPEN, MENU_CLOSE, ARROW_LEFT } from '../../components/Icons';
 
 const SPORT_META = {
-  badminton: { label: 'Badminton', icon: '🏸', color: '#3B82F6' },
-  'table-tennis': { label: 'Table Tennis', icon: '🏓', color: '#8B5CF6' },
-  carrom: { label: 'Carrom', icon: '🎯', color: '#EC4899' },
+  badminton: { label: 'Badminton', icon: BADMINTON, color: '#3B82F6' },
+  'table-tennis': { label: 'Table Tennis', icon: TABLE_TENNIS, color: '#8B5CF6' },
+  carrom: { label: 'Carrom', icon: CARROM, color: '#EC4899' },
 };
 
 export default function TournamentTeamPage() {
   const { sport: urlSport } = useParams();
   const navigate = useNavigate();
-  const { isDarkMode, toggleTheme } = useTheme();
-
   const sportKey = (urlSport || 'badminton').toLowerCase();
   const meta = SPORT_META[sportKey] || SPORT_META.badminton;
 
@@ -45,15 +44,15 @@ export default function TournamentTeamPage() {
   const getBadgeStyle = (pos) => {
     const p = (pos || '').toLowerCase();
     if (p.includes('captain') && !p.includes('vice')) {
-      return { background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#FFF', icon: '👑' };
+      return { background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#FFF', icon: CROWN };
     }
     if (p.includes('vice captain') || p.includes('vice-captain')) {
-      return { background: 'linear-gradient(135deg, #06B6D4, #0284C7)', color: '#FFF', icon: '⭐' };
+      return { background: 'linear-gradient(135deg, #06B6D4, #0284C7)', color: '#FFF', icon: STAR };
     }
     if (p.includes('game admin') || p.includes('admin') || p.includes('manager')) {
-      return { background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', color: '#FFF', icon: '🛡️' };
+      return { background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', color: '#FFF', icon: SHIELD };
     }
-    return { background: `${meta.color}20`, color: meta.color, icon: '🎽' };
+    return { background: `${meta.color}20`, color: meta.color, icon: SHIRT_ICON };
   };
 
   return (
@@ -88,7 +87,7 @@ export default function TournamentTeamPage() {
               gap: 6,
             }}
           >
-            <span>←</span> Back to {meta.label}
+            <span>{ARROW_LEFT}</span> Back to {meta.label}
           </button>
 
           <div
@@ -129,12 +128,10 @@ export default function TournamentTeamPage() {
 
         {/* Controls */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <button
-            onClick={toggleTheme}
-            style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', fontSize: 18 }}
-          >
-            {isDarkMode ? '🌞' : '🌙'}
-          </button>
+          <div className="app-header-control-group">
+            <HomeButton />
+            <ThemeToggleButton />
+          </div>
 
           <button
             onClick={() => navigate('/admin/login')}
@@ -149,7 +146,7 @@ export default function TournamentTeamPage() {
             onClick={() => setMenuOpen(!menuOpen)}
             style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--text)' }}
           >
-            {menuOpen ? '✕' : '☰'}
+            {menuOpen ? MENU_CLOSE : MENU_OPEN}
           </button>
         </div>
       </nav>
@@ -158,8 +155,9 @@ export default function TournamentTeamPage() {
       {menuOpen && (
         <div className="mobile-dropdown-overlay" onClick={() => setMenuOpen(false)}>
           <div className="mobile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+            <HomeButton variant="menu" onNavigate={() => setMenuOpen(false)} />
             <button className="mobile-dropdown-item" onClick={() => { navigate(`/${sportKey}`); setMenuOpen(false); }}>
-              ← Back to {meta.label} Tournament
+              {ARROW_LEFT} Back to {meta.label} Tournament
             </button>
             {Object.keys(SPORT_META).map((s) => (
               <button
@@ -222,7 +220,7 @@ export default function TournamentTeamPage() {
             alignItems: 'center',
             gap: 8,
           }}>
-            <span style={{ fontSize: 18 }}>🎓</span>
+            <span style={{ fontSize: 18 }}>{GRADUATION_CAP}</span>
             <span>{members.length} Registered Team {members.length === 1 ? 'Member' : 'Members'}</span>
           </div>
         </div>
@@ -244,7 +242,7 @@ export default function TournamentTeamPage() {
           <div style={{ flex: 1, minWidth: 260 }}>
             <input
               type="text"
-              placeholder={`🔍 Search ${meta.label.toLowerCase()} member name, reg. number, or role...`}
+              placeholder={`Search ${meta.label.toLowerCase()} member name, reg. number, or role...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -276,7 +274,7 @@ export default function TournamentTeamPage() {
               borderRadius: 28,
               border: '1px dashed var(--border)',
             }}>
-              <div style={{ fontSize: 64, marginBottom: 16, opacity: 0.5 }}>🎓</div>
+              <div style={{ fontSize: 64, marginBottom: 16, opacity: 0.5 }}>{GRADUATION_CAP}</div>
               <h3 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>No Team Members Found</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 15, marginTop: 8 }}>
                 {searchQuery || selectedFaculty !== 'ALL'
@@ -290,6 +288,7 @@ export default function TournamentTeamPage() {
 
             const renderCard = (member) => {
               const badge = getBadgeStyle(member.position);
+              const { icon: badgeIcon, ...badgeStyle } = badge;
               const avatarSrc = member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random&size=200`;
               const isGirl = member.teamGender === 'Women';
 
@@ -329,9 +328,9 @@ export default function TournamentTeamPage() {
                       alignItems: 'center',
                       gap: 6,
                       boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
-                      ...badge,
+                      ...badgeStyle,
                     }}>
-                      <span>{badge.icon}</span> {member.position.toUpperCase()}
+                      <span>{badgeIcon}</span> {member.position.toUpperCase()}
                     </div>
                     <div style={{
                       position: 'absolute',
@@ -346,7 +345,7 @@ export default function TournamentTeamPage() {
                       color: isGirl ? '#EC4899' : '#3B82F6',
                       border: `1px solid ${isGirl ? '#EC4899' : '#3B82F6'}60`,
                     }}>
-                      {isGirl ? '👧 Girls Team' : '👦 Boys Team'}
+                      {isGirl ? <>{USER_ROUND} Girls Team</> : <>{USER_ROUND} Boys Team</>}
                     </div>
                   </div>
 
@@ -356,10 +355,10 @@ export default function TournamentTeamPage() {
                         {member.fullName}
                       </h3>
                       <div style={{ fontSize: 14, fontWeight: 800, color: isGirl ? '#EC4899' : meta.color, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>🪪</span> {member.registrationNumber}
+                        <span>{ID_CARD}</span> {member.registrationNumber}
                       </div>
                       <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 14px', borderRadius: 14, background: 'var(--bg-input)' }}>
-                        🎓 <strong>Faculty:</strong><br />{member.faculty}
+                        {GRADUATION_CAP} <strong>Faculty:</strong><br />{member.faculty}
                       </div>
                     </div>
                   </div>
@@ -372,7 +371,7 @@ export default function TournamentTeamPage() {
                 {/* Boys Team Section */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, borderBottom: '2px solid rgba(59, 130, 246, 0.3)', paddingBottom: 10 }}>
-                    <span style={{ fontSize: 28 }}>👦</span>
+                    <span style={{ fontSize: 28 }}>{USERS_ROUND}</span>
                     <h3 style={{ fontSize: 22, fontWeight: 950, margin: 0, color: '#3B82F6' }}>
                       BOYS TEAM (MEN) — {boys.length} MEMBERS
                     </h3>
@@ -391,7 +390,7 @@ export default function TournamentTeamPage() {
                 {/* Girls Team Section */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, borderBottom: '2px solid rgba(236, 72, 153, 0.3)', paddingBottom: 10 }}>
-                    <span style={{ fontSize: 28 }}>👧</span>
+                    <span style={{ fontSize: 28 }}>{USERS_ROUND}</span>
                     <h3 style={{ fontSize: 22, fontWeight: 950, margin: 0, color: '#EC4899' }}>
                       GIRLS TEAM (WOMEN) — {girls.length} MEMBERS
                     </h3>

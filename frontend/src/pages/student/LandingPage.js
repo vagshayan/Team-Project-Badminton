@@ -3,12 +3,13 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './LandingPage.css';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
+import { ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [openTournamentCounts, setOpenTournamentCounts] = useState({});
   const menuRef = useRef(null);
@@ -62,14 +63,10 @@ export default function LandingPage() {
           </div>
 
           <div className="header-actions-desktop">
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDarkMode ? SUN : MOON}
-            </button>
+            <div className="app-header-control-group">
+              <HomeButton />
+              <ThemeToggleButton />
+            </div>
             <button className="admin-login-btn" onClick={() => navigate('/admin/login')}>
               Admin login
             </button>
@@ -90,6 +87,7 @@ export default function LandingPage() {
 
             {menuOpen && (
               <div className="menu-popover" role="menu">
+                <HomeButton variant="menu" onNavigate={() => setMenuOpen(false)} />
                 <button
                   className="menu-item"
                   onClick={() => {
@@ -101,16 +99,7 @@ export default function LandingPage() {
                   Admin login
                 </button>
 
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    toggleTheme();
-                  }}
-                  role="menuitem"
-                >
-                  {isDarkMode ? SUN : MOON} &nbsp; {isDarkMode ? 'Light mode' : 'Dark mode'}
-                </button>
+                <ThemeToggleButton variant="menu" onToggle={() => setMenuOpen(false)} />
               </div>
             )}
           </div>

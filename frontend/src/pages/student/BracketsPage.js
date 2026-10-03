@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { CLOSE, CLOCK_3, ARROW_RIGHT } from '../../components/Icons';
+import { CLOCK_3, ARROW_RIGHT } from '../../components/Icons';
+import { HomeButton } from '../../components/HeaderControls';
 import { SPORTS } from '../../constants/sports';
 
 export default function BracketsPage() {
@@ -53,9 +54,7 @@ export default function BracketsPage() {
           <h1 className="brackets-title">Live Brackets</h1>
           <p className="brackets-subtitle">Select a sport and view the published brackets.</p>
         </div>
-        <button onClick={() => navigate('/')} className="brackets-close-btn" aria-label="Back to home">
-          {CLOSE}
-        </button>
+        <HomeButton />
       </div>
 
       <div className="brackets-grid">

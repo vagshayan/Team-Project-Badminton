@@ -194,26 +194,6 @@ body.light-mode .brand-line {
   box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
 }
 
-.theme-toggle-btn {
-  background: var(--landing-surface);
-  color: var(--landing-text);
-  border: 1px solid var(--landing-border);
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 16px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.12s ease, background 0.12s ease;
-}
-
-body.light-mode .theme-toggle-btn {
-  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.1);
-}
-
-.theme-toggle-btn:hover { transform: translateY(-2px); }
-
 .admin-login-btn:hover {
   transform: translateY(-1px);
   background: #2563eb;

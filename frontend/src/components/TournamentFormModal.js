@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CALENDAR, CLOSE, WARNING, CLOCK, HOURGLASS, LOCATION, KEY, MEDAL, SCHEDULE } from './Icons';
+import { CALENDAR, CLOSE, WARNING, CLOCK, HOURGLASS, LOCATION, KEY, MEDAL, SCHEDULE, EYE, EYE_OFF } from './Icons';
 
 const CATEGORIES = [
   { value: 'singles-men',   label: 'Singles — Men' },
@@ -23,6 +23,7 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -139,7 +140,12 @@ export default function TournamentFormModal({ tournament, onClose, onSubmit, req
            {requirePassword && (
               <div style={{ ...sh.field, background: 'rgba(239, 68, 68, 0.05)', padding: 20, borderRadius: 16, border: '1px solid rgba(239, 68, 68, 0.1)' }}>
                  <label style={{ ...sh.label, color: '#EF4444' }}>ADMIN PASSWORD {KEY}</label>
-                 <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} placeholder="Confirm with admin password" style={{ ...sh.input, borderColor: 'rgba(239, 68, 68, 0.2)' }} required />
+                 <div style={{ position: 'relative' }}>
+                   <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => set('password', e.target.value)} placeholder="Confirm with admin password" style={{ ...sh.input, borderColor: 'rgba(239, 68, 68, 0.2)', paddingRight: 48 }} required />
+                   <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide admin password' : 'Show admin password'} title={showPassword ? 'Hide password' : 'Show password'} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>
+                     {showPassword ? EYE : EYE_OFF}
+                   </button>
+                 </div>
               </div>
            )}
 

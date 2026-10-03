@@ -4,13 +4,15 @@ import axios from 'axios';
 import Cropper from 'react-easy-crop';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { SUN, MOON, EYE, LOCK, BELL, SEARCH, LOGOUT, MENU_OPEN, MENU_CLOSE, TROPHY, DIAMOND, TARGET, TREE, FOLDER, PEOPLE, PHONE, EMAIL, ID_CARD, CALENDAR, LOCATION, TRASH, CLOSE, SUCCESS, WARNING_ROUND, ARROW_RIGHT, CHECK_MARK, CROSS, HOURGLASS, MEDAL } from '../../components/Icons';
+import { SUN, MOON, EYE, EYE_OFF, LOCK, SEARCH, MENU_OPEN, MENU_CLOSE, CARET_UP, CARET_DOWN, TROPHY, TREE, PEOPLE, PHONE, EMAIL, ID_CARD, CALENDAR, LOCATION, TRASH, CLOSE, SUCCESS, WARNING_ROUND, ARROW_RIGHT, ARROW_LEFT, CHECK_MARK, CROSS, HOURGLASS, MEDAL, DOWNLOAD, CAMERA, USER_ROUND, SHIELD } from '../../components/Icons';
+import { Bell, LayoutDashboard, ClipboardCheck, Trophy as TrophyOutline, UsersRound, GitBranch, ClipboardList, UserRound, LogOut } from 'lucide-react';
 import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
 import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
+import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 import { SPORT_META, getSportMeta } from '../../constants/sports';
 
@@ -184,9 +186,9 @@ const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return `${SUN} GOOD MORNING`;
-  if (hour < 18) return `${SUN} GOOD AFTERNOON`;
-  return `${MOON} GOOD EVENING`;
+  if (hour < 12) return 'GOOD MORNING';
+  if (hour < 18) return 'GOOD AFTERNOON';
+  return 'GOOD EVENING';
 };
 
 const formatActivityTime = (date) => {
@@ -268,7 +270,7 @@ const FILTER_CATEGORIES = [
 
 export default function Dashboard() {
   const { admin, logout, loginHistory, setAdmin } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(getTabFromSearch(location.search));
@@ -323,6 +325,7 @@ export default function Dashboard() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSecurityAnswer, setShowSecurityAnswer] = useState(false);
   const [passwordFocus, setPasswordFocus] = useState(false);
   const [confirmFocus, setConfirmFocus] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -461,7 +464,7 @@ export default function Dashboard() {
         setProfileAvatarUrl(avatarUrl);
         setAdmin((prev) => prev ? { ...prev, avatarUrl } : prev);
         setProfileMessage('Profile photo updated successfully.');
-        showToast(`${SUCCESS} Profile photo updated successfully.`);
+        showToast('Profile photo updated successfully.');
       } else {
         throw new Error(res?.data?.message || 'Unable to upload avatar');
       }
@@ -485,7 +488,7 @@ export default function Dashboard() {
         setProfileAvatarUrl('');
         setAdmin((prev) => prev ? { ...prev, avatarUrl: '' } : prev);
         setProfileMessage('Profile photo removed.');
-        showToast(`${SUCCESS} Profile photo removed.`);
+        showToast('Profile photo removed.');
       } else {
         throw new Error(res?.data?.message || 'Unable to remove avatar');
       }
@@ -517,6 +520,7 @@ export default function Dashboard() {
       type="button"
       onClick={onToggle}
       title={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()} password`}
+      aria-label={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()} password`}
       style={{
         position: 'absolute',
         right: 12,
@@ -533,7 +537,7 @@ export default function Dashboard() {
         fontSize: 18,
       }}
     >
-      {visible ? EYE : LOCK}
+      {visible ? EYE : EYE_OFF}
     </button>
   );
 
@@ -783,7 +787,7 @@ export default function Dashboard() {
     try {
       await axios.patch(`/api/registrations/${leadId}/approve-pair`);
       fetchData();
-      showToast(`${SUCCESS} Pair confirmed!`);
+      showToast('Pair confirmed!');
     } catch (err) {
       alert(err.response?.data?.message || 'Pair approval failed');
     }
@@ -793,7 +797,7 @@ export default function Dashboard() {
     try {
       await axios.patch(`/api/registrations/${leadId}/reset-pair`);
       fetchData();
-      showToast('🔄 Pair reset to pending');
+      showToast('Pair reset to pending');
     } catch (err) {
       alert(err.response?.data?.message || 'Pair reset failed');
     }
@@ -810,7 +814,7 @@ export default function Dashboard() {
       await axios.patch(`/api/registrations/${removePairTarget._id}/remove-pair`);
       setRemovePairTarget(null);
       fetchData();
-      showToast(`${TRASH} Pair removed and both players are now unlinked`);
+      showToast('Pair removed and both players are now unlinked');
     } catch (err) {
       alert(err.response?.data?.message || 'Pair removal failed');
     } finally {
@@ -827,7 +831,7 @@ export default function Dashboard() {
       setLinkSelected(null);
       setLinkSearch('');
       fetchData();
-      showToast(`${SUCCESS} Players linked as partners!`);
+      showToast('Players linked as partners!');
     } catch (err) {
       alert(err.response?.data?.message || 'Linking failed');
     } finally {
@@ -839,7 +843,7 @@ export default function Dashboard() {
     try {
       const res = await axios.patch(`/api/registrations/${id}/status`, { status });
       fetchData();
-      const message = res.data.message || `${SUCCESS} Status updated!`;
+      const message = res.data.message || 'Status updated!';
       showToast(message);
     }
     catch (err) {
@@ -951,15 +955,15 @@ export default function Dashboard() {
   }, [playerTotalPages]);
 
   const handleCreate = async (data) => {
-    try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast(`${SUCCESS} Tournament created!`); }
+    try { await axios.post('/api/tournaments', data); setShowCreate(false); fetchData(); showToast('Tournament created!'); }
     catch (err) { alert(err.response?.data?.message || 'Error creating tournament'); }
   };
   const handleUpdate = async (data) => {
-    try { await axios.put(`/api/tournaments/${editTarget._id}`, { ...data, password: data.password }); setEditTarget(null); fetchData(); showToast(`${SUCCESS} Tournament updated!`); }
+    try { await axios.put(`/api/tournaments/${editTarget._id}`, { ...data, password: data.password }); setEditTarget(null); fetchData(); showToast('Tournament updated!'); }
     catch (err) { alert(err.response?.data?.message || 'Error updating tournament.'); }
   };
   const handleDelete = async (password) => {
-    try { await axios.delete(`/api/tournaments/${deleteTarget._id}`, { data: { password } }); setDeleteTarget(null); fetchData(); showToast('🗑 Deleted.'); }
+    try { await axios.delete(`/api/tournaments/${deleteTarget._id}`, { data: { password } }); setDeleteTarget(null); fetchData(); showToast('Deleted.'); }
     catch (err) { alert(err.response?.data?.message || 'Invalid password.'); }
   };
 
@@ -975,7 +979,7 @@ export default function Dashboard() {
     try {
       await axios.delete('/api/tournaments/audit-logs/clear-all');
       setAuditLogs([]);
-      showToast(`${SUCCESS} All audit logs cleared successfully.`);
+      showToast('All audit logs cleared successfully.');
     } catch (err) {
       alert(err.response?.data?.message || 'Error clearing audit logs.');
     }
@@ -1013,15 +1017,13 @@ export default function Dashboard() {
         </div>
       </div>
       <button onClick={() => { changeTab('profile'); setProfileMenuOpen(false); }} style={ds.profileMenuItem}>
-        <span style={{ fontSize: 16 }}>👤</span>
+        <span style={{ fontSize: 16 }}><UserRound size={16} strokeWidth={1.8} aria-hidden="true" /></span>
         <span style={{ flex: 1, fontWeight: 800 }}>Profile Settings</span>
       </button>
-      <button onClick={() => { toggleTheme(); setProfileMenuOpen(false); }} style={ds.profileMenuItem}>
-        <span style={{ fontSize: 16 }}>{isDarkMode ? SUN : MOON}</span>
-        <span style={{ flex: 1, fontWeight: 800 }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-      </button>
+      <HomeButton variant="menu" onNavigate={() => setProfileMenuOpen(false)} />
+      <ThemeToggleButton variant="menu" onToggle={() => setProfileMenuOpen(false)} />
       <button onClick={() => { logout(); setProfileMenuOpen(false); }} style={{ ...ds.profileMenuItem, color: '#EF4444' }}>
-        <span style={{ fontSize: 16 }}>{LOGOUT}</span>
+        <span style={{ fontSize: 16 }}><LogOut size={16} strokeWidth={1.8} aria-hidden="true" /></span>
         <span style={{ flex: 1, fontWeight: 800 }}>Sign Out</span>
       </button>
     </div>
@@ -1135,13 +1137,15 @@ export default function Dashboard() {
 
         <nav style={ds.nav}>
           {[
-              { id: 'dashboard', label: 'DASHBOARD VIEW', icon: DIAMOND },
-              { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: TARGET },
-              { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TROPHY },
-              { id: 'university-team', label: 'UNIVERSITY TEAM', icon: PEOPLE },
-              { id: 'brackets', label: 'BRACKETS & DRAWS', icon: TREE },
-              { id: 'audit-log', label: 'AUDIT LOG', icon: FOLDER },
-            ].map((tab) => (
+            { id: 'dashboard', label: 'DASHBOARD VIEW', icon: LayoutDashboard },
+            { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: ClipboardCheck },
+            { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TrophyOutline },
+            { id: 'university-team', label: 'UNIVERSITY TEAM', icon: UsersRound },
+            { id: 'brackets', label: 'BRACKETS & DRAWS', icon: GitBranch },
+            { id: 'audit-log', label: 'AUDIT LOG', icon: ClipboardList },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
             <button
               key={tab.id}
               onClick={() => changeTab(tab.id)}
@@ -1156,10 +1160,11 @@ export default function Dashboard() {
                 borderRadius: '0 20px 20px 0',
               }}
             >
-              <span style={{ fontSize: 24, flexShrink: 0 }}>{tab.icon}</span>
+              <span style={{ fontSize: 24, flexShrink: 0 }}><Icon size={24} strokeWidth={1.8} aria-hidden="true" /></span>
               {(isMobile || !sidebarCollapsed) && <span style={{ fontSize: 13, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{tab.label}</span>}
             </button>
-          ))}
+            );
+          })}
         </nav>
 
         <div style={{ padding: (!isMobile && sidebarCollapsed) ? '20px 8px 32px' : '24px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: (!isMobile && sidebarCollapsed) ? 'center' : 'stretch' }}>
@@ -1194,7 +1199,7 @@ export default function Dashboard() {
                   <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
                     <div style={{ fontSize: 13, letterSpacing: 0.5, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{safeAdminFirstName.toUpperCase()}</div>
                   </div>
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>{profileMenuOpen ? '▲' : '▼'}</span>
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>{profileMenuOpen ? CARET_UP : CARET_DOWN}</span>
                 </>
               )}
             </button>
@@ -1236,19 +1241,11 @@ export default function Dashboard() {
                   }}
                   style={ds.profileMenuItem}
                 >
-                  <span style={{ fontSize: 16 }}>👤</span>
+                  <span style={{ fontSize: 16 }}><UserRound size={16} strokeWidth={1.8} aria-hidden="true" /></span>
                   <span style={{ flex: 1, fontWeight: 800 }}>Profile Settings</span>
                 </button>
-                <button
-                  onClick={() => {
-                    toggleTheme();
-                    setProfileMenuOpen(false);
-                  }}
-                  style={ds.profileMenuItem}
-                >
-                  <span style={{ fontSize: 16 }}>{isDarkMode ? SUN : MOON}</span>
-                  <span style={{ flex: 1, fontWeight: 800 }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                </button>
+                <HomeButton variant="menu" onNavigate={() => setProfileMenuOpen(false)} />
+                <ThemeToggleButton variant="menu" onToggle={() => setProfileMenuOpen(false)} />
                 <button
                   onClick={() => {
                     logout();
@@ -1256,7 +1253,7 @@ export default function Dashboard() {
                   }}
                   style={{ ...ds.profileMenuItem, color: '#EF4444' }}
                 >
-                  <span style={{ fontSize: 16 }}>{LOGOUT}</span>
+                  <span style={{ fontSize: 16 }}><LogOut size={16} strokeWidth={1.8} aria-hidden="true" /></span>
                   <span style={{ flex: 1, fontWeight: 800 }}>Sign Out</span>
                 </button>
               </div>
@@ -1293,7 +1290,7 @@ export default function Dashboard() {
                   style={ds.notificationBtn}
                   aria-label="Open notifications"
                 >
-                  {BELL}
+                  <Bell size={18} strokeWidth={1.8} aria-hidden="true" />
                   {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
                 </button>
                 {notificationsOpen && (
@@ -1317,7 +1314,7 @@ export default function Dashboard() {
           <header style={ds.header}>
             <div style={ds.greetBox}>
               <h2 style={{ fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: -1 }}>
-                {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
+                {new Date().getHours() < 18 ? 'GOOD DAY' : 'GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
               </h2>
             </div>
             <div style={ds.headerActions}>
@@ -1334,7 +1331,7 @@ export default function Dashboard() {
                   style={ds.notificationBtn}
                   aria-label="Open notifications"
                 >
-                  {BELL}
+                  <Bell size={18} strokeWidth={1.8} aria-hidden="true" />
                   {unreadCount > 0 && <span style={ds.notificationBadge}>{unreadCount}</span>}
                 </button>
                 {notificationsOpen && (
@@ -1357,7 +1354,7 @@ export default function Dashboard() {
         {isMobile && (
           <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <h2 style={{ fontSize: 18, fontWeight: 950, margin: 0, letterSpacing: -0.5 }}>
-              {new Date().getHours() < 18 ? `${SUN} GOOD DAY` : `${MOON} GOOD EVENING`}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
+                {new Date().getHours() < 18 ? 'GOOD DAY' : 'GOOD EVENING'}, <span style={{ color: meta.color }}>{safeAdminFirstName.toUpperCase()}</span>
             </h2>
           </div>
         )}
@@ -1413,14 +1410,14 @@ export default function Dashboard() {
                       </div>
                     </section>
                     <section style={ds.dashboardPanel}>
-                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>⚠ NEEDS ATTENTION</h3><p style={ds.dashboardPanelSubtitle}>Items requiring a decision.</p></div></div>
+                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>{WARNING_ROUND} NEEDS ATTENTION</h3><p style={ds.dashboardPanelSubtitle}>Items requiring a decision.</p></div></div>
                       {dashboardSummary?.attentionItems?.length ? dashboardSummary.attentionItems.slice(0, 4).map((item, index) => <button key={`${item.message}-${index}`} type="button" onClick={() => changeTab(item.tab)} style={ds.attentionItem}><span style={{ color: '#F59E0B', fontSize: 18 }}>!</span><span><strong>{item.message}</strong><small>   Review and take action</small></span><span style={{ marginLeft: 'auto' }}>{ARROW_RIGHT}</span></button>) : <div style={ds.emptyPanel}><span style={{ color: '#10B981', fontSize: 20 }}>{CHECK_MARK}</span> Everything is up to date</div>}
                     </section>
                   </div>
 
                   <div>
                     <section style={ds.dashboardPanel}>
-                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>🏆 ACTIVE TOURNAMENTS</h3><p style={ds.dashboardPanelSubtitle}>Current {safeMetaLabel.toLowerCase()} tournament progress.</p></div><button type="button" onClick={() => changeTab('tournament-setup')} style={ds.textAction}>View all {ARROW_RIGHT}</button></div>
+                      <div style={ds.dashboardPanelHeader}><div><h3 style={ds.dashboardPanelTitle}>{TROPHY} ACTIVE TOURNAMENTS</h3><p style={ds.dashboardPanelSubtitle}>Current {safeMetaLabel.toLowerCase()} tournament progress.</p></div><button type="button" onClick={() => changeTab('tournament-setup')} style={ds.textAction}>View all {ARROW_RIGHT}</button></div>
                       {activeTournamentData.length ? (
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
                           {activeTournamentData.map((tournament) => {
@@ -1433,7 +1430,7 @@ export default function Dashboard() {
                               <article key={tournament._id} style={{ ...ds.tournamentCard, ...(isCompleted ? ds.completedTournamentCard : {}) }}>
                                 <div style={ds.tournamentCardTop}>
                                   <div style={{ ...ds.tournamentIcon, color: isCompleted ? '#10B981' : meta.color, background: isCompleted ? 'rgba(16,185,129,0.14)' : `${meta.color}18` }}>{isCompleted ? CHECK_MARK : (isTeamCategory ? PEOPLE : TROPHY)}</div>
-                                  <span style={{ ...ds.statusBadge, ...(isCompleted ? ds.completedStatusBadge : { color: tone.color, background: tone.background }) }}>{isCompleted ? 'Completed ✓' : cardStatus}</span>
+                                  <span style={{ ...ds.statusBadge, ...(isCompleted ? ds.completedStatusBadge : { color: tone.color, background: tone.background }) }}>{isCompleted ? <>Completed {CHECK_MARK}</> : cardStatus}</span>
                                 </div>
                                 <div>
                                   <h4 style={ds.tournamentCardTitle}>{CAT_LABELS[tournament.category] || tournament.category}</h4>
@@ -1570,7 +1567,7 @@ export default function Dashboard() {
                     </label>
                   </div>
                   <button onClick={() => changeTab('dashboard')} style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 20px', height: 44, borderRadius: 16 }}>
-                    ← BACK TO DASHBOARD
+                    {ARROW_LEFT} BACK TO DASHBOARD
                   </button>
                 </div>
               </div>
@@ -1678,7 +1675,7 @@ export default function Dashboard() {
                         <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{selectedCategoryLabel}</span>
                         <span style={{ fontSize: 14, fontWeight: 900 }}>{selectedLabel}</span>
                       </div>
-                      <span style={{ fontSize: 12, opacity: 0.6 }}>{filterOpen ? '▲' : '▼'}</span>
+                      <span style={{ fontSize: 12, opacity: 0.6 }}>{filterOpen ? CARET_UP : CARET_DOWN}</span>
                     </div>
 
                     {filterOpen && (
@@ -1782,7 +1779,7 @@ export default function Dashboard() {
                       exportFilteredPlayersCSV(unique, `${admin.sport.toUpperCase()} PARTICIPANTS - ${statusFilter.toUpperCase()}`);
                     }}
                     style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
-                  >💾 DOWNLOAD CSV</button>
+                  >{DOWNLOAD} DOWNLOAD CSV</button>
                   <div style={{ position: 'relative', width: isMobile ? '100%' : 350 }}>
                     <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>{SEARCH}</span>
                     <input
@@ -2079,7 +2076,7 @@ export default function Dashboard() {
                                       transition: 'all 0.25s ease',
                                     }}
                                   >
-                                    {pairApproved ? `${CHECK_MARK} PAIR APPROVED` : 'APPROVE PAIR'}
+                                    {pairApproved ? <>{CHECK_MARK} PAIR APPROVED</> : 'APPROVE PAIR'}
                                   </button>
                                 </div>
                               </td>
@@ -2177,7 +2174,7 @@ export default function Dashboard() {
                         style={ds.avatarUploadBtn}
                         title="Upload profile photo"
                       >
-                        📷
+                        {CAMERA}
                       </button>
                       <input
                         ref={fileInputRef}
@@ -2260,7 +2257,7 @@ export default function Dashboard() {
                     <div style={{ position: 'relative' }}>
                       <label style={ds.fieldLabel}>Full Name</label>
                       <div style={ds.inputIconWrapper}>
-                        <span style={ds.inputIcon}>👤</span>
+                        <span style={ds.inputIcon}>{USER_ROUND}</span>
                         <input
                           type="text"
                           value={profileName}
@@ -2307,7 +2304,7 @@ export default function Dashboard() {
                           });
 
                           if (res?.status >= 200 && res?.status < 300 && res?.data) {
-                            showToast(`${SUCCESS} Profile updated successfully.`);
+                            showToast('Profile updated successfully.');
                             setProfileMessage('');
                             setAdmin(res.data);
                             setProfileName(res.data.name || '');
@@ -2344,7 +2341,7 @@ export default function Dashboard() {
                   <div style={{ padding: 18, border: '1px solid var(--border)', borderRadius: 18, background: 'var(--bg-panel)', marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
                       <div>
-                        <div style={{ fontWeight: 900, fontSize: 16 }}>🔐 Password</div>
+                        <div style={{ fontWeight: 900, fontSize: 16 }}>{LOCK} Password</div>
                         <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 13 }}>Password: ••••••••••••</div>
                         <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 12 }}>Last changed: {admin?.passwordChangedAt ? formatDatePreference(admin.passwordChangedAt, dateFormat) : 'Not available'}</div>
                       </div>
@@ -2363,7 +2360,7 @@ export default function Dashboard() {
                         }}
                         style={{ ...ds.textAction, whiteSpace: 'nowrap' }}
                       >
-                        {showPasswordEditor ? 'Cancel' : 'Change Password'} →
+                        {showPasswordEditor ? 'Cancel' : 'Change Password'} {ARROW_RIGHT}
                       </button>
                     </div>
                   </div>
@@ -2375,7 +2372,7 @@ export default function Dashboard() {
                     <div>
                       <label style={ds.fieldLabel}>Confirm New Password</label>
                       <div style={{ position: 'relative' }}><input name="confirmNewPassword" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} onFocus={() => setConfirmFocus(true)} onBlur={() => setConfirmFocus(false)} placeholder="Confirm new password" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46, borderColor: confirmPassword.length > 0 ? (passwordsMatch ? '#10B981' : '#EF4444') : 'var(--border)' }} />{renderPasswordToggle('Confirm', showConfirmPassword, () => setShowConfirmPassword((v) => !v))}</div>
-                      {showPasswordMatchMessage && <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>{passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match`}</div>}
+                      {showPasswordMatchMessage && <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>{passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match</>}</div>}
                     </div>
                     {newPassword.length > 0 && <div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3, 4, 5].map((level) => <div key={level} style={{ height: 4, flex: 1, borderRadius: 99, background: level <= passwordStrength ? (passwordStrength >= 5 ? '#10B981' : passwordStrength >= 3 ? '#F59E0B' : '#EF4444') : 'var(--border)' }} />)}</div>}
                     {passwordMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(239, 68, 68, 0.12)', color: '#B91C1C', fontWeight: 700 }}>{passwordMessage}</div>}
@@ -2396,7 +2393,7 @@ export default function Dashboard() {
                           setPasswordMessage(message);
                           setAdmin((prev) => prev ? { ...prev, passwordChangedAt: new Date().toISOString() } : prev);
                           setNewPassword(''); setConfirmPassword('');
-                          showToast(`${SUCCESS} ${message}`);
+                          showToast(message);
                         } catch (err) {
                           const message = err.response?.data?.message || 'Unable to update password';
                           setPasswordMessage(message);
@@ -2412,11 +2409,11 @@ export default function Dashboard() {
                   <div style={{ padding: 18, border: '1px solid var(--border)', borderRadius: 18, background: 'var(--bg-panel)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
                       <div>
-                        <div style={{ fontWeight: 900, fontSize: 16 }}>🛡️ Security Question</div>
+                        <div style={{ fontWeight: 900, fontSize: 16 }}>{SHIELD} Security Question</div>
                         <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 13 }}>{admin?.securityQuestion || 'No security question set'}</div>
                         <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 13 }}>Security answer: ••••••••</div>
                       </div>
-                      <button type="button" onClick={() => setShowSecurityEditor((value) => !value)} style={{ ...ds.textAction, whiteSpace: 'nowrap' }}>{showSecurityEditor ? 'Cancel' : 'Change Security Question'} →</button>
+                      <button type="button" onClick={() => setShowSecurityEditor((value) => !value)} style={{ ...ds.textAction, whiteSpace: 'nowrap' }}>{showSecurityEditor ? 'Cancel' : 'Change Security Question'} {ARROW_RIGHT}</button>
                     </div>
                   </div>
                   {showSecurityEditor && <div style={{ display: 'grid', gap: 18, padding: 18, border: '1px solid var(--border)', borderRadius: 18, marginTop: 16 }}>
@@ -2426,7 +2423,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <label style={ds.fieldLabel}>New Security Answer</label>
-                      <div style={{ position: 'relative' }}><input type={showNewPassword ? 'text' : 'password'} value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="Enter a new answer" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46 }} />{renderPasswordToggle('Answer', showNewPassword, () => setShowNewPassword((v) => !v))}</div>
+                      <div style={{ position: 'relative' }}><input type={showSecurityAnswer ? 'text' : 'password'} value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="Enter a new answer" autoComplete="new-password" style={{ ...ds.input, paddingRight: 46 }} />{renderPasswordToggle('Answer', showSecurityAnswer, () => setShowSecurityAnswer((v) => !v))}</div>
                     </div>
                     {securityMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{securityMessage}</div>}
                     <button onClick={async () => {
@@ -2449,7 +2446,7 @@ export default function Dashboard() {
                           setSecurityMessage(message);
                           setSecurityAnswer('');
                           setAdmin((prev) => prev ? { ...prev, securityQuestion: securityQuestion.trim() } : prev);
-                          showToast(`${SUCCESS} ${message}`);
+                          showToast(message);
                         } catch (err) {
                           const message = err.response?.data?.message || 'Unable to update security question';
                           setSecurityMessage(message);
@@ -2523,7 +2520,7 @@ export default function Dashboard() {
                       </div>
                       {showPasswordMatchMessage && (
                         <div style={{ marginTop: 10, color: passwordsMatch ? '#10B981' : '#EF4444', fontWeight: 700 }}>
-                          {passwordsMatch ? `${CHECK_MARK} Passwords match` : `${CROSS} Passwords do not match.`}
+                          {passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match.</>}
                         </div>
                       )}
                     </div>
@@ -2558,7 +2555,7 @@ export default function Dashboard() {
                           const res = await axios.put(`${apiBase}/api/auth/me/password`, { newPassword, confirmPassword });
                           const message = res.data?.message || 'Password updated successfully';
                           setPasswordMessage(message);
-                          showToast(`${SUCCESS} ${message}`);
+                          showToast(message);
                           setNewPassword('');
                           setConfirmPassword('');
                         } catch (err) {
@@ -2582,7 +2579,7 @@ export default function Dashboard() {
                   <div style={{ display: 'grid', gap: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                       <div><div style={{ fontWeight: 850 }}>Dark Mode</div><div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Use the dashboard theme.</div></div>
-                      <button type="button" role="switch" aria-checked={isDarkMode} onClick={toggleTheme} style={{ ...ds.toggle, background: isDarkMode ? 'var(--primary)' : 'var(--border)' }}><span style={{ ...ds.toggleKnob, transform: isDarkMode ? 'translateX(18px)' : 'translateX(0)' }} /></button>
+                      <ThemeToggleButton variant="settings" />
                     </div>
                     <div style={ds.preferenceRow}>
                       <span style={ds.preferenceLabel}>Date Format</span>
@@ -2614,7 +2611,7 @@ export default function Dashboard() {
                 <div style={{ color: '#EF4444', fontSize: 12, fontWeight: 950, letterSpacing: 1.4 }}>DANGER ZONE</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 18, marginTop: 14 }}>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 950 }}>🗑️ Delete Account</div>
+                    <div style={{ fontSize: 20, fontWeight: 950 }}>{TRASH} Delete Account</div>
                     <div style={{ marginTop: 8, color: 'var(--text-muted)', fontSize: 13 }}>Permanently delete your administrator account.</div>
                   </div>
                   <button type="button" onClick={() => setShowDeleteAccountModal(true)} style={{ ...ds.actionBtn, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '13px 20px', borderRadius: 14, fontWeight: 900, whiteSpace: 'nowrap' }}>
@@ -2695,7 +2692,7 @@ export default function Dashboard() {
       {editTarget && <TournamentFormModal tournament={editTarget} onClose={() => setEditTarget(null)} onSubmit={handleUpdate} requirePassword />}
       {viewTarget && <RegistrationsModal tournament={viewTarget} onClose={() => setViewTarget(null)} />}
       {deleteTarget && <PasswordConfirmModal title="DELETE TOURNAMENT" message={`Delete ${CAT_LABELS[deleteTarget.category]}? This will remove all registration data.`} confirmLabel="DELETE NOW" danger onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
-      {showDeleteAccountModal && <PasswordConfirmModal title="⚠️ Delete your account?" message="This action cannot be undone." confirmLabel="Delete Account" danger showPasswordToggle onConfirm={handleDeleteAccount} onClose={() => setShowDeleteAccountModal(false)} />}
+      {showDeleteAccountModal && <PasswordConfirmModal title={<>{WARNING_ROUND} Delete your account?</>} message="This action cannot be undone." confirmLabel="Delete Account" danger showPasswordToggle onConfirm={handleDeleteAccount} onClose={() => setShowDeleteAccountModal(false)} />}
 
       {removePairTarget && (
         <div
@@ -2979,9 +2976,6 @@ const ds = {
   greetBox: { display: 'flex', flexDirection: 'column', gap: 4 },
   headerActions: { display: 'flex', alignItems: 'center', gap: 18 },
   domainBadge: { padding: '10px 24px', borderRadius: 40, fontSize: 11, fontWeight: 900, border: '1px solid' },
-  themeBtn: { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px', borderRadius: '14px', fontSize: 12, fontWeight: 900, cursor: 'pointer' },
-  toggle: { width: 42, height: 24, padding: 2, border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0 },
-  toggleKnob: { display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s ease', boxShadow: '0 2px 5px rgba(0,0,0,0.18)' },
   preferenceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, minHeight: 42, padding: '8px 0', borderBottom: '1px solid var(--border)' },
   paginationButton: { minHeight: 38, padding: '0 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 12, fontWeight: 850, cursor: 'pointer' },
   preferenceLabel: { fontSize: 13, fontWeight: 850 },
