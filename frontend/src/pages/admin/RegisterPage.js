@@ -159,37 +159,35 @@ export default function RegisterPage() {
         input[type="password"]::-ms-reveal { display: none; }
         input[type="password"]::-ms-clear { display: none; }
         input[type="password"]::-webkit-reveal-button { display: none; }
-        input[type="password"]::-ms-reveal { display: none; }
-        input[type="password"]::-ms-clear { display: none; }
-        input[type="password"]::-webkit-reveal-button { display: none; }
-        input[type="password"]::-ms-reveal { display: none; }
-        input[type="password"]::-ms-clear { display: none; }
-        input[type="password"]::-webkit-reveal-button { display: none; }
         @media (max-width: 900px) {
           .content-container {
-            flex-direction: column !important;
-            padding: 40px 20px !important;
-            align-items: stretch !important;
-            width: 100% !important;
-            box-sizing: border-box !important;
+            padding: 20px 16px 40px !important;
+            gap: 24px !important;
           }
-          .hero-side {
-            padding-right: 0 !important;
-            margin-bottom: 40px !important;
-            text-align: center !important;
+          .register-top-section {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 28px 20px !important;
+            gap: 28px !important;
+            border-radius: 24px !important;
           }
           .hero-title {
-            font-size: 40px !important;
+            font-size: 32px !important;
           }
           .benefit-list {
-            align-items: center !important;
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+          .domain-side {
+            max-width: 100% !important;
+            width: 100% !important;
           }
           .form-side {
             width: 100% !important;
             max-width: 100% !important;
           }
           .form-card {
-            padding: 30px !important;
+            padding: 24px 20px !important;
             border-radius: 24px !important;
             max-height: 82vh !important;
             overflow-y: auto !important;
@@ -215,6 +213,11 @@ export default function RegisterPage() {
           .register-brand-line {
             font-size: 10px !important;
           }
+          .sport-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
           .sport-grid {
             grid-template-columns: 1fr !important;
           }
@@ -250,26 +253,50 @@ export default function RegisterPage() {
       </nav>
 
       <div className="content-container" style={sh.content}>
-        <div className="hero-side" style={sh.heroSide}>
-           <div style={sh.badge}>OFFICIAL ACCESS</div>
-           <h1 className="hero-title" style={sh.title}><span style={sh.highlight}>CREATE ADMIN</span> <br/>ACCOUNT</h1>
-           <p style={sh.subtitle}>Set up your administrator account to manage Badminton, Table Tennis, or Carrom tournaments.</p>
-           
-           <div className="benefit-list" style={sh.benefitList}>
-              {[
-                 'Strong & Secure Password',
-                 'Select Your Sport / Domain',
-                 'Admin Access Code Required',
-                 'Security Question & Answer'
-              ].map((b, index) => (
-                 <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>{index === 0 ? LOCK : index === 1 ? TROPHY : index === 2 ? KEY : SHIELD}</span> {b}
-                 </div>
-              ))}
-           </div>
+        {/* Top Section: OFFICIAL ACCESS and CHOOSE DOMAIN aligned horizontally */}
+        <div className="register-top-section" style={sh.topSection}>
+          <div className="hero-side" style={sh.heroSideTop}>
+             <div style={sh.badge}>OFFICIAL ACCESS</div>
+             <h1 className="hero-title" style={sh.title}>CREATE YOUR <br/><span style={sh.highlight}>ARENA HUB</span></h1>
+             <p style={sh.subtitle}>Initialize your dedicated management dashboard for Badminton, Table Tennis, or Carrom tournaments.</p>
+             
+             <div className="benefit-list" style={sh.benefitList}>
+                {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map(b => (
+                   <div key={b} style={sh.benefit}>
+                      <span style={sh.check}>{CHECK_MARK}</span> {b}
+                   </div>
+                ))}
+             </div>
+          </div>
+
+          <div className="domain-side" style={sh.domainSideTop}>
+            <div style={sh.section}>
+              <label style={sh.label}>CHOOSE DOMAIN</label>
+              <div className="sport-grid" style={sh.sportGrid}>
+                 {SPORT_OPTIONS.map(s => {
+                    const sMeta = getSportMeta(s.id, isDarkMode);
+                    return (
+                      <div 
+                         key={s.id} 
+                         onClick={() => setFormData({ ...formData, sport: s.id })}
+                         style={{ 
+                            ...sh.sportCard, 
+                            borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
+                            background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)'
+                         }}
+                      >
+                         <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
+                         <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text-muted)' }}>{sMeta.label.toUpperCase()}</div>
+                      </div>
+                    );
+                 })}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="form-side" style={sh.formSide}>
+        {/* Main Form Section below */}
+        <div className="form-side" style={sh.formSideFull}>
           <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
@@ -283,29 +310,6 @@ export default function RegisterPage() {
             )}
 
             {!verificationSent && <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-              <div style={sh.section}>
-                <label style={sh.label}>CHOOSE DOMAIN</label>
-                <div className="sport-grid" style={sh.sportGrid}>
-                   {SPORT_OPTIONS.map(s => {
-                      const sMeta = getSportMeta(s.id, isDarkMode);
-                      return (
-                        <div 
-                           key={s.id} 
-                           onClick={() => setFormData({ ...formData, sport: s.id })}
-                           style={{ 
-                              ...sh.sportCard, 
-                              borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
-                              background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)'
-                           }}
-                        >
-                           <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
-                           <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text-muted)' }}>{sMeta.label.toUpperCase()}</div>
-                        </div>
-                      );
-                   })}
-                </div>
-              </div>
-
               <div className="field-group" style={sh.fieldGroup}>
                 <div style={sh.field}>
                    <label style={sh.label}>MANAGER NAME</label>
@@ -467,7 +471,7 @@ export default function RegisterPage() {
 }
 
 const sh = {
-  container: { position: 'relative', width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden'  },
+  container: { position: 'relative', width: '100%', minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
@@ -475,17 +479,21 @@ const sh = {
   brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
   brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
   brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
-  content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', padding: '0 60px' },
-  heroSide: { flex: 1, paddingRight: 60 },
-  formSide: { flex: 1, maxWidth: 500 },
-  badge: { fontSize: 11, fontWeight: 950, color: 'var(--primary)', letterSpacing: 2, marginBottom: 20 },
-  title: { fontSize: 64, fontWeight: 950, letterSpacing: -2, margin: 0, lineHeight: 1.1 },
+  logoCircle: { width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' },
+  themeBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 18, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' },
+  content: { display: 'flex', flexDirection: 'column', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', padding: '20px 60px 80px', gap: 32, position: 'relative', zIndex: 10 },
+  topSection: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '36px', padding: '36px 44px', boxShadow: 'var(--shadow)' },
+  heroSideTop: { flex: 1.2 },
+  domainSideTop: { flex: 1, maxWidth: 440, width: '100%' },
+  formSideFull: { width: '100%' },
+  badge: { fontSize: 11, fontWeight: 950, color: 'var(--primary)', letterSpacing: 2, marginBottom: 12 },
+  title: { fontSize: 40, fontWeight: 950, letterSpacing: -1, margin: 0, lineHeight: 1.15 },
   highlight: { background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-  subtitle: { fontSize: 18, color: 'var(--text-muted)', marginTop: 24, lineHeight: 1.6 },
-  benefitList: { marginTop: 48, display: 'flex', flexDirection: 'column', gap: 16 },
-  benefit: { display: 'flex', alignItems: 'center', gap: 12, fontWeight: 700, fontSize: 15, color: 'var(--text)' },
+  subtitle: { fontSize: 15, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 },
+  benefitList: { marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: '12px 24px' },
+  benefit: { display: 'inline-flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 14, color: 'var(--text)' },
   check: { color: '#10B981', fontWeight: 950 },
-  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
+  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '36px', padding: '44px 50px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
   label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1.5px', display: 'block', marginBottom: 12 },
   sportGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
   sportCard: { padding: '16px', borderRadius: '18px', border: '2px solid transparent', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s cubic-bezier(0.2, 1, 0.3, 1)' },

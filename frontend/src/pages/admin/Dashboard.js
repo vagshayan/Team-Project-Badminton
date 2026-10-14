@@ -2952,7 +2952,7 @@ export default function Dashboard() {
 }
 
 const ds = {
-  container: { display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' },
+  container: { display: 'flex', minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', zIndex: 2 },
   sidebar: { width: 340, background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0 },
   sidebarBrand: { minHeight: 100, display: 'flex', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', padding: '0 24px' },
   //sidebarBrand: { height: 110, display: 'flex', alignItems: 'center', px: 32, gap: 16, borderBottom: '1px solid var(--border)', padding: '0 32px' },

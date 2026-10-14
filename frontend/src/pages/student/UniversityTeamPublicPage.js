@@ -63,7 +63,7 @@ export default function UniversityTeamPublicPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', zIndex: 2 }}>
       {/* Navigation Header */}
       <nav style={{
         position: 'sticky',

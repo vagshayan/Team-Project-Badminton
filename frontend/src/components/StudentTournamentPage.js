@@ -387,7 +387,7 @@ export default function StudentTournamentPage({ sport }) {
   const totalWidth = roundNums.length * (COLUMN_WIDTH + COLUMN_GAP);
 
   return (
-    <div className="student-tournament-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-main)' }}>
+    <div className="student-tournament-page" style={{ minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'var(--font-main)', position: 'relative', zIndex: 2 }}>
 
       <nav style={sh.nav} className="mobile-nav">
         <div style={sh.brand} onClick={() => navigate('/')} className="mobile-brand">
@@ -899,7 +899,7 @@ export default function StudentTournamentPage({ sport }) {
 }
 
 const bh = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
+  overlay: { position: 'fixed', inset: 0, background: 'var(--bg)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
   card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: { position: 'relative', padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   close: { position: 'absolute', top: 15, right: 10, zIndex: 30, width: 44, height: 44, borderRadius: 999, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },

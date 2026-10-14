@@ -15,6 +15,8 @@ import TournamentTeamPage from './pages/student/TournamentTeamPage';
 
 import LandingPage from './pages/student/LandingPage';
 
+import GlobalBackground from './components/GlobalBackground';
+
 function ProtectedRoute({ children }) {
   const { admin, loading } = useAuth();
   if (loading) return (
@@ -31,6 +33,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <GlobalBackground />
           <Routes>
             <Route path="/admin/login" element={<LoginPage />} />
             <Route path="/admin/register" element={<RegisterPage />} />

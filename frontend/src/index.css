@@ -26,7 +26,6 @@
 body.light-mode {
   --bg: #F8FAFC;
   --bg-card: #FFFFFF;
-  --bg-panel: #F8FAFC;
   --bg-input: #F1F5F9;
   --border: #E2E8F0;
   --text: #0F172A;
@@ -194,109 +193,6 @@ input[type="reset"]:disabled,
   transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.app-header-control-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.app-header-button {
-  height: 42px;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  color: var(--text);
-  cursor: pointer;
-  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.app-header-button:hover:not(:disabled) {
-  background: var(--bg-input);
-  border-color: var(--text-muted);
-}
-
-.app-header-button:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.45);
-  outline-offset: 3px;
-}
-
-.app-home-button {
-  gap: 7px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.app-theme-button {
-  width: 42px;
-  padding: 0;
-}
-
-.app-menu-action {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--text);
-  padding: 12px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
-  text-align: left;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.app-menu-action:hover:not(:disabled) {
-  background: var(--bg-input);
-  border-color: var(--border);
-}
-
-.app-menu-action svg {
-  flex: 0 0 auto;
-}
-
-.header-control-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.header-control-button {
-  height: 42px;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.header-home-button {
-  gap: 7px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.header-theme-button {
-  width: 42px;
-  padding: 0;
-}
-
 .mobile-dropdown-item:focus-visible,
 .dropdown-item-btn:focus-visible {
   outline: 3px solid rgba(59, 130, 246, 0.45);
@@ -403,44 +299,12 @@ body {
 }
 
 @media (max-width: 768px) {
-  .auth-background-blob {
-    display: none;
-  }
-
-  .student-results-hero {
-    padding: 24px 16px !important;
-  }
-
-  .student-results-hero .mobile-hero-title {
-    font-size: 34px !important;
-    line-height: 1.12 !important;
-  }
-
-  .student-results-hero .team-members-live-board-btn {
-    max-width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
-    white-space: normal;
-    padding: 10px 14px !important;
-  }
-
-  .student-live-indicator-text {
-    display: block;
-    max-width: 100%;
-    min-width: 0;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    text-align: center;
-    font-size: 10px !important;
-    letter-spacing: 1px !important;
-  }
-
   .responsive-grid-3, .responsive-grid-auto {
     grid-template-columns: 1fr;
   }
   
   .mobile-padding {
-    padding: 16px !important;
+    padding: 20px !important;
   }
 
   .site-header .btn-primary {
@@ -448,25 +312,23 @@ body {
   }
   
   .mobile-padding-x {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
   }
   
   .mobile-card {
-    padding: 24px 18px !important;
-    border-radius: 28px !important;
+    padding: 24px !important;
   }
 
   .mobile-title {
-    font-size: 32px !important;
+    font-size: 40px !important;
   }
 
   .mobile-nav {
-    padding: 10px 14px !important;
+    padding: 12px 15px !important;
     height: auto !important;
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
-    align-items: center !important;
     gap: 8px !important;
   }
 
@@ -483,27 +345,23 @@ body {
   }
 
   .mobile-logo {
-    width: 32px !important;
-    height: 32px !important;
+    width: 30px !important;
+    height: 30px !important;
     font-size: 14px !important;
     border-radius: 8px !important;
-    flex-shrink: 0 !important;
   }
 
   .mobile-title-main {
-    font-size: 14px !important;
-    line-height: 1.15 !important;
+    font-size: 16px !important;
   }
 
   .mobile-title-sub {
-    font-size: 8px !important;
-    letter-spacing: 0.5px !important;
-    line-height: 1.15 !important;
+    font-size: 7px !important;
+    letter-spacing: 1px !important;
   }
 
   .mobile-controls {
     gap: 8px !important;
-    flex-shrink: 0 !important;
   }
 
   /* Hide desktop tabs on mobile, show hamburger */
@@ -516,104 +374,18 @@ body {
   }
 
   .mobile-hero-title {
-    font-size: 36px !important;
+    font-size: 40px !important;
     letter-spacing: -1px !important;
   }
 
   .mobile-btn {
-    padding: 6px 12px !important;
-    font-size: 11px !important;
+    padding: 6px 10px !important;
+    font-size: 10px !important;
     white-space: nowrap !important;
   }
 
   .mobile-hide-text {
     display: none !important;
-  }
-
-  .mobile-main-content {
-    min-height: calc(100vh - 70px) !important;
-    padding: 24px 16px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-sizing: border-box !important;
-  }
-
-  .mobile-card-title {
-    font-size: 24px !important;
-    margin-bottom: 8px !important;
-    line-height: 1.25 !important;
-  }
-
-  .mobile-card-subtitle {
-    font-size: 13px !important;
-    line-height: 1.4 !important;
-  }
-
-  .mobile-header-block {
-    margin-bottom: 24px !important;
-  }
-
-  .mobile-form {
-    gap: 16px !important;
-  }
-
-  .mobile-footer {
-    margin-top: 20px !important;
-    font-size: 13px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .mobile-nav {
-    padding: 8px 12px !important;
-  }
-  .mobile-logo {
-    width: 28px !important;
-    height: 28px !important;
-  }
-  .mobile-title-main {
-    font-size: 13px !important;
-  }
-  .mobile-title-sub {
-    font-size: 7px !important;
-  }
-  .mobile-btn {
-    padding: 5px 10px !important;
-    font-size: 10px !important;
-  }
-  .app-header-button {
-    height: 38px;
-  }
-  .app-home-button {
-    gap: 5px;
-    padding: 0 9px;
-    font-size: 12px;
-  }
-  .app-theme-button {
-    width: 38px;
-  }
-  .header-control-button {
-    height: 38px;
-  }
-  .header-home-button {
-    gap: 5px;
-    padding: 0 9px;
-    font-size: 12px;
-  }
-  .header-theme-button {
-    width: 38px;
-  }
-  .mobile-card {
-    padding: 20px 14px !important;
-    border-radius: 22px !important;
-  }
-  .mobile-card-title {
-    font-size: 22px !important;
-  }
-
-  .student-results-hero .mobile-hero-title {
-    font-size: 30px !important;
   }
 }
 
@@ -802,41 +574,16 @@ body.light-mode .context-menu-item:hover {
 
 .sport-card { min-width: 240px; display: flex; gap: 12px; align-items: center; padding: 18px 20px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.03); }
 
-.brackets-page { padding: 36px 28px 40px; min-height: 100vh; background: var(--bg); color: var(--text); }
-.brackets-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
-.brackets-title { font-size: 30px; font-weight: 900; margin: 0 0 8px; letter-spacing: -0.03em; }
-.brackets-subtitle { color: var(--text-muted); margin: 0; max-width: 620px; font-size: 15px; }
-.brackets-close-btn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
-.brackets-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.brackets-sport-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid var(--border); border-radius: 24px; padding: 20px 18px 16px; position: relative; overflow: hidden; border-top: 4px solid var(--sport-color); }
-.brackets-sport-card::after { content: ''; position: absolute; inset: 0 auto auto 0; width: 100%; height: 1px; background: linear-gradient(90deg, var(--sport-color), transparent); opacity: 0.6; }
-.sport-card-topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.sport-icon-wrap { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; font-weight: 700; }
-.sport-header-copy { display: flex; flex-direction: column; min-width: 0; }
-.sport-label { font-size: 18px; font-weight: 800; }
-.sport-count { color: var(--text-muted); font-size: 12px; }
-.sport-summary-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.summary-pill { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-.published-pill { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.35); color: #86efac; }
-.pending-pill { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); color: #fbbf24; }
-.sport-card-list { display: flex; flex-direction: column; gap: 12px; }
-.bracket-item-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; }
-.bracket-item-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.bracket-title { font-size: 15px; font-weight: 800; line-height: 1.4; }
-.status-badge { display: inline-flex; align-items: center; justify-content: center; padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
-.status-published { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.35); color: #86efac; }
-.status-pending { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); color: #fbbf24; }
-.bracket-item-meta { display: grid; grid-template-columns: 1fr; gap: 8px; }
-.bracket-item-meta div { display: flex; flex-direction: column; gap: 4px; }
-.bracket-item-meta span { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.bracket-item-meta strong { font-size: 12px; line-height: 1.5; }
-.bracket-item-footer { display: flex; justify-content: flex-end; gap: 12px; align-items: center; }
-.view-bracket-btn { border: none; background: var(--sport-color); color: #fff; border-radius: 12px; padding: 10px 12px; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.coming-soon-text { color: #fbbf24; font-size: 12px; font-weight: 800; }
-.brackets-empty-box { background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.12); border-radius: 16px; padding: 22px 16px; text-align: center; color: var(--text-muted); }
-.empty-icon { font-size: 20px; margin-bottom: 10px; }
-.empty-title { font-weight: 800; color: var(--text); margin-bottom: 8px; }
-.empty-copy { font-size: 12px; line-height: 1.5; }
+.brackets-page { padding: 40px; min-height: 100vh; background: var(--bg); color: var(--text); }
+.brackets-title { font-size: 28px; font-weight: 900; margin-bottom: 10px; }
+.brackets-subtitle { color: var(--text-muted); margin-bottom: 22px; max-width: 640px; }
+.brackets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.brackets-card { background: var(--bg-card); border: 1px solid var(--border); padding: 22px; min-height: 420px; position: relative; overflow: hidden; border-radius: 8px; }
+.brackets-left-accent { position: absolute; left: 8px; top: 12px; bottom: 12px; width: 8px; border-radius: 6px; }
+.brackets-empty-wrapper { display: flex; align-items: center; justify-content: center; height: 160px; }
+.brackets-empty-box { background: transparent; border: 1px dashed rgba(255,255,255,0.04); border-radius: 12px; padding: 24px; text-align: center; color: var(--text-muted); max-width: 360px; margin: 0 auto; }
+.brackets-small-tile { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); padding: 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.01); }
+.brackets-view-btn { white-space: nowrap; }
 
 @media (max-width: 1024px) {
   .hero-main { grid-template-columns: 1fr 360px; padding: 48px 32px; }
@@ -933,3 +680,60 @@ body.light-mode .context-menu-item:hover {
 
 /* Make images scale */
 img { max-width: 100%; height: auto; }
+
+/* =========================================================
+   GLOBAL BACKGROUND IMAGE & OVERLAY ENGINE
+   ========================================================= */
+.site-bg-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.site-bg-image.active {
+  opacity: 1;
+}
+
+.site-bg-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  background: 
+    linear-gradient(180deg, rgba(10, 14, 23, 0.78) 0%, rgba(10, 14, 23, 0.48) 38%, rgba(10, 14, 23, 0.82) 100%),
+    radial-gradient(ellipse at 32% 38%, rgba(10, 14, 23, 0.72) 0%, rgba(10, 14, 23, 0.28) 60%, rgba(10, 14, 23, 0.82) 100%);
+  transition: background 0.4s ease;
+}
+
+body.light-mode .site-bg-overlay {
+  background: 
+    linear-gradient(180deg, rgba(244, 246, 251, 0.75) 0%, rgba(244, 246, 251, 0.42) 40%, rgba(244, 246, 251, 0.82) 100%),
+    radial-gradient(ellipse at 32% 38%, rgba(244, 246, 251, 0.65) 0%, rgba(244, 246, 251, 0.25) 60%, rgba(244, 246, 251, 0.8) 100%);
+}
+
+/* Responsive background positioning across Desktop, iPad/Tablet, and Mobile */
+@media (max-width: 1024px) {
+  .site-bg-image {
+    background-size: cover;
+    background-position: center center;
+  }
+}
+
+@media (max-width: 768px) {
+  .site-bg-image {
+    background-size: cover;
+    background-position: center 30%;
+  }
+}

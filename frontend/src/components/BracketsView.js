@@ -1094,7 +1094,7 @@ const spotlightS = {
 };
 
 const s = {
-  container: { padding: '40px 0' },
+  container: { padding: '32px', background: 'var(--bg)', borderRadius: '24px', border: '1px solid var(--border)' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   title: { fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: 1 },
   selectWrapper: { position: 'relative', minWidth: 380, zIndex: 999 },

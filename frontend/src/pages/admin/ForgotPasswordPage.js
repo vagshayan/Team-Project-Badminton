@@ -266,7 +266,7 @@ export default function ForgotPasswordPage() {
 }
 
 const sh = {
-  container: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
+  container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
