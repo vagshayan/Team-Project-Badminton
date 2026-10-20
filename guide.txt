@@ -1,0 +1,84 @@
+==========================================================
+   🏆 TOURNAMENT MANAGEMENT SYSTEM - OFFICIAL MANUAL 🏆
+==========================================================
+
+🚀 ARCHITECTURE: MERN Stack (MongoDB, Express, React, Node.js)
+📍 REPOSITORY: tournament_app (GitHub Managed)
+
+----------------------------------------------------------
+1. 💡 SYSTEM OVERVIEW
+----------------------------------------------------------
+This system handles end-to-end tournament management for three
+major sport domains:
+🏸 BADMINTON  |  🏓 TABLE TENNIS  |  🎯 CARROM
+
+The system consists of two main portals:
+- [ADMIN]: Secure Control Panel for Tournament & Player Management.
+- [PUBLIC]: Open registration portal for participants.
+
+----------------------------------------------------------
+2. 🔧 START-UP COMMANDS (Two Terminals Required)
+----------------------------------------------------------
+TERMINAL 1 (Backend - Runs on Port 5000):
+   cd backend
+   node server.js
+
+TERMINAL 2 (Frontend - Runs on Port 3000):
+   cd frontend
+   npm run dev
+
+----------------------------------------------------------
+3. 🛠️ DATABASE MANAGEMENT (MongoDB Atlas)
+----------------------------------------------------------
+Your database is hosted in the Cloud on MongoDB Atlas.
+CONNECTION STRING: [Saved securely in backend/.env]
+
+🛠️ Useful Diagnostic Scripts:
+- `node test_db.js`:  Verifies if the DB is connected.
+- `node inspect_db.js`: Shows the list of Admin accounts.
+
+----------------------------------------------------------
+4. 🔐 ADMIN CREDENTIALS
+----------------------------------------------------------
+Admin accounts are created via the [Register] option in the
+app. Current Registered Domain Managers:
+(Run `node inspect_db.js` in the backend to view details)
+
+✅ Default Admin Role: "Tournament Manager"
+✅ Access: Full CRUD for Tournaments & Player Approval.
+
+----------------------------------------------------------
+5. 🔍 TROUBLESHOOTING
+----------------------------------------------------------
+❌ "500 Internal Server Error":
+   Check `backend/.env`—the database password must be correct.
+   
+❌ "Bad Auth/Authentication Failed":
+   Reset your database user password in MongoDB Atlas ->
+   Database Access.
+
+❌ "Module Not Found":
+   Run `npm install` inside the backend or frontend folders.
+
+
+
+----------------------------------------------------------
+7. 🤝 TEAM COLLABORATION (GitHub Setup)
+----------------------------------------------------------
+If you just pulled/cloned this project, you MUST install 
+dependencies before running the app.
+
+1. In Root:     npm install
+2. In Backend:  cd backend && npm install
+3. In Frontend: cd frontend && npm install
+
+Note: The .env file is NOT on GitHub for security. Ask the 
+creator for the database connection string.
+
+
+ C:\Badminton\tournament_app\backend> node inspect_db.js
+ to show admin detail in cmd
+
+
+ cd backend ; node set_security.js badminton@gmail.com "What is your favorite sport?" "Badminton"
+ bad123
