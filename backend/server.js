@@ -138,7 +138,7 @@ const startServer = async () => {
         const docs = await Tournament.find({ registrationDeadline: { $exists: false } });
         for (const doc of docs) {
           doc.registrationDeadline = doc.date;
-          await doc.save();
+          await doc.save({ validateBeforeSave: false });
         }
         if (docs.length > 0) {
           console.log(`📡 Migrated ${docs.length} ${sport} tournaments`);
@@ -149,7 +149,7 @@ const startServer = async () => {
       const standaloneDocs = await StandaloneTournament.find({ registrationDeadline: { $exists: false } });
       for (const doc of standaloneDocs) {
         doc.registrationDeadline = doc.date;
-        await doc.save();
+        await doc.save({ validateBeforeSave: false });
       }
       if (standaloneDocs.length > 0) {
         console.log(`📡 Migrated ${standaloneDocs.length} standalone tournaments`);

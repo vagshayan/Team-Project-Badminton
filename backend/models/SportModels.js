@@ -123,6 +123,8 @@ function getModelsForSport(sport) {
         targetRegistration: { type: mongoose.Schema.Types.ObjectId, ref: rModelName, required: true },
         targetRollNumber: { type: String, required: true },
         status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+        confirmationToken: { type: String, default: null },
+        notificationSent: { type: Boolean, default: false },
       }, { timestamps: true });
       PartnerRequest = mongoose.model(partnerRequestModelName, prSchema, `${prefix}partner_requests`);
     }

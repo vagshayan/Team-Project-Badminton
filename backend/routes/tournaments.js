@@ -7,6 +7,10 @@ const { getModelsForSport } = require('../models/SportModels');
 const Match = require('../models/Match');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const {
+  sendScheduleUpdateBatchEmail,
+  sendDrawPublishedEmail,
+} = require('../utils/emailService');
 
 const SINGLES = ['singles-men', 'singles-women'];
 const CATEGORY_LABELS = {
@@ -533,6 +537,71 @@ router.put('/:id', protect, async (req, res) => {
       },
       req
     });
+
+    // Detect what changed to notify affected registered participants
+    const changes = [];
+    const beforeDate = beforeValues.date ? new Date(beforeValues.date).toISOString().split('T')[0] : '';
+    const newDate = tournament.date ? new Date(tournament.date).toISOString().split('T')[0] : '';
+    if (beforeDate && newDate && beforeDate !== newDate) {
+      changes.push({
+        field: 'Event Date',
+        previous: new Date(beforeValues.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+        updated: new Date(tournament.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+      });
+    }
+
+    if (beforeValues.time && tournament.time && beforeValues.time.trim() !== tournament.time.trim()) {
+      changes.push({
+        field: 'Start Time',
+        previous: beforeValues.time,
+        updated: tournament.time,
+      });
+    }
+
+    if (beforeValues.venue && tournament.venue && beforeValues.venue.trim() !== tournament.venue.trim()) {
+      changes.push({
+        field: 'Venue',
+        previous: beforeValues.venue,
+        updated: tournament.venue,
+      });
+    }
+
+    const beforeDeadline = beforeValues.registrationDeadline ? new Date(beforeValues.registrationDeadline).toISOString().split('T')[0] : '';
+    const newDeadline = tournament.registrationDeadline ? new Date(tournament.registrationDeadline).toISOString().split('T')[0] : '';
+    if (beforeDeadline && newDeadline && beforeDeadline !== newDeadline) {
+      changes.push({
+        field: 'Registration Deadline',
+        previous: new Date(beforeValues.registrationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        updated: new Date(tournament.registrationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      });
+    }
+
+    if (changes.length > 0) {
+      // Find all registered participants for this specific tournament
+      const { Registration } = getModelsForSport(req.admin.sport);
+      const registeredParticipants = await Registration.find({
+        tournament: tournament._id,
+        status: { $in: ['pending', 'confirmed'] },
+      }).select('email playerName');
+
+      if (registeredParticipants.length > 0) {
+        sendScheduleUpdateBatchEmail({
+          participants: registeredParticipants,
+          sport: req.admin.sport,
+          category: tournament.category,
+          changes,
+          currentSchedule: {
+            date: tournament.date,
+            time: tournament.time,
+            venue: tournament.venue,
+            registrationDeadline: tournament.registrationDeadline,
+          },
+        }).catch((emailErr) => {
+          console.error('[Notification] Schedule update batch email error:', emailErr.message);
+        });
+      }
+    }
+
     res.json(tournament);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -930,6 +999,29 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
       details: { category: tournament.category, year: tournament.year },
       req
     });
+
+    // Notify all confirmed participants that the official draw and bracket are published
+    const { Registration } = getModelsForSport(req.admin.sport);
+    const confirmedPlayers = await Registration.find({
+      tournament: tournament._id,
+      status: 'confirmed',
+    }).select('email playerName');
+
+    for (const player of confirmedPlayers) {
+      if (player.email) {
+        sendDrawPublishedEmail({
+          email: player.email,
+          playerName: player.playerName,
+          sport: req.admin.sport,
+          category: tournament.category,
+          tournamentDate: tournament.date,
+          venue: tournament.venue,
+        }).catch((err) => {
+          console.error(`[Notification] Draw publish email error for ${player.email}:`, err.message);
+        });
+      }
+    }
+
     res.json({ message: 'Draw published! Students can now see the bracket.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
