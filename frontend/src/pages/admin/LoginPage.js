@@ -58,7 +58,10 @@ export default function LoginPage() {
       <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
       <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/before-merged-update
       <nav style={sh.nav} className="mobile-nav">
         <Link to="/" aria-label="Go to the landing page" style={{ ...sh.brand, color: 'inherit', textDecoration: 'none' }} className="mobile-brand">
           <div style={sh.brandMark} className="mobile-logo">
@@ -136,7 +139,11 @@ export default function LoginPage() {
 }
 
 const sh = {
+<<<<<<< HEAD
   container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflow: 'hidden' },
+=======
+  container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden' },
+>>>>>>> origin/before-merged-update
   blob: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 20 },
