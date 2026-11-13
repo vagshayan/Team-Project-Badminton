@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -483,7 +482,7 @@ body {
 /* ─── Admin Dashboard Mobile Layout ─── */
 @media (max-width: 768px) {
 
-  /* Sidebar becomes a slide-in drawer — remove it from flow */
+  /* Sidebar becomes a slide-in drawer - remove it from flow */
   aside[style*="position: fixed"] {
     left: 0;
   }
@@ -501,13 +500,13 @@ body {
     border-radius: 20px;
   }
 
-  /* Tournament card — tighten padding */
+  /* Tournament card - tighten padding */
   .admin-tourn-card {
     padding: 24px !important;
     border-radius: 24px !important;
   }
 
-  /* Stat cards — tighten padding */
+  /* Stat cards - tighten padding */
   .admin-stat-card {
     padding: 24px 20px !important;
     border-radius: 24px !important;
@@ -790,9 +789,6 @@ body.light-mode .app-header-button:hover:not(:disabled) {
   transform: scale(0.97);
 }
 
-.app-home-button { /* same base, no extra rules needed */ }
-.app-theme-button { /* same base, no extra rules needed */ }
-
 /* Menu-variant: full-width row inside a popover/dropdown */
 .app-menu-action {
   display: flex;
@@ -1068,8 +1064,7 @@ body.light-mode .status-pending {
   }
 }
 
-=======
-<<<<<<< HEAD
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -1798,7 +1793,7 @@ body {
 /* ─── Admin Dashboard Mobile Layout ─── */
 @media (max-width: 768px) {
 
-  /* Sidebar becomes a slide-in drawer — remove it from flow */
+  /* Sidebar becomes a slide-in drawer - remove it from flow */
   aside[style*="position: fixed"] {
     left: 0;
   }
@@ -1816,13 +1811,13 @@ body {
     border-radius: 20px;
   }
 
-  /* Tournament card — tighten padding */
+  /* Tournament card - tighten padding */
   .admin-tourn-card {
     padding: 24px !important;
     border-radius: 24px !important;
   }
 
-  /* Stat cards — tighten padding */
+  /* Stat cards - tighten padding */
   .admin-stat-card {
     padding: 24px 20px !important;
     border-radius: 24px !important;
@@ -2078,7 +2073,6 @@ body.light-mode .site-bg-overlay {
     background-position: center 30%;
   }
 }
-=======
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -2563,7 +2557,7 @@ body {
 /* ─── Admin Dashboard Mobile Layout ─── */
 @media (max-width: 768px) {
 
-  /* Sidebar becomes a slide-in drawer — remove it from flow */
+  /* Sidebar becomes a slide-in drawer - remove it from flow */
   aside[style*="position: fixed"] {
     left: 0;
   }
@@ -2581,13 +2575,13 @@ body {
     border-radius: 20px;
   }
 
-  /* Tournament card — tighten padding */
+  /* Tournament card - tighten padding */
   .admin-tourn-card {
     padding: 24px !important;
     border-radius: 24px !important;
   }
 
-  /* Stat cards — tighten padding */
+  /* Stat cards - tighten padding */
   .admin-stat-card {
     padding: 24px 20px !important;
     border-radius: 24px !important;
@@ -2870,9 +2864,6 @@ body.light-mode .app-header-button:hover:not(:disabled) {
   transform: scale(0.97);
 }
 
-.app-home-button { /* same base, no extra rules needed */ }
-.app-theme-button { /* same base, no extra rules needed */ }
-
 /* Menu-variant: full-width row inside a popover/dropdown */
 .app-menu-action {
   display: flex;
@@ -3148,5 +3139,4 @@ body.light-mode .status-pending {
   }
 }
 
->>>>>>> 7510aca (Updated badminton project UI)
->>>>>>> origin/before-merged-update
+

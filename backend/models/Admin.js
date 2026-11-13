@@ -28,7 +28,7 @@ const adminSchema = new mongoose.Schema(
     passwordChangedAt: { type: Date },
     sport: { type: String, required: true, enum: ['badminton', 'table-tennis', 'carrom'] },
     name: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'super_admin'], default: 'admin', required: true },
+    role: { type: String, enum: ['admin'], default: 'admin', required: true },
     avatarUrl: { type: String },
     securityQuestion: { type: String },
     securityAnswer: { type: String },

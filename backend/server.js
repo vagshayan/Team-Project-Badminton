@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-<<<<<<< HEAD
 const dns = require('dns');
 require('dotenv').config();
 
@@ -14,10 +13,9 @@ try {
 }
 
 
-=======
 require('dotenv').config();
 
->>>>>>> origin/before-merged-update
+
 process.on('uncaughtException', (err) => {
   console.error('🔥 Uncaught Exception:', err);
   process.exit(1);

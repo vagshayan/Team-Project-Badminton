@@ -5,16 +5,16 @@ import { exportTournamentResultPDF } from '../utils/exporters';
 import { LOCK, RESET, WARNING_ROUND, PUBLISH, PDF, LIGHTNING, TARGET, TROPHY, CARET_UP, CARET_DOWN, CHECK_MARK, SUCCESS, MEDAL } from './Icons';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men',
-  'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men',
-  'doubles-women': 'Doubles — Women',
+  'singles-men': 'Singles - Men',
+  'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men',
+  'doubles-women': 'Doubles - Women',
   'mixed-doubles': 'Mixed Doubles',
 };
 
 const SINGLES = ['singles-men', 'singles-women'];
 
-// CARD_HEIGHT must equal the card's actual rendered height — the position
+// CARD_HEIGHT must equal the card's actual rendered height - the position
 // algorithm and connector lines both space/center off this value.
 // Singles stay compact; doubles keep extra vertical room for wrapped names
 // and the completed-match winner status line.
@@ -101,7 +101,7 @@ function isMatchWinner(match, player) {
   return Boolean(match?.winner?._id && player?._id && match.winner._id === player._id);
 }
 
-// ── Match label e.g. "Match 2.1" — uses the match's position within its
+// ── Match label e.g. "Match 2.1" - uses the match's position within its
 // own round's visible list (1st, 2nd, 3rd...) rather than the raw
 // matchNumber field, since matchNumber is a global sequence across the
 // whole draw and can jump around within a round (e.g. round 1 showing
@@ -132,12 +132,12 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
   const playerRowMinHeight = isSinglesTournament ? 28 : 34;
   const footerMinHeight = isSinglesTournament ? 16 : 18;
   const footerFontSize = isSinglesTournament ? 9 : 11;
-  // ── Click-to-reveal player info. Holds { key, rect, expanded } — rect is
+  // ── Click-to-reveal player info. Holds { key, rect, expanded } - rect is
   // the trigger's viewport bounding box, captured on click, used to
   // position the popover via a portal so it's never clipped by the card's
   // overflow:hidden or the bracket's horizontal scroll container.
   // `expanded` gates the second, more sensitive tier of fields (NIC,
-  // phone, address) behind an explicit "View full details" click — the
+  // phone, address) behind an explicit "View full details" click - the
   // first tier only shows Reg No / Department / Gender / Email. ──
   const [activePlayerInfo, setActivePlayerInfo] = useState(null);
 
@@ -448,7 +448,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
     } finally { setLoading(false); }
   };
 
-  // ── Mark Result (W/L only — no scores) ──────────────────
+  // ── Mark Result (W/L only - no scores) ──────────────────
   const handleMarkWinner = async (winnerId) => {
     try {
       await axios.put(`/api/tournaments/matches/${resultModal._id}/score`, { winnerId });
@@ -480,12 +480,12 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
     return `ROUND ${roundIdx + 1}`;
   };
 
-  // ── Renders a player cell as NAME ONLY on the card — no reg no inline.
+  // ── Renders a player cell as NAME ONLY on the card - no reg no inline.
   // Singles: one line, the player's name.
   // Doubles: two lines, "Name1  &" then "Name2" (partner), so the pairing
   // reads naturally without cramming registration numbers into the same
   // line. Reg No, Department, Gender, and Email now live exclusively in
-  // the click-to-reveal popover (see renderPlayerInfoPortal) — the card
+  // the click-to-reveal popover (see renderPlayerInfoPortal) - the card
   // itself is purely a scanning surface for "who is this."
   const renderPlayerCell = (m, player, slot) => {
     if (!player) {
@@ -545,10 +545,10 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
   // positioning, so ancestor overflow/scroll can never clip it.
   //
   // Two-tier disclosure:
-  //   Tier 1 (always visible): Reg No, Department, Gender, Email — plus
+  //   Tier 1 (always visible): Reg No, Department, Gender, Email - plus
   //   partner's Name/Reg No for doubles. This is what an admin usually
   //   needs during live event operation.
-  //   Tier 2 (behind "View full details"): NIC, Phone, Address — shown
+  //   Tier 2 (behind "View full details"): NIC, Phone, Address - shown
   //   only once the admin explicitly asks for it.
   // ──
   const renderPlayerInfoPortal = () => {
@@ -667,7 +667,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
           fontSize: isMobile ? 22 : 28,
         }}>BRACKET MANAGEMENT</h2>
 
-        <div className="custom-select-container" style={{ ...s.selectWrapper, minWidth: isMobile ? 'auto' : 380, width: isMobile ? '100%' : 'auto' }}>
+        <div className="custom-select-container" style={{ ...s.selectWrapper, minWidth: isMobile ? 'auto' : 380, width: isMobile ? '100%' : 'auto', zIndex: isMobile ? 1 : s.selectWrapper.zIndex }}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             style={s.selectTrigger}
@@ -755,10 +755,15 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
         <div style={s.emptyState}>Select a tournament to view or generate brackets.</div>
       ) : (
         <div>
-          <div style={s.statusBar}>
+          <div style={{
+            ...s.statusBar,
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? 14 : undefined,
+          }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700 }}>
-                {CAT_LABELS[selectedTournament.category]} — {selectedTournament.year}
+                {CAT_LABELS[selectedTournament.category]} - {selectedTournament.year}
               </div>
               <div style={{ marginTop: 6 }}>
                 <span style={{
@@ -767,23 +772,23 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
                   color: selectedTournament.isPublished ? '#10B981' : selectedTournament.isLocked ? '#F59E0B' : '#3B82F6',
                   border: `1px solid ${selectedTournament.isPublished ? '#10B981' : selectedTournament.isLocked ? '#F59E0B' : '#3B82F6'}40`,
                 }}>
-                  {selectedTournament.isPublished ? 'PUBLISHED' : selectedTournament.isLocked ? <>{LOCK} DRAFT — NOT PUBLISHED YET</> : 'OPEN FOR REGISTRATION'}
+                  {selectedTournament.isPublished ? 'PUBLISHED' : selectedTournament.isLocked ? <>{LOCK} DRAFT - NOT PUBLISHED YET</> : 'OPEN FOR REGISTRATION'}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: isMobile ? 'wrap' : 'nowrap', width: isMobile ? '100%' : 'auto' }}>
               {!selectedTournament.isLocked && (
-                <button onClick={generateDraws} style={{ ...s.btn, background: color }}>
+                <button onClick={generateDraws} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: color }}>
                   {LIGHTNING} GENERATE DRAW
                 </button>
               )}
               {selectedTournament.isLocked && !selectedTournament.isPublished && (
                 <>
-                  <button onClick={handleResetDraw} style={{ ...s.btn, background: '#EF4444' }}>
+                  <button onClick={handleResetDraw} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#EF4444' }}>
                     {RESET} RESET DRAW
                   </button>
-                  <button onClick={handlePublishDraw} style={{ ...s.btn, background: '#10B981' }}>
+                  <button onClick={handlePublishDraw} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#10B981' }}>
                     {PUBLISH} PUBLISH DRAW
                   </button>
                 </>
@@ -792,14 +797,14 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
                 <>
                   <button
                     onClick={() => exportTournamentResultPDF(selectedTournament, matches)}
-                    style={{ ...s.btn, background: '#3B82F6' }}
+                    style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#3B82F6' }}
                   >
                     {PDF} DOWNLOAD PDF
                   </button>
                   <button
                     onClick={handleForceUnlock}
-                    style={{ ...s.btn, background: '#6B7280', fontSize: 11 }}
-                    title="Testing only — bypasses the publish safety rule"
+                    style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#6B7280', fontSize: 11 }}
+                    title="Testing only - bypasses the publish safety rule"
                   >
                     {WARNING_ROUND} FORCE UNLOCK (TEST)
                   </button>
@@ -819,16 +824,16 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
             </div>
           ) : (
             <>
-              {/* ── Final spotlight — pulled out above the tree. No dedicated
+              {/* ── Final spotlight - pulled out above the tree. No dedicated
                   3rd-place match exists in the current data model (only
                   round/matchNumber tree matches), so that box from the
-                  reference design isn't shown here — it would need a real
+                  reference design isn't shown here - it would need a real
                   backend-generated 3rd-place match to do correctly. ── */}
               {finalMatch && (
                 <div style={s.spotlightRow}>
                   <div style={s.spotlightCard}>
                     <div style={s.spotlightLabel}>
-                      {getMatchLabel(roundNums.length - 1, 0)} — FINAL
+                      {getMatchLabel(roundNums.length - 1, 0)} - FINAL
                     </div>
                     <SpotlightMatchBody
                       match={finalMatch}
@@ -964,7 +969,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
         <div style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setSeedingModal(false)}>
           <div style={modalS.content}>
             <h3 style={{ marginBottom: 8, fontSize: 20, fontWeight: 900 }}>
-              {TROPHY} Seeding — Previous Year Results
+              {TROPHY} Seeding - Previous Year Results
             </h3>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>
               Enter registration numbers of previous year's champion and runner-up.
@@ -993,7 +998,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
             <div style={modalS.actions}>
               <button onClick={() => setSeedingModal(false)} style={modalS.cancel}>CANCEL</button>
               <button onClick={() => { setSeedingModal(false); executeGenerateDraw({}); }} style={modalS.secondary}>
-                SKIP — RANDOM
+                SKIP - RANDOM
               </button>
               <button onClick={handleSeedingSubmit} style={{ ...modalS.confirm, background: color }}>
                 GENERATE WITH SEEDING
@@ -1003,7 +1008,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
         </div>
       )}
 
-      {/* W/L Result Modal — replaces numeric score modal */}
+      {/* W/L Result Modal - replaces numeric score modal */}
       {resultModal && (
         <div className="modal-overlay" style={modalS.overlay} onClick={(e) => e.target === e.currentTarget && setResultModal(null)}>
           <div className="modal-card" style={modalS.content}>
@@ -1020,7 +1025,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
                 }}
                 style={modalS.winnerOption}
               >
-                {TROPHY} {getDisplayName(resultModal.player1)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                {TROPHY} {getDisplayName(resultModal.player1)} <span style={{ opacity: 0.7, fontWeight: 600 }}>- WINS</span>
               </button>
               <button
                 onClick={() => {
@@ -1030,7 +1035,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
                 }}
                 style={modalS.winnerOption}
               >
-                {TROPHY} {getDisplayName(resultModal.player2)} <span style={{ opacity: 0.7, fontWeight: 600 }}>— WINS</span>
+                {TROPHY} {getDisplayName(resultModal.player2)} <span style={{ opacity: 0.7, fontWeight: 600 }}>- WINS</span>
               </button>
             </div>
             <div style={modalS.actions}>
@@ -1094,11 +1099,8 @@ const spotlightS = {
 };
 
 const s = {
-<<<<<<< HEAD
   container: { padding: '32px', background: 'var(--bg)', borderRadius: '24px', border: '1px solid var(--border)' },
-=======
   container: { padding: '40px 0' },
->>>>>>> origin/before-merged-update
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   title: { fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: 1 },
   selectWrapper: { position: 'relative', minWidth: 380, zIndex: 999 },
@@ -1112,12 +1114,13 @@ const s = {
   statusBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, padding: '16px 20px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)' },
   badge: { display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: 1 },
   btn: { border: 'none', color: '#FFF', padding: '12px 24px', borderRadius: 10, fontWeight: 900, cursor: 'pointer', fontSize: 13 },
+  mobileStatusAction: { flex: '1 1 120px', minWidth: 0, boxSizing: 'border-box', padding: '12px 8px', lineHeight: 1.2, textAlign: 'center' },
   matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', flexDirection: 'column' },
   matchLabel: { flex: '0 0 auto', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 0.5, marginBottom: 4, lineHeight: '12px' },
   playerRow: { flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
   divider: { flex: '0 0 auto', height: 1, background: 'var(--border)', margin: '3px 0' },
   // Flex-grow so this area always fills whatever space is left in the fixed
-  // CARD_HEIGHT box — whether it holds a caption, a button, or nothing.
+  // CARD_HEIGHT box - whether it holds a caption, a button, or nothing.
   cardFooter: { flex: '1 1 auto', display: 'flex', alignItems: 'center', minHeight: 0 },
   winnerCaption: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' },
   scoreBtn: { width: '100%', padding: '6px', borderRadius: 6, background: 'transparent', border: '1px solid', cursor: 'pointer', fontSize: 10, fontWeight: 800 },

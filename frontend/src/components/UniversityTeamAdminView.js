@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BADMINTON, TABLE_TENNIS, CARROM, CROWN, STAR, SHIELD, SHIRT_ICON, USER_ROUND, USERS_ROUND, ID_CARD, GRADUATION_CAP, PENCIL, TRASH, WARNING_ROUND, CLOSE } from './Icons';
 
@@ -38,6 +39,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   // Category view filter
   const [activeCategoryTab, setActiveCategoryTab] = useState('ALL'); // 'ALL', 'Men', 'Women'
@@ -59,6 +61,12 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -318,6 +326,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
         {/* Top Image Banner */}
         <div style={{
           height: 180,
+          ...(isMobile ? { height: 132 } : {}),
           position: 'relative',
           background: 'rgba(0,0,0,0.2)',
           overflow: 'hidden',
@@ -374,7 +383,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
         </div>
 
         {/* Member Info */}
-        <div style={{ padding: 20, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ padding: isMobile ? 16 : 20, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: 'var(--text)' }}>
               {member.fullName}
@@ -468,37 +477,40 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
         display: 'flex',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 16,
-        marginBottom: 20
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: isMobile ? 12 : 16,
+        marginBottom: isMobile ? 16 : 20
       }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={{ fontSize: 28 }}>{activeSportMeta.icon}</span>
-            <h2 style={{ fontSize: 24, fontWeight: 950, margin: 0, letterSpacing: -0.5, textTransform: 'uppercase' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? 8 : 10, marginBottom: 4 }}>
+            <h2 style={{ fontSize: isMobile ? 18 : 24, lineHeight: 1.2, fontWeight: 950, margin: 0, letterSpacing: -0.5, textTransform: 'uppercase' }}>
               {activeSportMeta.label} UNIVERSITY TEAM MANAGEMENT
             </h2>
           </div>
-          <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
+          <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: isMobile ? 13 : 14, lineHeight: 1.4 }}>
             Manage official Boys Team and Girls Team members for {activeSportMeta.label}.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: isMobile ? 8 : 10, flexWrap: isMobile ? 'nowrap' : 'wrap', width: isMobile ? '100%' : 'auto' }}>
           <button
             onClick={() => handleOpenAddModal('Men')}
+            aria-label="Add boys team member"
             style={{
-              padding: '12px 20px',
+              padding: isMobile ? '10px 8px' : '12px 20px',
               borderRadius: 14,
               border: 'none',
               background: activeSportMeta.color,
               color: '#FFF',
               fontWeight: 900,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 8,
+              flex: isMobile ? '1 1 0' : undefined,
+              minWidth: isMobile ? 0 : undefined,
               boxShadow: `0 8px 20px ${activeSportMeta.color}40`,
             }}
           >
@@ -507,18 +519,22 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
 
           <button
             onClick={() => handleOpenAddModal('Women')}
+            aria-label="Add girls team member"
             style={{
-              padding: '12px 20px',
+              padding: isMobile ? '10px 8px' : '12px 20px',
               borderRadius: 14,
               border: 'none',
               background: '#EC4899',
               color: '#FFF',
               fontWeight: 900,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 8,
+              flex: isMobile ? '1 1 0' : undefined,
+              minWidth: isMobile ? 0 : undefined,
               boxShadow: '0 8px 20px rgba(236, 72, 153, 0.4)',
             }}
           >
@@ -530,48 +546,66 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
       {/* Category Tabs & Search Bar */}
       <div style={{
         display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 16,
-        marginBottom: 28,
-        background: 'var(--bg-card)',
-        padding: 14,
-        borderRadius: 20,
-        border: '1px solid var(--border)',
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: isMobile ? 10 : 16,
+        marginBottom: isMobile ? 20 : 28,
+        background: isMobile ? 'transparent' : 'var(--bg-card)',
+        padding: isMobile ? 0 : 14,
+        borderRadius: isMobile ? 0 : 20,
+        border: isMobile ? 'none' : '1px solid var(--border)',
       }}>
         {/* Category Tabs */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{
+          display: 'flex',
+          gap: isMobile ? 1 : 8,
+          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          width: isMobile ? '100%' : 'auto',
+          minWidth: 0,
+          padding: isMobile ? 3 : 0,
+          borderRadius: isMobile ? 16 : 0,
+          border: isMobile ? '1px solid var(--border)' : 'none',
+          background: isMobile ? 'var(--border)' : 'transparent',
+          boxShadow: isMobile ? '0 3px 10px rgba(15,23,42,0.06)' : 'none',
+        }}>
           <button
             onClick={() => setActiveCategoryTab('ALL')}
             style={{
-              padding: '8px 16px',
+              flex: isMobile ? '1 1 0' : undefined,
+              minWidth: 0,
+              padding: isMobile ? '9px 4px' : '8px 16px',
               borderRadius: 12,
-              border: activeCategoryTab === 'ALL' ? `1px solid ${activeSportMeta.color}` : '1px solid var(--border)',
-              background: activeCategoryTab === 'ALL' ? `${activeSportMeta.color}20` : 'transparent',
-              color: activeCategoryTab === 'ALL' ? activeSportMeta.color : 'var(--text-muted)',
+              border: isMobile ? 'none' : activeCategoryTab === 'ALL' ? `1px solid ${activeSportMeta.color}` : '1px solid var(--border)',
+              background: activeCategoryTab === 'ALL' ? (isMobile ? '#102A43' : `${activeSportMeta.color}20`) : 'transparent',
+              color: activeCategoryTab === 'ALL' ? (isMobile ? '#FFFFFF' : activeSportMeta.color) : 'var(--text-muted)',
               fontWeight: 900,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
+              whiteSpace: 'nowrap',
               cursor: 'pointer',
             }}
           >
-            All Squads ({members.length})
+            All ({members.length})
           </button>
 
           <button
             onClick={() => setActiveCategoryTab('Men')}
             style={{
-              padding: '8px 16px',
+              flex: isMobile ? '1 1 0' : undefined,
+              minWidth: 0,
+              padding: isMobile ? '9px 4px' : '8px 16px',
               borderRadius: 12,
-              border: activeCategoryTab === 'Men' ? '1px solid #3B82F6' : '1px solid var(--border)',
-              background: activeCategoryTab === 'Men' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-              color: activeCategoryTab === 'Men' ? '#3B82F6' : 'var(--text-muted)',
+              border: isMobile ? 'none' : activeCategoryTab === 'Men' ? '1px solid #3B82F6' : '1px solid var(--border)',
+              background: activeCategoryTab === 'Men' ? (isMobile ? '#102A43' : 'rgba(59, 130, 246, 0.2)') : 'transparent',
+              color: activeCategoryTab === 'Men' ? (isMobile ? '#FFFFFF' : '#3B82F6') : 'var(--text-muted)',
               fontWeight: 900,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
+              whiteSpace: 'nowrap',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: isMobile ? 4 : 6,
             }}
           >
             {USER_ROUND} Boys Team ({members.filter((m) => (m.teamGender || 'Men') === 'Men').length})
@@ -580,17 +614,20 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
           <button
             onClick={() => setActiveCategoryTab('Women')}
             style={{
-              padding: '8px 16px',
+              flex: isMobile ? '1 1 0' : undefined,
+              minWidth: 0,
+              padding: isMobile ? '9px 4px' : '8px 16px',
               borderRadius: 12,
-              border: activeCategoryTab === 'Women' ? '1px solid #EC4899' : '1px solid var(--border)',
-              background: activeCategoryTab === 'Women' ? 'rgba(236, 72, 153, 0.2)' : 'transparent',
-              color: activeCategoryTab === 'Women' ? '#EC4899' : 'var(--text-muted)',
+              border: isMobile ? 'none' : activeCategoryTab === 'Women' ? '1px solid #EC4899' : '1px solid var(--border)',
+              background: activeCategoryTab === 'Women' ? (isMobile ? '#102A43' : 'rgba(236, 72, 153, 0.2)') : 'transparent',
+              color: activeCategoryTab === 'Women' ? (isMobile ? '#FFFFFF' : '#EC4899') : 'var(--text-muted)',
               fontWeight: 900,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
+              whiteSpace: 'nowrap',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: isMobile ? 4 : 6,
             }}
           >
             {USER_ROUND} Girls Team ({members.filter((m) => m.teamGender === 'Women').length})
@@ -598,7 +635,8 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
         </div>
 
         {/* Search Input */}
-        <div style={{ width: '100%', maxWidth: 280 }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: isMobile ? 'none' : 280 }}>
+          <Search size={18} strokeWidth={1.8} aria-hidden="true" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
             type="text"
             placeholder={`Search ${activeSportMeta.label} roster...`}
@@ -606,7 +644,8 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 14px',
+              boxSizing: 'border-box',
+              padding: '10px 14px 10px 40px',
               borderRadius: 12,
               border: '1px solid var(--border)',
               background: 'var(--bg-input)',
@@ -641,21 +680,21 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 24 : 36 }}>
           {/* Boys Team Section */}
           {(activeCategoryTab === 'ALL' || activeCategoryTab === 'Men') && (
             <div>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
-                marginBottom: 16,
+                gap: isMobile ? 8 : 12,
+                marginBottom: isMobile ? 12 : 16,
                 paddingBottom: 10,
                 borderBottom: '2px solid rgba(59, 130, 246, 0.3)'
               }}>
-                <span style={{ fontSize: 24 }}>{USERS_ROUND}</span>
-                <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, color: '#3B82F6', letterSpacing: 0.5 }}>
-                  BOYS TEAM (MEN) — {boysMembers.length} MEMBERS
+                <span style={{ fontSize: isMobile ? 20 : 24, flexShrink: 0 }}>{USERS_ROUND}</span>
+                <h3 style={{ fontSize: isMobile ? 15 : 18, lineHeight: 1.3, fontWeight: 950, margin: 0, color: '#3B82F6', letterSpacing: 0.5 }}>
+                  BOYS TEAM - {boysMembers.length} MEMBERS
                 </h3>
               </div>
 
@@ -666,8 +705,8 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               ) : (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 20
+                  gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: isMobile ? 14 : 20
                 }}>
                   {boysMembers.map(renderMemberCard)}
                 </div>
@@ -681,14 +720,14 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
-                marginBottom: 16,
+                gap: isMobile ? 8 : 12,
+                marginBottom: isMobile ? 12 : 16,
                 paddingBottom: 10,
                 borderBottom: '2px solid rgba(236, 72, 153, 0.3)'
               }}>
-                <span style={{ fontSize: 24 }}>{USERS_ROUND}</span>
-                <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, color: '#EC4899', letterSpacing: 0.5 }}>
-                  GIRLS TEAM (WOMEN) — {girlsMembers.length} MEMBERS
+                <span style={{ fontSize: isMobile ? 20 : 24, flexShrink: 0 }}>{USERS_ROUND}</span>
+                <h3 style={{ fontSize: isMobile ? 15 : 18, lineHeight: 1.3, fontWeight: 950, margin: 0, color: '#EC4899', letterSpacing: 0.5 }}>
+                  GIRLS TEAM - {girlsMembers.length} MEMBERS
                 </h3>
               </div>
 
@@ -699,8 +738,8 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               ) : (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 20
+                  gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: isMobile ? 14 : 20
                 }}>
                   {girlsMembers.map(renderMemberCard)}
                 </div>

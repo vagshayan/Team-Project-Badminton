@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { EYE, EYE_OFF, WARNING_ROUND } from '../../components/Icons';
+import axios from 'axios';
 import { SPORTS, getSportMeta } from '../../constants/sports';
 import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const { login, admin } = useAuth();
   const { isDarkMode } = useTheme();
@@ -19,6 +22,7 @@ export default function LoginPage() {
   const location = useLocation();
 
   const sportParam = new URLSearchParams(location.search).get('sport');
+  const verificationInvalid = new URLSearchParams(location.search).get('verification') === 'invalid';
   const sportMeta = getSportMeta(sportParam, isDarkMode) || null;
   const pageTitle = sportMeta ? `${sportMeta.label} Admin Login` : 'Admin Login';
 
@@ -32,7 +36,7 @@ export default function LoginPage() {
     const verification = new URLSearchParams(location.search).get('verification');
     const deleted = new URLSearchParams(location.search).get('deleted');
     if (verification === 'success') setError('Email verified. You can now log in.');
-    if (verification === 'invalid') setError('This verification link is invalid or expired. Request a new one from registration.');
+    if (verification === 'invalid') setError('This verification link is invalid or expired. Enter your registration email below to request a new one.');
     if (deleted === 'success') setSuccessMessage('Your account has been deleted successfully.');
   }, [location.search]);
 
@@ -53,15 +57,25 @@ export default function LoginPage() {
     }
   };
 
+  const handleResendVerification = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    setResendingVerification(true);
+    try {
+      const response = await axios.post('/api/auth/resend-verification', { email: resendEmail.trim() });
+      setSuccessMessage(response.data?.message || 'If the account is pending verification, a new email will be sent.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to request a new verification email. Please try again later.');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   return (
     <div style={sh.container}>
       <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--primary)', top: '-10%', left: '10%', opacity: 0.08 }} />
       <div className="auth-background-blob" style={{ ...sh.blob, background: 'var(--secondary)', top: '40%', right: '0%', opacity: 0.08 }} />
-
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/before-merged-update
       <nav style={sh.nav} className="mobile-nav">
         <Link to="/" aria-label="Go to the landing page" style={{ ...sh.brand, color: 'inherit', textDecoration: 'none' }} className="mobile-brand">
           <div style={sh.brandMark} className="mobile-logo">
@@ -89,6 +103,24 @@ export default function LoginPage() {
               </div>
               {successMessage && <div style={sh.successBox}>{successMessage}</div>}
               {error && <div style={sh.errorBox}>{WARNING_ROUND} {error}</div>}
+              {verificationInvalid && (
+                <form onSubmit={handleResendVerification} style={sh.resendForm}>
+                  <label htmlFor="verification-resend-email" style={sh.fieldLabel}>RESEND VERIFICATION EMAIL</label>
+                  <input
+                    id="verification-resend-email"
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="Email address used to register"
+                    autoComplete="email"
+                    required
+                    style={sh.fieldInput}
+                  />
+                  <button type="submit" style={sh.resendBtn} disabled={resendingVerification}>
+                    {resendingVerification ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                </form>
+              )}
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }} className="mobile-form">
                  <div style={sh.fieldGroup}>
                     <label style={sh.fieldLabel}>USERNAME</label>
@@ -139,11 +171,8 @@ export default function LoginPage() {
 }
 
 const sh = {
-<<<<<<< HEAD
   container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflow: 'hidden' },
-=======
   container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden' },
->>>>>>> origin/before-merged-update
   blob: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 20 },
@@ -164,6 +193,8 @@ const sh = {
   cardDesc: { fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 32 },
   cardBtn: { fontSize: 13, fontWeight: 800, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10 },
   successBox: { background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', padding: '12px 20px', borderRadius: 12, marginBottom: 24, fontSize: 14, fontWeight: 700 },
+  resendForm: { display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24, padding: 16, border: '1px solid var(--border)', borderRadius: 14, background: 'var(--bg-input)' },
+  resendBtn: { minHeight: 44, padding: '0 16px', border: '1px solid var(--primary)', borderRadius: 12, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   loginContainer: { width: '100%', maxWidth: 460 },
   loginPane: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '40px', padding: '60px', boxShadow: 'var(--shadow)' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 10 },
