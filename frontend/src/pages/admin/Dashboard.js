@@ -18,8 +18,8 @@ import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, 
 import { SPORT_META, getSportMeta } from '../../constants/sports';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles - Men', 'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men', 'doubles-women': 'Doubles - Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
 const STATUS_STYLE = {
@@ -111,16 +111,16 @@ const formatTeamMemberDetails = (details, actionLabel) => {
   ].filter(Boolean);
   const registrationNumber = formatAuditValue(details.registrationNumber);
   if (registrationNumber) fields.push(`Registration No: ${registrationNumber}`);
-  return `${actionLabel} team member${fields.length ? ` — ${fields.join(', ')}` : ''}`;
+  return `${actionLabel} team member${fields.length ? ` - ${fields.join(', ')}` : ''}`;
 };
 
 const formatGenericAuditDetails = (details) => Object.entries(details)
   .filter(([, value]) => value !== null && value !== undefined && value !== '')
   .map(([key, value]) => `${formatAuditFieldName(key)}: ${typeof value === 'object' ? formatGenericAuditDetails(value) : value}`)
-  .join(', ') || '—';
+  .join(', ') || '-';
 
 const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
-  if (!log?.details) return '—';
+  if (!log?.details) return '-';
   const details = log.details;
   if (typeof details === 'string') return details;
 
@@ -144,7 +144,7 @@ const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
           if (key === 'registrationDeadline') return `Registration deadline to ${formatDatePreference(value, dateFormat)}`;
           return `${key} to ${value}`;
         }).join(', ');
-        return `Updated tournament — ${updated}`;
+        return `Updated tournament - ${updated}`;
       }
       return 'Updated tournament details';
     }
@@ -2958,7 +2958,7 @@ export default function Dashboard() {
 }
 
 const ds = {
-  container: { display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' },
+  container: { display: 'flex', minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', zIndex: 2 },
   sidebar: { width: 340, background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0 },
   sidebarBrand: { minHeight: 100, display: 'flex', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)', padding: '0 24px' },
   //sidebarBrand: { height: 110, display: 'flex', alignItems: 'center', px: 32, gap: 16, borderBottom: '1px solid var(--border)', padding: '0 32px' },

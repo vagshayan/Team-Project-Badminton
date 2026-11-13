@@ -266,7 +266,8 @@ export default function ForgotPasswordPage() {
 }
 
 const sh = {
-  container: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
+  container: { minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
+  container: { position: 'relative', zIndex: 2, minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' },
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
@@ -285,6 +286,20 @@ const sh = {
   passwordInputWrapper: { position: 'relative' },
   passwordToggleBtn: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: 4, lineHeight: 1 },
   passwordReqBox: { marginTop: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(15, 23, 42, 0.06)', display: 'grid', gap: 6 },
+  brandName: { fontWeight: 950, fontSize: 18, letterSpacing: -0.5, color: 'var(--text)' },
+  content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', justifyContent: 'center', padding: '0 60px', position: 'relative', zIndex: 10 },
+  formSide: { flex: 1, maxWidth: 480, width: '100%' },
+  card: { background: 'var(--bg-card)', backdropFilter: 'blur(30px)', border: '1px solid var(--border)', borderRadius: '36px', padding: '50px 48px', boxShadow: 'var(--shadow)' },
+  errorBox: { background: '#FEE2E2', color: '#DC2626', padding: '12px 16px', borderRadius: '12px', marginBottom: 20, fontSize: 14, fontWeight: 700 },
+  successBox: { textAlign: 'center' },
+  title: { fontSize: 28, fontWeight: 950, margin: 0, marginBottom: 10, color: 'var(--text)' },
+  subtitle: { fontSize: 15, color: 'var(--text-muted)', marginBottom: 28, lineHeight: 1.5 },
+  field: { marginBottom: 24 },
+  label: { display: 'block', fontSize: 11, fontWeight: 900, color: 'var(--text)', opacity: 0.9, marginBottom: 8, letterSpacing: 1.2 },
+  input: { width: '100%', padding: '15px 18px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '14px', fontSize: 15, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' },
+  passwordInputWrapper: { position: 'relative' },
+  passwordToggleBtn: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: 4, lineHeight: 1 },
+  passwordReqBox: { marginTop: 12, padding: '14px 16px', borderRadius: 14, background: 'var(--bg-input)', border: '1px solid var(--border)', display: 'grid', gap: 6 },
   requirement: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700 },
   reqIcon: { width: 16, textAlign: 'center', flexShrink: 0 },
   passwordHint: { marginTop: 8, fontSize: 12, fontWeight: 700 },
@@ -292,5 +307,6 @@ const sh = {
   resendBtn: { border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: 0 },
   submitBtn: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', color: 'white', border: 'none', borderRadius: '12px', fontSize: 16, fontWeight: 900, cursor: 'pointer', marginTop: 20 },
   footerLinkWrap: { textAlign: 'center', marginTop: 30, fontSize: 14 },
+  footerLinkWrap: { textAlign: 'center', marginTop: 28, fontSize: 14, color: 'var(--text-muted)' },
   footerLink: { color: 'var(--primary)', textDecoration: 'none', fontWeight: 700 }
 };

@@ -63,7 +63,7 @@ export default function UniversityTeamPublicPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', color: 'var(--text)', fontFamily: 'Inter, sans-serif', position: 'relative', zIndex: 2 }}>
       {/* Navigation Header */}
       <nav style={{
         position: 'sticky',
@@ -398,7 +398,7 @@ export default function UniversityTeamPublicPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, borderBottom: '2px solid rgba(59, 130, 246, 0.3)', paddingBottom: 10 }}>
                     <span style={{ fontSize: 28 }}>{USERS_ROUND}</span>
                     <h3 style={{ fontSize: 22, fontWeight: 950, margin: 0, color: '#3B82F6' }}>
-                      BOYS TEAM (MEN) — {boys.length} MEMBERS
+                      BOYS TEAM (MEN) - {boys.length} MEMBERS
                     </h3>
                   </div>
                   {boys.length === 0 ? (
@@ -417,7 +417,7 @@ export default function UniversityTeamPublicPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, borderBottom: '2px solid rgba(236, 72, 153, 0.3)', paddingBottom: 10 }}>
                     <span style={{ fontSize: 28 }}>{USERS_ROUND}</span>
                     <h3 style={{ fontSize: 22, fontWeight: 950, margin: 0, color: '#EC4899' }}>
-                      GIRLS TEAM (WOMEN) — {girls.length} MEMBERS
+                      GIRLS TEAM (WOMEN) - {girls.length} MEMBERS
                     </h3>
                   </div>
                   {girls.length === 0 ? (

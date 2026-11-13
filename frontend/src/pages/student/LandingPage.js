@@ -112,7 +112,7 @@ export default function LandingPage() {
               <div className="hero-badge">University Tournaments</div>
               <h1 className="hero-title">Manage every<br />match day.</h1>
               <p className="hero-desc">
-                Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> — all in one clean tournament hub.
+                Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> - all in one clean tournament hub.
               </p>
 
               <div className="hero-actions">

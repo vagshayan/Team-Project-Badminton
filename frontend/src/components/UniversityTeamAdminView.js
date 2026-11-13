@@ -483,7 +483,6 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? 8 : 10, marginBottom: 4 }}>
-            <span style={{ fontSize: isMobile ? 22 : 28, flexShrink: 0 }}>{activeSportMeta.icon}</span>
             <h2 style={{ fontSize: isMobile ? 18 : 24, lineHeight: 1.2, fontWeight: 950, margin: 0, letterSpacing: -0.5, textTransform: 'uppercase' }}>
               {activeSportMeta.label} UNIVERSITY TEAM MANAGEMENT
             </h2>
@@ -695,7 +694,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               }}>
                 <span style={{ fontSize: isMobile ? 20 : 24, flexShrink: 0 }}>{USERS_ROUND}</span>
                 <h3 style={{ fontSize: isMobile ? 15 : 18, lineHeight: 1.3, fontWeight: 950, margin: 0, color: '#3B82F6', letterSpacing: 0.5 }}>
-                  BOYS TEAM (MEN) — {boysMembers.length} MEMBERS
+                  BOYS TEAM - {boysMembers.length} MEMBERS
                 </h3>
               </div>
 
@@ -728,7 +727,7 @@ export default function UniversityTeamAdminView({ color = '#3B82F6' }) {
               }}>
                 <span style={{ fontSize: isMobile ? 20 : 24, flexShrink: 0 }}>{USERS_ROUND}</span>
                 <h3 style={{ fontSize: isMobile ? 15 : 18, lineHeight: 1.3, fontWeight: 950, margin: 0, color: '#EC4899', letterSpacing: 0.5 }}>
-                  GIRLS TEAM (WOMEN) — {girlsMembers.length} MEMBERS
+                  GIRLS TEAM - {girlsMembers.length} MEMBERS
                 </h3>
               </div>
 

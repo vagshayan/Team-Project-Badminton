@@ -113,7 +113,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!isMatch) return res.status(401).json({ message: 'Invalid username or password' });
     res.json({
       token: generateToken(admin._id),
-      admin: { id: admin._id, username: admin.username, name: admin.name, sport: admin.sport, avatarUrl: admin.avatarUrl },
+      admin: { id: admin._id, username: admin.username, email: admin.email, name: admin.name, sport: admin.sport, avatarUrl: admin.avatarUrl },
     });
   } catch (err) {
     console.error('Login Error:', err);

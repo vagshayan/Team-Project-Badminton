@@ -15,7 +15,17 @@ const SparklesIcon = (props) => (
 );
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '', confirmPassword: '', sport: '', accessCode: '', securityQuestion: '', securityAnswer: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    sport: '',
+    accessCode: '',
+    securityQuestion: '',
+    securityAnswer: '',
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +39,6 @@ export default function RegisterPage() {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
 
-  // Password validation - AWS Moderate Policy
   const validatePassword = (pwd) => ({
     length: pwd.length >= 8,
     uppercase: /[A-Z]/.test(pwd),
@@ -39,20 +48,25 @@ export default function RegisterPage() {
   });
 
   const passwordChecks = validatePassword(formData.password);
-  const passwordValid = Object.values(passwordChecks).every(check => check);
+  const passwordValid = Object.values(passwordChecks).every((check) => check);
   const showPasswordRequirements = isPasswordFocused && formData.password.length > 0 && !passwordValid;
   const showPasswordMatchMessage = isConfirmPasswordFocused && formData.confirmPassword.length > 0;
   const passwordsMatch = showPasswordMatchMessage && formData.password === formData.confirmPassword;
-  const passwordMatchMessage = !showPasswordMatchMessage ? null : passwordsMatch ? <>{CHECK_MARK} Passwords match</> : <>{CROSS} Passwords do not match</>;
+  const passwordMatchMessage = !showPasswordMatchMessage
+    ? null
+    : passwordsMatch
+      ? <>{CHECK_MARK} Passwords match</>
+      : <>{CROSS} Passwords do not match</>;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === 'accessCode') {
       setAccessCodeStatus('idle');
     }
   };
+
   const handlePasswordFocus = () => setIsPasswordFocused(true);
   const handlePasswordBlur = () => setIsPasswordFocused(false);
   const handleConfirmPasswordFocus = () => setIsConfirmPasswordFocused(true);
@@ -103,7 +117,7 @@ export default function RegisterPage() {
       }
 
       password = shuffleSecure(password).join('');
-      setFormData(prev => ({ ...prev, password, confirmPassword: password }));
+      setFormData((prev) => ({ ...prev, password, confirmPassword: password }));
       setIsPasswordFocused(true);
       setIsConfirmPasswordFocused(false);
     } catch {
@@ -115,6 +129,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     const { name, username, email, password, confirmPassword, sport, securityQuestion, securityAnswer } = formData;
+
     if (!passwordValid) return setError('Password does not meet all requirements');
     if (password !== confirmPassword) return setError('Passwords do not match');
     if (!sport) return setError('Please select your arena domain');
@@ -123,7 +138,16 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await axios.post('/api/auth/register', { name, username, email, password, sport, accessCode: formData.accessCode, securityQuestion, securityAnswer });
+      await axios.post('/api/auth/register', {
+        name,
+        username,
+        email,
+        password,
+        sport,
+        accessCode: formData.accessCode,
+        securityQuestion,
+        securityAnswer,
+      });
       setAccessCodeStatus('verified');
       setVerificationEmail(email.trim());
       setVerificationSent(true);
@@ -159,12 +183,7 @@ export default function RegisterPage() {
         input[type="password"]::-ms-reveal { display: none; }
         input[type="password"]::-ms-clear { display: none; }
         input[type="password"]::-webkit-reveal-button { display: none; }
-        input[type="password"]::-ms-reveal { display: none; }
-        input[type="password"]::-ms-clear { display: none; }
-        input[type="password"]::-webkit-reveal-button { display: none; }
-        input[type="password"]::-ms-reveal { display: none; }
-        input[type="password"]::-ms-clear { display: none; }
-        input[type="password"]::-webkit-reveal-button { display: none; }
+
         @media (max-width: 900px) {
           .content-container {
             flex-direction: column !important;
@@ -173,9 +192,16 @@ export default function RegisterPage() {
             width: 100% !important;
             box-sizing: border-box !important;
           }
+          .register-top-section {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 28px 20px !important;
+            gap: 28px !important;
+            border-radius: 24px !important;
+          }
           .hero-side {
             padding-right: 0 !important;
-            margin-bottom: 40px !important;
+            margin-bottom: 20px !important;
             text-align: center !important;
           }
           .hero-title {
@@ -184,12 +210,16 @@ export default function RegisterPage() {
           .benefit-list {
             align-items: center !important;
           }
+          .domain-side {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
           .form-side {
             width: 100% !important;
             max-width: 100% !important;
           }
           .form-card {
-            padding: 30px !important;
+            padding: 24px 20px !important;
             border-radius: 24px !important;
             max-height: 82vh !important;
             overflow-y: auto !important;
@@ -199,26 +229,26 @@ export default function RegisterPage() {
           .field-group {
             grid-template-columns: 1fr !important;
           }
+          .sport-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+          }
           .nav-container {
             padding: 0 20px !important;
           }
-          .register-brand {
-            gap: 10px !important;
-          }
-          .register-brand-mark {
-            width: 48px !important;
-            height: 48px !important;
-          }
-          .register-brand-university {
-            font-size: 17px !important;
-          }
-          .register-brand-line {
-            font-size: 10px !important;
-          }
+        }
+
+        @media (max-width: 480px) {
           .sport-grid {
             grid-template-columns: 1fr !important;
           }
+          .hero-title {
+            font-size: 32px !important;
+          }
+          .benefit-list {
+            gap: 10px !important;
+          }
         }
+
         @media (max-width: 380px) {
           .register-brand-mark {
             width: 40px !important;
@@ -250,26 +280,50 @@ export default function RegisterPage() {
       </nav>
 
       <div className="content-container" style={sh.content}>
-        <div className="hero-side" style={sh.heroSide}>
-           <div style={sh.badge}>OFFICIAL ACCESS</div>
-           <h1 className="hero-title" style={sh.title}><span style={sh.highlight}>CREATE ADMIN</span> <br/>ACCOUNT</h1>
-           <p style={sh.subtitle}>Set up your administrator account to manage Badminton, Table Tennis, or Carrom tournaments.</p>
-           
-           <div className="benefit-list" style={sh.benefitList}>
-              {[
-                 'Strong & Secure Password',
-                 'Select Your Sport / Domain',
-                 'Admin Access Code Required',
-                 'Security Question & Answer'
-              ].map((b, index) => (
-                 <div key={b} style={sh.benefit}>
-                    <span style={sh.check}>{index === 0 ? LOCK : index === 1 ? TROPHY : index === 2 ? KEY : SHIELD}</span> {b}
-                 </div>
+        <div className="register-top-section" style={sh.topSection}>
+          <div className="hero-side" style={sh.heroSideTop}>
+            <div style={sh.badge}>OFFICIAL ACCESS</div>
+            <h1 className="hero-title" style={sh.title}>CREATE YOUR <br /><span style={sh.highlight}>ARENA HUB</span></h1>
+            <p style={sh.subtitle}>Initialize your dedicated management dashboard for Badminton, Table Tennis, or Carrom tournaments.</p>
+
+            <div className="benefit-list" style={sh.benefitList}>
+              {['Real-time Player Verification', 'Unified Result Boards', 'Automated Seeding Systems'].map((b) => (
+                <div key={b} style={sh.benefit}>
+                  <span style={sh.check}>{CHECK_MARK}</span> {b}
+                </div>
               ))}
-           </div>
+            </div>
+          </div>
+
+          <div className="domain-side" style={sh.domainSideTop}>
+            <div style={sh.section}>
+              <label style={sh.label}>CHOOSE DOMAIN</label>
+              <div className="sport-grid" style={sh.sportGrid}>
+                {SPORT_OPTIONS.map((s) => {
+                  const sMeta = getSportMeta(s.id, isDarkMode);
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => setFormData((prev) => ({ ...prev, sport: s.id }))}
+                      style={{
+                        ...sh.sportCard,
+                        borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
+                        background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)',
+                      }}
+                    >
+                      <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text-muted)' }}>
+                        {sMeta.label.toUpperCase()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="form-side" style={sh.formSide}>
+        <div className="form-side" style={sh.formSideFull}>
           <div className="form-card" style={sh.card}>
             {error && <div style={sh.errorBox}>{error}</div>}
 
@@ -282,179 +336,216 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {!verificationSent && <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-              <div style={sh.section}>
-                <label style={sh.label}>CHOOSE DOMAIN</label>
-                <div className="sport-grid" style={sh.sportGrid}>
-                   {SPORT_OPTIONS.map(s => {
+            {!verificationSent && (
+              <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                <div style={sh.section}>
+                  <label style={sh.label}>CHOOSE DOMAIN</label>
+                  <div className="sport-grid" style={sh.sportGrid}>
+                    {SPORT_OPTIONS.map((s) => {
                       const sMeta = getSportMeta(s.id, isDarkMode);
                       return (
-                        <div 
-                           key={s.id} 
-                           onClick={() => setFormData({ ...formData, sport: s.id })}
-                           style={{ 
-                              ...sh.sportCard, 
-                              borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
-                              background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)'
-                           }}
+                        <div
+                          key={s.id}
+                          onClick={() => setFormData((prev) => ({ ...prev, sport: s.id }))}
+                          style={{
+                            ...sh.sportCard,
+                            borderColor: formData.sport === s.id ? sMeta.color : 'var(--border)',
+                            background: formData.sport === s.id ? `${sMeta.color}08` : 'var(--bg-input)',
+                          }}
                         >
-                           <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
-                           <div style={{ fontSize: 10, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text-muted)' }}>{sMeta.label.toUpperCase()}</div>
+                          <div style={{ fontSize: 24, marginBottom: 8 }}>{sMeta.icon}</div>
+                          <div style={{ fontSize: 11, fontWeight: 900, color: formData.sport === s.id ? sMeta.color : 'var(--text)', opacity: formData.sport === s.id ? 1 : 0.85 }}>
+                            {sMeta.label.toUpperCase()}
+                          </div>
                         </div>
                       );
-                   })}
-                </div>
-              </div>
-
-              <div className="field-group" style={sh.fieldGroup}>
-                <div style={sh.field}>
-                   <label style={sh.label}>MANAGER NAME</label>
-                   <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" style={sh.input} autoComplete="name" required />
-                </div>
-                <div style={sh.field}>
-                   <label style={sh.label}>USERNAME</label>
-                   <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} autoComplete="off" required />
-                </div>
-                 <div style={{ ...sh.field, gridColumn: '1 / -1' }}>
-                   <label style={sh.label}>EMAIL ADDRESS</label>
-                   <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="admin@example.com" style={sh.input} autoComplete="email" required />
-                 </div>
-              </div>
-
-              <div className="field-group" style={{ ...sh.fieldGroup, gridTemplateColumns: '1fr' }}>
-                <div style={sh.field}>
-                   <label style={sh.label}>PASSWORD</label>
-                   <div style={sh.passwordInputWrapper}>
-                     <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} onFocus={handlePasswordFocus} onBlur={handlePasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 72 }} autoComplete="new-password" required />
-                     <button type="button" title="Generate strong password" onClick={generateStrongPassword} style={sh.suggestPasswordBtn} aria-label="Generate strong password">
-                       <SparklesIcon style={sh.suggestPasswordIcon} />
-                     </button>
-                     <button type="button" onClick={() => setShowPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                       {showPassword ? EYE : EYE_OFF}
-                     </button>
-                   </div>
-                   {showPasswordRequirements && (
-                     <div style={sh.passwordReqBox} aria-live="polite">
-                       <div style={{ ...sh.requirement, color: passwordChecks.length ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.length ? CHECK_MARK : CROSS}</span>
-                         <span>At least 8 characters ({formData.password.length}/8)</span>
-                       </div>
-                       <div style={{ ...sh.requirement, color: passwordChecks.uppercase ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.uppercase ? CHECK_MARK : CROSS}</span>
-                         <span>One uppercase letter (A-Z)</span>
-                       </div>
-                       <div style={{ ...sh.requirement, color: passwordChecks.lowercase ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.lowercase ? CHECK_MARK : CROSS}</span>
-                         <span>One lowercase letter (a-z)</span>
-                       </div>
-                       <div style={{ ...sh.requirement, color: passwordChecks.number ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.number ? CHECK_MARK : CROSS}</span>
-                         <span>One number (0-9)</span>
-                       </div>
-                       <div style={{ ...sh.requirement, color: passwordChecks.special ? '#10B981' : '#EF4444' }}>
-                         <span style={sh.reqIcon}>{passwordChecks.special ? CHECK_MARK : CROSS}</span>
-                         <span>One special character (!@#$%^&*)</span>
-                       </div>
-                     </div>
-                   )}
-                </div>
-                <div style={sh.field}>
-                   <label style={sh.label}>CONFIRM PASSWORD</label>
-                   <div style={sh.passwordInputWrapper}>
-                     <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onFocus={handleConfirmPasswordFocus} onBlur={handleConfirmPasswordBlur} placeholder="••••••••" style={{ ...sh.input, paddingRight: 44 }} autoComplete="new-password" required />
-                     <button type="button" onClick={() => setShowConfirmPassword(prev => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                       {showConfirmPassword ? EYE : EYE_OFF}
-                     </button>
-                   </div>
-                   {showPasswordMatchMessage && (
-                     <div style={{ ...sh.passwordHint, color: passwordsMatch ? '#10B981' : '#EF4444' }} aria-live="polite">
-                       {passwordMatchMessage}
-                     </div>
-                   )}
-                </div>
-              </div>
-
-              <div style={sh.securitySection}>
-                <div style={sh.sectionTitleRow}>
-                  <span style={sh.securityIcon}>{SHIELD}</span>
-                  <span style={sh.securityTitle}>SECURITY ACCESS</span>
+                    })}
+                  </div>
                 </div>
 
-                <div style={{ ...sh.securityAccessField, marginTop: 12 }}>
-                  <label style={{ ...sh.label, marginBottom: 10 }}>ACCESS CODE</label>
-                  <div style={sh.accessCodeWrap}>
-                    <span aria-hidden="true" style={sh.accessCodeIcon}>{KEY}</span>
-                    <input
-                      type={showAccessCode ? 'text' : 'password'}
-                      name="accessCode"
-                      value={formData.accessCode}
-                      onChange={handleChange}
-                      placeholder="XXXX-XXXX-XXXX"
-                      autoComplete="off"
-                      spellCheck="false"
-                      inputMode="text"
-                      style={{ ...sh.accessCodeInput, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-                      required
-                    />
-                    {showAccessCode ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAccessCode(false);
-                        }}
-                        style={sh.accessCodeToggleBtn}
-                        aria-label="Hide access code"
-                        aria-pressed={true}
-                      >
-                        {EYE}
+                <div className="field-group" style={sh.fieldGroup}>
+                  <div style={sh.field}>
+                    <label style={sh.label}>MANAGER NAME</label>
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" style={sh.input} autoComplete="name" required />
+                  </div>
+                  <div style={sh.field}>
+                    <label style={sh.label}>USERNAME</label>
+                    <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="admin_01" style={sh.input} autoComplete="off" required />
+                  </div>
+                  <div style={{ ...sh.field, gridColumn: '1 / -1' }}>
+                    <label style={sh.label}>EMAIL ADDRESS</label>
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="admin@example.com" style={sh.input} autoComplete="email" required />
+                  </div>
+                </div>
+
+                <div className="field-group" style={{ ...sh.fieldGroup, gridTemplateColumns: '1fr' }}>
+                  <div style={sh.field}>
+                    <label style={sh.label}>PASSWORD</label>
+                    <div style={sh.passwordInputWrapper}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        onFocus={handlePasswordFocus}
+                        onBlur={handlePasswordBlur}
+                        placeholder="••••••••"
+                        style={{ ...sh.input, paddingRight: 72 }}
+                        autoComplete="new-password"
+                        required
+                      />
+                      <button type="button" title="Generate strong password" onClick={generateStrongPassword} style={sh.suggestPasswordBtn} aria-label="Generate strong password">
+                        <SparklesIcon style={sh.suggestPasswordIcon} />
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAccessCode(true);
-                        }}
-                        style={sh.accessCodeToggleBtn}
-                        aria-label="Show access code"
-                        aria-pressed={false}
-                      >
-                        {EYE_OFF}
+                      <button type="button" onClick={() => setShowPassword((prev) => !prev)} style={sh.passwordToggleBtn} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                        {showPassword ? EYE : EYE_OFF}
                       </button>
+                    </div>
+                    {showPasswordRequirements && (
+                      <div style={sh.passwordReqBox} aria-live="polite">
+                        <div style={{ ...sh.requirement, color: passwordChecks.length ? '#10B981' : '#EF4444' }}>
+                          <span style={sh.reqIcon}>{passwordChecks.length ? CHECK_MARK : CROSS}</span>
+                          <span>At least 8 characters ({formData.password.length}/8)</span>
+                        </div>
+                        <div style={{ ...sh.requirement, color: passwordChecks.uppercase ? '#10B981' : '#EF4444' }}>
+                          <span style={sh.reqIcon}>{passwordChecks.uppercase ? CHECK_MARK : CROSS}</span>
+                          <span>One uppercase letter (A-Z)</span>
+                        </div>
+                        <div style={{ ...sh.requirement, color: passwordChecks.lowercase ? '#10B981' : '#EF4444' }}>
+                          <span style={sh.reqIcon}>{passwordChecks.lowercase ? CHECK_MARK : CROSS}</span>
+                          <span>One lowercase letter (a-z)</span>
+                        </div>
+                        <div style={{ ...sh.requirement, color: passwordChecks.number ? '#10B981' : '#EF4444' }}>
+                          <span style={sh.reqIcon}>{passwordChecks.number ? CHECK_MARK : CROSS}</span>
+                          <span>One number (0-9)</span>
+                        </div>
+                        <div style={{ ...sh.requirement, color: passwordChecks.special ? '#10B981' : '#EF4444' }}>
+                          <span style={sh.reqIcon}>{passwordChecks.special ? CHECK_MARK : CROSS}</span>
+                          <span>One special character (!@#$%^&*)</span>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div style={{ ...sh.accessCodeHelp, marginTop: 10 }}>Given to you by the platform owner or the manager handing over this facility</div>
-                  {accessCodeStatus !== 'idle' && (
-                    <div style={{ ...sh.validationRow, ...(accessCodeStatus === 'verified' ? sh.validationRowConfirmed : accessCodeStatus === 'invalid' ? sh.validationRowInvalid : sh.validationRowNeutral) }} aria-live="polite">
-                      <span style={sh.validationIcon}>{accessCodeStatus === 'verified' ? CHECK_MARK : accessCodeStatus === 'invalid' ? CROSS : '•'}</span>
-                      <span>
-                        {accessCodeStatus === 'verified' && 'Code confirmed'}
-                        {accessCodeStatus === 'invalid' && 'Code not recognized'}
-                      </span>
+
+                  <div style={sh.field}>
+                    <label style={sh.label}>CONFIRM PASSWORD</label>
+                    <div style={sh.passwordInputWrapper}>
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        onFocus={handleConfirmPasswordFocus}
+                        onBlur={handleConfirmPasswordBlur}
+                        placeholder="••••••••"
+                        style={{ ...sh.input, paddingRight: 44 }}
+                        autoComplete="new-password"
+                        required
+                      />
+                      <button type="button" onClick={() => setShowConfirmPassword((prev) => !prev)} style={sh.passwordToggleBtn} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
+                        {showConfirmPassword ? EYE : EYE_OFF}
+                      </button>
                     </div>
-                  )}
+                    {showPasswordMatchMessage && (
+                      <div style={{ ...sh.passwordHint, color: passwordsMatch ? '#10B981' : '#EF4444' }} aria-live="polite">
+                        {passwordMatchMessage}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div style={sh.securityDivider} />
+                <div style={sh.securitySection}>
+                  <div style={sh.sectionTitleRow}>
+                    <span style={sh.securityIcon}>{SHIELD}</span>
+                    <span style={sh.securityTitle}>SECURITY ACCESS</span>
+                  </div>
 
-                <div style={{ ...sh.securityQuestionField, marginTop: 24 }}>
-                  <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY QUESTION</label>
-                  <input type="text" name="securityQuestion" value={formData.securityQuestion} onChange={handleChange} placeholder="e.g., What is your favorite sport?" style={sh.input} required />
+                  <div style={{ ...sh.securityAccessField, marginTop: 12 }}>
+                    <label style={{ ...sh.label, marginBottom: 10 }}>ACCESS CODE</label>
+                    <div style={sh.accessCodeWrap}>
+                      <span aria-hidden="true" style={sh.accessCodeIcon}>{KEY}</span>
+                      <input
+                        type={showAccessCode ? 'text' : 'password'}
+                        name="accessCode"
+                        value={formData.accessCode}
+                        onChange={handleChange}
+                        placeholder="XXXX-XXXX-XXXX"
+                        autoComplete="off"
+                        spellCheck="false"
+                        inputMode="text"
+                        style={{ ...sh.accessCodeInput, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
+                        required
+                      />
+                      {showAccessCode ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowAccessCode(false);
+                          }}
+                          style={sh.accessCodeToggleBtn}
+                          aria-label="Hide access code"
+                          aria-pressed={true}
+                        >
+                          {EYE}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowAccessCode(true);
+                          }}
+                          style={sh.accessCodeToggleBtn}
+                          aria-label="Show access code"
+                          aria-pressed={false}
+                        >
+                          {EYE_OFF}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ ...sh.accessCodeHelp, marginTop: 10 }}>Given to you by the platform owner or the manager handing over this facility</div>
+                    {accessCodeStatus !== 'idle' && (
+                      <div
+                        style={{
+                          ...sh.validationRow,
+                          ...(accessCodeStatus === 'verified'
+                            ? sh.validationRowConfirmed
+                            : accessCodeStatus === 'invalid'
+                              ? sh.validationRowInvalid
+                              : sh.validationRowNeutral),
+                        }}
+                        aria-live="polite"
+                      >
+                        <span style={sh.validationIcon}>{accessCodeStatus === 'verified' ? CHECK_MARK : accessCodeStatus === 'invalid' ? CROSS : '•'}</span>
+                        <span>
+                          {accessCodeStatus === 'verified' && 'Code confirmed'}
+                          {accessCodeStatus === 'invalid' && 'Code not recognized'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={sh.securityDivider} />
+
+                  <div style={{ ...sh.securityQuestionField, marginTop: 24 }}>
+                    <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY QUESTION</label>
+                    <input type="text" name="securityQuestion" value={formData.securityQuestion} onChange={handleChange} placeholder="e.g., What is your favorite sport?" style={sh.input} required />
+                  </div>
+
+                  <div style={{ ...sh.securityAnswerField, marginTop: 24 }}>
+                    <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY ANSWER</label>
+                    <input type="text" name="securityAnswer" value={formData.securityAnswer} onChange={handleChange} placeholder="Your answer" style={sh.input} required />
+                  </div>
                 </div>
 
-                <div style={{ ...sh.securityAnswerField, marginTop: 24 }}>
-                  <label style={{ ...sh.label, marginBottom: 10 }}>SECURITY ANSWER</label>
-                  <input type="text" name="securityAnswer" value={formData.securityAnswer} onChange={handleChange} placeholder="Your answer" style={sh.input} required />
-                </div>
-              </div>
-
-              <button type="submit" style={sh.submitBtn} disabled={loading}>
-                {loading ? 'INITIALIZING ARENA...' : 'CREATE ACCOUNT'}
-              </button>
-            </form>}
+                <button type="submit" style={sh.submitBtn} disabled={loading}>
+                  {loading ? 'INITIALIZING ARENA...' : 'CREATE ACCOUNT'}
+                </button>
+              </form>
+            )}
 
             <p style={sh.footerLinkWrap}>
               Existing Manager? <Link to="/admin/login" style={sh.footerLink}>Login here</Link>
@@ -467,7 +558,16 @@ export default function RegisterPage() {
 }
 
 const sh = {
-  container: { position: 'relative', width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', overflowX: 'hidden'  },
+  container: {
+    position: 'relative',
+    width: '100%',
+    minHeight: '100vh',
+    background: 'transparent',
+    color: 'var(--text)',
+    fontFamily: 'Inter, sans-serif',
+    overflowX: 'hidden',
+    zIndex: 2,
+  },
   blob: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', filter: 'blur(150px)', pointerEvents: 'none' },
   nav: { height: 100, padding: '0 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, position: 'relative' },
   brand: { display: 'flex', alignItems: 'center', gap: 15, cursor: 'pointer' },
@@ -475,35 +575,38 @@ const sh = {
   brandName: { display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 950 },
   brandUniversity: { color: '#22B8FF', fontSize: 18, lineHeight: 1.1, letterSpacing: 0.2 },
   brandLine: { color: '#FACC15', fontSize: 11, lineHeight: 1.1, fontWeight: 800 },
-  content: { display: 'flex', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', alignItems: 'center', padding: '0 60px' },
-  heroSide: { flex: 1, paddingRight: 60 },
-  formSide: { flex: 1, maxWidth: 500 },
-  badge: { fontSize: 11, fontWeight: 950, color: 'var(--primary)', letterSpacing: 2, marginBottom: 20 },
-  title: { fontSize: 64, fontWeight: 950, letterSpacing: -2, margin: 0, lineHeight: 1.1 },
+  content: { display: 'flex', flexDirection: 'column', maxWidth: 1200, margin: '0 auto', minHeight: 'calc(100vh - 100px)', padding: '20px 60px 80px', gap: 32, position: 'relative', zIndex: 10 },
+  topSection: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '36px', padding: '36px 44px', boxShadow: 'var(--shadow)' },
+  heroSideTop: { flex: 1.2 },
+  domainSideTop: { flex: 1, maxWidth: 440, width: '100%' },
+  formSideFull: { width: '100%' },
+  badge: { fontSize: 11, fontWeight: 950, color: 'var(--primary)', letterSpacing: 2, marginBottom: 12 },
+  title: { fontSize: 40, fontWeight: 950, letterSpacing: -1, margin: 0, lineHeight: 1.15 },
   highlight: { background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-  subtitle: { fontSize: 18, color: 'var(--text-muted)', marginTop: 24, lineHeight: 1.6 },
-  benefitList: { marginTop: 48, display: 'flex', flexDirection: 'column', gap: 16 },
-  benefit: { display: 'flex', alignItems: 'center', gap: 12, fontWeight: 700, fontSize: 15, color: 'var(--text)' },
+  subtitle: { fontSize: 15, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 },
+  benefitList: { marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: '12px 24px' },
+  benefit: { display: 'inline-flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 14, color: 'var(--text)' },
   check: { color: '#10B981', fontWeight: 950 },
-  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '44px', padding: '60px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
+  card: { background: 'var(--bg-card)', backdropFilter: 'blur(40px)', border: '1px solid var(--border)', borderRadius: '36px', padding: '44px 50px', boxShadow: 'var(--shadow)', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' },
   label: { fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1.5px', display: 'block', marginBottom: 12 },
+  section: { display: 'flex', flexDirection: 'column', gap: 16 },
   sportGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
   sportCard: { padding: '16px', borderRadius: '18px', border: '2px solid transparent', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s cubic-bezier(0.2, 1, 0.3, 1)' },
   fieldGroup: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
   field: { display: 'flex', flexDirection: 'column', gap: 8 },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)', padding: '14px 18px', borderRadius: '14px', fontSize: '15px', outline: 'none', transition: 'border 0.2s', width: '100%', boxSizing: 'border-box' },
-  securitySection: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '20px', padding: '20px 20px 8px', marginTop: '2px', opacity: 1, filter: 'none' },
+  securitySection: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '20px', padding: '20px 20px 8px', marginTop: '2px' },
   sectionTitleRow: { display: 'flex', alignItems: 'center', gap: '10px' },
   securityIcon: { color: 'var(--text)', fontSize: '15px' },
   securityTitle: { color: 'var(--text)', fontSize: '10px', fontWeight: 900, letterSpacing: '1.6px' },
-  securityAccessField: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24, opacity: 1 },
+  securityAccessField: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 },
   securityQuestionField: { display: 'flex', flexDirection: 'column', gap: 10 },
   securityAnswerField: { display: 'flex', flexDirection: 'column', gap: 10 },
   securityDivider: { height: '1px', width: '100%', background: 'var(--border)', margin: '0 0 10px' },
   accessCodeWrap: { display: 'flex', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden', minHeight: '48px', position: 'relative' },
-  accessCodeIcon: { paddingLeft: '14px', color: 'var(--text)', fontSize: '16px', display: 'inline-flex', alignItems: 'center', opacity: 1 },
-  accessCodeInput: { background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', fontWeight: 800, outline: 'none', width: '100%', padding: '14px 44px 14px 10px', letterSpacing: '0.12em', boxSizing: 'border-box', opacity: 1, filter: 'none' },
-  accessCodeToggleBtn: { position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text)', opacity: 1, filter: 'none' },
+  accessCodeIcon: { paddingLeft: '14px', color: 'var(--text)', fontSize: '16px', display: 'inline-flex', alignItems: 'center' },
+  accessCodeInput: { background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', fontWeight: 800, outline: 'none', width: '100%', padding: '14px 44px 14px 10px', letterSpacing: '0.12em', boxSizing: 'border-box' },
+  accessCodeToggleBtn: { position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text)' },
   accessCodeHelp: { fontSize: '11px', lineHeight: 1.5, color: 'var(--text)' },
   validationRow: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', marginTop: '10px', fontWeight: 700 },
   validationIcon: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '16px' },
@@ -524,5 +627,6 @@ const sh = {
   passwordReqBox: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' },
   requirement: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: 600, transition: 'color 0.2s ease' },
   reqIcon: { fontSize: '14px', fontWeight: 900, minWidth: '18px', textAlign: 'center' },
-  passwordHint: { marginTop: '8px', fontSize: '13px', fontWeight: 600 }
+  passwordHint: { marginTop: '8px', fontSize: '13px', fontWeight: 600 },
 };
+

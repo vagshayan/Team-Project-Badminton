@@ -3,10 +3,10 @@ import axios from 'axios';
 import { CALENDAR, LOCATION, CLOSE, WARNING, PHONE, CLIPBOARD } from './Icons';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men',
-  'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men',
-  'doubles-women': 'Doubles — Women',
+  'singles-men': 'Singles - Men',
+  'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men',
+  'doubles-women': 'Doubles - Women',
   'mixed-doubles': 'Mixed Doubles',
 };
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
@@ -124,8 +124,8 @@ export default function RegistrationsModal({ tournament, onClose }) {
                     </td>
                     {isDoubles && (
                       <td style={sh.td}>
-                        <div style={{ fontWeight: 800, fontSize: 13 }}>{r.partnerName || '—'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.partnerRollNumber || '—'}</div>
+                        <div style={{ fontWeight: 800, fontSize: 13 }}>{r.partnerName || '-'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.partnerRollNumber || '-'}</div>
                       </td>
                     )}
                   </tr>

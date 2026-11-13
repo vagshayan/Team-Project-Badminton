@@ -6,8 +6,8 @@ import { CLOSE, LOCATION, CLOCK, WARNING, SUCCESS } from './Icons';
 
 const DOUBLES = ['doubles-men', 'doubles-women', 'mixed-doubles'];
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles - Men', 'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men', 'doubles-women': 'Doubles - Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
 const FACULTIES = [
@@ -384,7 +384,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
               </span>
               <div>
                 <div className="modal-title" style={{ fontSize: 24, fontWeight: 950, color: 'var(--text)', letterSpacing: -0.5 }}>{initialData ? 'EDIT PLAYER DETAILS' : 'REGISTER FOR TOURNAMENT'}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{sport.label} Registration — {tournament.year}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{sport.label} Registration - {tournament.year}</div>
               </div>
             </div>
           </div>
@@ -393,7 +393,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
         <div className="modal-info-bar" style={{ ...sh.infoBar, position: 'relative' }}>
           <div className="info-bar-content" style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
             <span className="info-bar-category" style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-              {CAT_LABELS[tournament.category]} — {tournament.year}
+              {CAT_LABELS[tournament.category]} - {tournament.year}
             </span>
             <span className="info-bar-divider" style={{ flex: '0 0 auto', marginLeft: 16, marginRight: 16, fontSize: 13, color: 'var(--border)' }}>|</span>
             <div className="info-bar-venue" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)', fontWeight: 700, whiteSpace: 'nowrap' }}>

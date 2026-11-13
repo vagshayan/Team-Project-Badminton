@@ -29,26 +29,25 @@ body.light-mode {
 }
 
 .landing-hero-page {
+  position: relative;
   min-height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at 82% 10%, rgba(59, 130, 246, 0.1), transparent 55%),
-              radial-gradient(circle at 95% 85%, rgba(239, 93, 168, 0.08), transparent 55%),
-              var(--landing-bg);
   color: var(--landing-text);
   overflow-x: hidden;
+  background-color: transparent;
   transition: background 0.3s ease, color 0.3s ease;
 }
 
 body.light-mode .landing-hero-page {
-  background: radial-gradient(circle at 85% 8%, rgba(245, 197, 66, 0.16), transparent 45%),
-              radial-gradient(circle at 100% 55%, rgba(239, 93, 168, 0.12), transparent 50%),
-              radial-gradient(circle at 5% 70%, rgba(79, 199, 234, 0.10), transparent 45%),
-              var(--landing-bg);
+  background-color: transparent;
 }
 
+
 .landing-inner {
+  position: relative;
+  z-index: 2;
   width: 100%;
   min-height: 100vh;
   margin: 0;
@@ -57,42 +56,8 @@ body.light-mode .landing-hero-page {
   flex-direction: column;
   justify-content: space-between;
   box-sizing: border-box;
-  background: var(--landing-bg);
+  background: transparent;
 }
-
-/* Header spanning 100% viewport width */
-/* .landing-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 28px 0;
-  border-bottom: 1px solid var(--landing-border);
-  box-sizing: border-box;
-} */
-
-/* .landing-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-
-  padding: 28px 60px;
-  box-sizing: border-box;
-
-  background: var(--landing-bg); 
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-
-  border-bottom: none;
-} */
 
 .landing-header {
   position: fixed;
@@ -106,17 +71,22 @@ body.light-mode .landing-hero-page {
   justify-content: space-between;
   gap: 20px;
 
-  padding: 28px 60px;
+  padding: 24px 60px;
   box-sizing: border-box;
 
-  background: var(--landing-bg);
-  border-bottom: none;
+  background: rgba(10, 14, 23, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
   z-index: 1000;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 body.light-mode .landing-header {
-  box-shadow: 0 4px 20px -8px rgba(15, 23, 42, 0.1);
+  background: rgba(244, 246, 251, 0.82);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px -8px rgba(15, 23, 42, 0.08);
 }
 
 .brand-block {
@@ -297,10 +267,11 @@ body.light-mode .brand-line {
 
 /* Hero Grid spanning full viewport width */
 .hero-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 60px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: 60px 0 40px;
   width: 100%;
   box-sizing: border-box;
@@ -308,12 +279,18 @@ body.light-mode .brand-line {
 
 .hero-copy {
   width: 100%;
-  max-width: 720px;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .hero-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   color: var(--accent-yellow);
   font-weight: 800;
@@ -321,6 +298,10 @@ body.light-mode .brand-line {
   letter-spacing: 1.8px;
   text-transform: uppercase;
   margin-bottom: 20px;
+}
+
+body.light-mode .hero-badge {
+  color: #161301;
 }
 
 .hero-badge::before {
@@ -334,6 +315,12 @@ body.light-mode .brand-line {
   font-weight: 900;
   letter-spacing: -1.5px;
   color: var(--landing-text);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+
+body.light-mode .hero-title {
+  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.8);
 }
 
 .hero-desc {
@@ -341,10 +328,18 @@ body.light-mode .brand-line {
   font-size: 19px;
   line-height: 1.6;
   color: var(--landing-muted);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+
+body.light-mode .hero-desc {
+  text-shadow: none;
 }
 
 .hero-actions {
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
   margin-top: 36px;
@@ -399,12 +394,7 @@ body.light-mode .button-primary:hover {
 
 /* Hero Right Graphic */
 .hero-visual {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  min-height: 320px;
-  width: 100%;
+  display: none;
 }
 
 .visual-graphic {
@@ -484,11 +474,16 @@ body.light-mode .visual-circle-small {
 .tournament-card {
   position: relative;
   overflow: hidden;
-
   border-radius: 18px;
   border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--landing-border));
   background: var(--landing-card-bg);
   padding: 28px;
+  border-radius: 24px;
+  border: 1px solid var(--landing-border);
+  background: rgba(16, 22, 34, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 32px;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -523,18 +518,20 @@ body.light-mode .visual-circle-small {
   pointer-events: none;
 }
 body.light-mode .tournament-card {
+  background: rgba(255, 255, 255, 0.85);
   box-shadow: var(--landing-shadow);
 }
 
 body.light-mode .tournament-card:hover {
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--landing-shadow-lg);
 }
 
 .tournament-card:hover {
   transform: translateY(-6px);
-  border-color: rgba(255, 255, 255, 0.2);
-  background: var(--landing-card-hover);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(22, 30, 46, 0.85);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
 }
 
 .tournament-card-header {
@@ -748,11 +745,17 @@ body.light-mode .tournament-icon {
     justify-content: space-between;
 
     padding: 20px 16px;
-
+    background: rgba(10, 14, 23, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: var(--landing-bg);
     border-bottom: none;
-
     z-index: 1000;
+  }
+  body.light-mode .landing-header {
+    background: rgba(244, 246, 251, 0.85);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   }
 
   .landing-main {
