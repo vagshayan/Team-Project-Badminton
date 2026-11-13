@@ -667,7 +667,7 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
           fontSize: isMobile ? 22 : 28,
         }}>BRACKET MANAGEMENT</h2>
 
-        <div className="custom-select-container" style={{ ...s.selectWrapper, minWidth: isMobile ? 'auto' : 380, width: isMobile ? '100%' : 'auto' }}>
+        <div className="custom-select-container" style={{ ...s.selectWrapper, minWidth: isMobile ? 'auto' : 380, width: isMobile ? '100%' : 'auto', zIndex: isMobile ? 1 : s.selectWrapper.zIndex }}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             style={s.selectTrigger}
@@ -755,7 +755,12 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
         <div style={s.emptyState}>Select a tournament to view or generate brackets.</div>
       ) : (
         <div>
-          <div style={s.statusBar}>
+          <div style={{
+            ...s.statusBar,
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? 14 : undefined,
+          }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700 }}>
                 {CAT_LABELS[selectedTournament.category]} — {selectedTournament.year}
@@ -772,18 +777,18 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: isMobile ? 'wrap' : 'nowrap', width: isMobile ? '100%' : 'auto' }}>
               {!selectedTournament.isLocked && (
-                <button onClick={generateDraws} style={{ ...s.btn, background: color }}>
+                <button onClick={generateDraws} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: color }}>
                   {LIGHTNING} GENERATE DRAW
                 </button>
               )}
               {selectedTournament.isLocked && !selectedTournament.isPublished && (
                 <>
-                  <button onClick={handleResetDraw} style={{ ...s.btn, background: '#EF4444' }}>
+                  <button onClick={handleResetDraw} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#EF4444' }}>
                     {RESET} RESET DRAW
                   </button>
-                  <button onClick={handlePublishDraw} style={{ ...s.btn, background: '#10B981' }}>
+                  <button onClick={handlePublishDraw} style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#10B981' }}>
                     {PUBLISH} PUBLISH DRAW
                   </button>
                 </>
@@ -792,13 +797,13 @@ export default function BracketsView({ admin, color, initialTournamentId }) {
                 <>
                   <button
                     onClick={() => exportTournamentResultPDF(selectedTournament, matches)}
-                    style={{ ...s.btn, background: '#3B82F6' }}
+                    style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#3B82F6' }}
                   >
                     {PDF} DOWNLOAD PDF
                   </button>
                   <button
                     onClick={handleForceUnlock}
-                    style={{ ...s.btn, background: '#6B7280', fontSize: 11 }}
+                    style={{ ...s.btn, ...(isMobile ? s.mobileStatusAction : {}), background: '#6B7280', fontSize: 11 }}
                     title="Testing only — bypasses the publish safety rule"
                   >
                     {WARNING_ROUND} FORCE UNLOCK (TEST)
@@ -1108,6 +1113,7 @@ const s = {
   statusBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, padding: '16px 20px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)' },
   badge: { display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: 1 },
   btn: { border: 'none', color: '#FFF', padding: '12px 24px', borderRadius: 10, fontWeight: 900, cursor: 'pointer', fontSize: 13 },
+  mobileStatusAction: { flex: '1 1 120px', minWidth: 0, boxSizing: 'border-box', padding: '12px 8px', lineHeight: 1.2, textAlign: 'center' },
   matchCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', flexDirection: 'column' },
   matchLabel: { flex: '0 0 auto', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 0.5, marginBottom: 4, lineHeight: '12px' },
   playerRow: { flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },

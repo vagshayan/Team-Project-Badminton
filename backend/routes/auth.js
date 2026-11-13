@@ -8,7 +8,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { Admin, validatePasswordRequirements } = require('../models/Admin');
 const AuditLog = require('../models/AuditLog');
-const { protect, requireSuperAdmin } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
 const { validateUploadFile, validateFileMagicBytes } = require('../utils/fileValidator');
 const { sendVerificationEmail, sendPasswordResetOtpEmail, sendSecurityChangeEmail } = require('../utils/emailService');
@@ -367,71 +367,6 @@ router.put('/me/password', protect, async (req, res) => {
   }
 });
 
-// Get all admins
-router.get('/admins', protect, requireSuperAdmin, async (req, res) => {
-  try {
-    const admins = await Admin.find({ isDeleted: { $ne: true } }).select('id username email emailVerified name sport role securityQuestion');
-    res.json(admins);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Create admin 
-router.post('/create-admin', protect, requireSuperAdmin, async (req, res) => {
-  const { username, password, sport, name, securityQuestion, securityAnswer } = req.body;
-  try {
-    const existing = await Admin.findOne({ username });
-    if (existing) return res.status(400).json({ message: 'Username already exists' });
-
-    const admin = await Admin.create({ username, password, sport, name, securityQuestion, securityAnswer, role: 'admin' });
-    res.status(201).json({ id: admin._id, username: admin.username, name: admin.name, sport: admin.sport, role: admin.role });
-  } catch (err) {
-    res.status(400).json({ message: 'Failed to create admin' });
-  }
-});
-
-// Reset password
-router.post('/reset-password', protect, async (req, res) => {
-  const { currentPassword, newPassword, targetAdminId } = req.body;
-  try {
-    const currentAdmin = await Admin.findById(req.admin._id);
-    const isMatch = await currentAdmin.comparePassword(currentPassword);
-    if (!isMatch) return res.status(401).json({ message: 'Your current password is incorrect' });
-
-    const targetId = targetAdminId || req.admin._id;
-    const isSelfReset = targetId.toString() === req.admin._id.toString();
-
-    if (!isSelfReset && req.admin.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Forbidden: only a super-admin can reset another administrator password' });
-    }
-
-    const targetAdmin = await Admin.findById(targetId);
-    if (!targetAdmin) return res.status(404).json({ message: 'Target admin not found' });
-    targetAdmin.password = newPassword;
-    targetAdmin.passwordChangedAt = new Date();
-    await targetAdmin.save();
-
-    await logAdminAction({
-      adminId: req.admin._id,
-      action: 'RESET_ADMIN_PASSWORD',
-      targetId: targetAdmin._id,
-      targetModel: 'Admin',
-      details: {
-        targetAdminId: targetAdmin._id,
-        targetUsername: targetAdmin.username,
-        requestedBy: req.admin._id,
-        selfReset: isSelfReset,
-      },
-      req,
-    });
-
-    res.json({ message: `Password reset successful for ${targetAdmin.username}` });
-  } catch (err) {
-    res.status(400).json({ message: 'Password reset failed' });
-  }
-});
-
 // Request a password reset OTP by registered email.
 router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
@@ -556,58 +491,6 @@ router.post('/update-security-question', protect, async (req, res) => {
     res.json({ message: 'Security question updated successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Unable to update security question' });
-  }
-});
-
-// Delete Admin — password required
-router.delete('/delete/:id', protect, requireSuperAdmin, async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ message: 'Password is required to delete admin account' });
-  try {
-    const currentAdmin = await Admin.findById(req.admin._id);
-    if (!currentAdmin) return res.status(404).json({ message: 'Current admin not found' });
-
-    // Verify password
-    const isMatch = await currentAdmin.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
-
-    // Find admin to delete
-    const adminToDelete = await Admin.findById(req.params.id);
-    if (!adminToDelete) return res.status(404).json({ message: 'Admin not found' });
-
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        const existingAudit = await AuditLog.exists({ admin: adminToDelete._id }).session(session);
-        if (existingAudit) {
-          const error = new Error('This admin cannot be deleted because audit logs reference the account.');
-          error.statusCode = 409;
-          throw error;
-        }
-
-        await logAdminAction({
-          action: 'DELETE_ADMIN',
-          targetId: adminToDelete._id,
-          targetModel: 'Admin',
-          details: {
-            deletedAdminUsername: adminToDelete.username,
-            deletedAdminName: adminToDelete.name,
-            deletedAdminSport: adminToDelete.sport,
-            deletedBy: req.admin.username,
-          },
-          req,
-          session,
-        });
-
-        await Admin.deleteOne({ _id: adminToDelete._id }, { session });
-      });
-    } finally {
-      await session.endSession();
-    }
-
-    res.json({ message: `Admin ${adminToDelete.username} has been deleted successfully` });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ message: err.message });
   }
 });
 

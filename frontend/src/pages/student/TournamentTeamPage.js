@@ -65,39 +65,23 @@ export default function TournamentTeamPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '14px 32px',
+        padding: '14px 20px',
         background: 'var(--bg-panel)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button
-            onClick={() => navigate(`/${sportKey}`)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 12,
-              border: '1px solid var(--border)',
-              background: 'var(--bg-input)',
-              color: 'var(--text)',
-              fontWeight: 800,
-              fontSize: 13,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <span>{ARROW_LEFT}</span> Back to {meta.label}
-          </button>
-
-          <div
-            onClick={() => navigate('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-          >
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#FFF' }}>
-              {meta.icon}
-            </div>
-            <span style={{ fontWeight: 950, fontSize: 17, letterSpacing: -0.5 }}>UoJ SPORTS</span>
+      }} className="team-header-nav">
+        <div
+          onClick={() => navigate('/')}
+          className="brand-block team-header-brand"
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="brand-mark">
+            <img src="/logo.png" alt="University of Jaffna logo" />
+          </div>
+          <span className="brand-divider" aria-hidden="true" />
+          <div className="brand-name">
+            <span className="brand-university">University of Jaffna</span>
+            <span className="brand-line">Sports Tournament Manager</span>
           </div>
         </div>
 
@@ -127,7 +111,7 @@ export default function TournamentTeamPage() {
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }} className="team-header-controls">
           <div className="app-header-control-group">
             <HomeButton />
             <ThemeToggleButton />
@@ -156,6 +140,7 @@ export default function TournamentTeamPage() {
         <div className="mobile-dropdown-overlay" onClick={() => setMenuOpen(false)}>
           <div className="mobile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
             <HomeButton variant="menu" onNavigate={() => setMenuOpen(false)} />
+            <ThemeToggleButton variant="menu" onToggle={() => setMenuOpen(false)} />
             <button className="mobile-dropdown-item" onClick={() => { navigate(`/${sportKey}`); setMenuOpen(false); }}>
               {ARROW_LEFT} Back to {meta.label} Tournament
             </button>
@@ -170,6 +155,9 @@ export default function TournamentTeamPage() {
                 <span style={{ fontWeight: 800, fontSize: 15 }}>{SPORT_META[s].label} Team Members</span>
               </button>
             ))}
+            <button className="mobile-dropdown-item" onClick={() => { navigate('/admin/login'); setMenuOpen(false); }}>
+              ADMIN LOGIN
+            </button>
           </div>
         </div>
       )}

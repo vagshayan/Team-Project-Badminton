@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
 import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
+import SportIcon from '../../components/SportIcon';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -134,6 +135,7 @@ export default function LandingPage() {
             <div className="tournaments-grid">
               {SPORTS.map((sport) => {
                 const sportMeta = getSportMeta(sport.id, isDarkMode);
+                const iconColor = isDarkMode ? sportMeta.accent : sportMeta.color;
                 return (
                   <button
                     key={sport.id}
@@ -141,13 +143,15 @@ export default function LandingPage() {
                     style={{ "--accent": sportMeta.accent }}
                     onClick={() => navigate(sport.path)}
                   >
-                    <div className="tournament-icon">{sportMeta.icon}</div>
+                    <div className="tournament-icon" style={{ "--accent": sportMeta.accent }}>
+                      <SportIcon sportId={sport.id} accent={iconColor} size={64} strokeWidth={1.8} />
+                    </div>
                     <div className="tournament-card-body">
                       <div className="tournament-title">{sportMeta.label}</div>
                       <div className="tournament-count">
                         {openTournamentCounts[sport.id] || 0} Open Tournament{openTournamentCounts[sport.id] === 1 ? '' : 's'}
                       </div>
-                      <div className="tournament-link" style={{ color: sportMeta.color }}>
+                      <div className="tournament-link" style={{ color: sportMeta.accent }}>
                         View Tournaments {ARROW_RIGHT}
                       </div>
                     </div>
