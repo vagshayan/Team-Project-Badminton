@@ -1,16 +1,18 @@
 import React from 'react';
+import SportIcon from './SportIcon';
 import {
   ArrowLeft, ArrowRight, Bell as BellIcon, Building2, CalendarDays, Camera as CameraIcon,
-  Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleDot, Cloud as CloudIcon,
+  Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, Cloud as CloudIcon,
   Clipboard, Clock as ClockIcon, Crown as CrownIcon, Eye as EyeIcon, EyeOff, FileDown,
   Folder as FolderIcon, Gem, GitBranch, Globe, GraduationCap, Hourglass as HourglassIcon,
   IdCard as IdCardIcon, KeyRound, LockKeyhole, LogOut, Mail, MapPin, Medal as MedalIcon,
   Menu, Moon as MoonIcon, Pencil, Phone as PhoneIcon, RotateCcw, Search as SearchIcon,
-  Shield as ShieldIcon, Shirt, Star as StarIcon, Sun as SunIcon, Table2, Target as TargetIcon, TriangleAlert,
+  Shield as ShieldIcon, Shirt, Star as StarIcon, Sun as SunIcon, Target as TargetIcon, TriangleAlert,
   Trash2, TreeDeciduous, Trophy as TrophyIcon, UserRound, UsersRound, X, Zap,
 } from 'lucide-react';
 
-const icon = (Icon) => React.createElement(Icon, {
+const icon = (Icon, props = {}) => React.createElement(Icon, {
+  ...props,
   size: '1em',
   strokeWidth: 1.8,
   'aria-hidden': true,
@@ -64,9 +66,9 @@ export const TRASH = icon(Trash2);
 export const LIGHTNING = icon(Zap);
 export const CLIPBOARD = icon(Clipboard);
 export const STADIUM = icon(Building2);
-export const BADMINTON = icon(TrophyIcon);
-export const TABLE_TENNIS = icon(Table2);
-export const CARROM = icon(CircleDot);
+export const BADMINTON = icon(SportIcon, { sportId: 'badminton' });
+export const TABLE_TENNIS = icon(SportIcon, { sportId: 'table-tennis' });
+export const CARROM = icon(SportIcon, { sportId: 'carrom' });
 export const USER_ROUND = icon(UserRound);
 export const USERS_ROUND = icon(UsersRound);
 export const GRADUATION_CAP = icon(GraduationCap);
