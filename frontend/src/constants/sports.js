@@ -39,7 +39,8 @@ export const SPORT_META = SPORTS.reduce((meta, sport) => {
 }, {});
 
 export const getSportMeta = (sportId, isDarkMode = false) => {
-  const rawMeta = SPORT_META[sportId] || SPORT_META.badminton;
+  const rawMeta = sportId ? SPORT_META[sportId] : null;
+  if (!rawMeta) return null;
 
   return {
     ...rawMeta,
@@ -48,12 +49,14 @@ export const getSportMeta = (sportId, isDarkMode = false) => {
   };
 };
 
+
 export const getSportColor = (sportId, isDarkMode = false) => {
-  const meta = getSportMeta(sportId, isDarkMode);
+  const meta = getSportMeta(sportId, isDarkMode) || getSportMeta('badminton', isDarkMode);
   return meta.color;
 };
 
 export const getSportAccent = (sportId, isDarkMode = false) => {
-  const meta = getSportMeta(sportId, isDarkMode);
+  const meta = getSportMeta(sportId, isDarkMode) || getSportMeta('badminton', isDarkMode);
   return meta.accent;
 };
+
