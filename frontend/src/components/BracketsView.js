@@ -1094,11 +1094,7 @@ const spotlightS = {
 };
 
 const s = {
-<<<<<<< HEAD
   container: { padding: '32px', background: 'var(--bg)', borderRadius: '24px', border: '1px solid var(--border)' },
-=======
-  container: { padding: '40px 0' },
->>>>>>> origin/before-merged-update
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   title: { fontSize: 28, fontWeight: 950, margin: 0, letterSpacing: 1 },
   selectWrapper: { position: 'relative', minWidth: 380, zIndex: 999 },
