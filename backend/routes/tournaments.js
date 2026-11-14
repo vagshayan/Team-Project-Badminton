@@ -1078,6 +1078,17 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
       return res.status(400).json({ message: 'winnerId must be one of the two players in this match' });
     }
 
+    if (req.body.score1 !== undefined) match.score1 = Number(req.body.score1) || 0;
+    if (req.body.score2 !== undefined) match.score2 = Number(req.body.score2) || 0;
+    if (req.body.player1Stats) {
+      match.player1Stats = req.body.player1Stats;
+      match.statsEnteredByAdmin = true;
+    }
+    if (req.body.player2Stats) {
+      match.player2Stats = req.body.player2Stats;
+      match.statsEnteredByAdmin = true;
+    }
+
     match.winner = winnerId;
     match.isCompleted = true;
     await match.save();

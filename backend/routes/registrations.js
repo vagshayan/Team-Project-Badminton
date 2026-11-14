@@ -7,6 +7,7 @@ const { publicRegistrationLimiter, publicPartnerLookupLimiter } = require('../mi
 const { logAdminAction } = require('../utils/auditLogger');
 const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
 const crypto = require('crypto');
+
 const {
   sendRegistrationConfirmationEmail,
   sendRegistrationApprovedEmail,
@@ -16,6 +17,8 @@ const {
   sendPartnershipRejectedEmail,
   sendRegistrationCancellationEmail,
 } = require('../utils/emailService');
+
+const { ensurePlayerPass } = require('../utils/playerPass');
 
 // Admin - view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -815,7 +818,25 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       }
     }
 
+
     // ── Email Notifications (sent only after successful database save) ──
+    // Generate a player pass first so we can include the link in the email
+    let passUrl = null;
+    try {
+      const { token } = await ensurePlayerPass(targetSport, reg._id);
+      const frontendUrl = (
+        process.env.FRONTEND_URL ||
+        process.env.CLIENT_ORIGIN ||
+        req.get('origin') ||
+        ''
+      ).replace(/\/$/, '');
+      if (token) {
+        passUrl = `${frontendUrl}/pass/${encodeURIComponent(token)}`;
+      }
+    } catch (passErr) {
+      console.error('[PlayerPass] Pass creation warning:', passErr.message);
+    }
+
     sendRegistrationConfirmationEmail({
       email: reg.email,
       playerName: reg.playerName,
@@ -830,6 +851,7 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       tournamentDate: tournamentDoc.date,
       tournamentTime: tournamentDoc.time,
       venue: tournamentDoc.venue,
+      passUrl,
     }).catch((emailErr) => {
       console.error('[Notification] Registration confirmation email error:', emailErr.message);
     });
@@ -878,7 +900,8 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       }
     }
 
-    res.status(201).json(reg);
+    // Return registration details (pass link is sent via email only)
+    return res.status(201).json(reg.toObject());
   } catch (err) {
     if (err.code === 11000) {
       const dupKey = Object.keys(err.keyValue || {})[0];

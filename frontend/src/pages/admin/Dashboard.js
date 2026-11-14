@@ -5,13 +5,28 @@ import Cropper from 'react-easy-crop';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { SUN, MOON, EYE, EYE_OFF, LOCK, SEARCH, MENU_OPEN, MENU_CLOSE, CARET_UP, CARET_DOWN, TROPHY, TREE, PEOPLE, PHONE, EMAIL, ID_CARD, CALENDAR, LOCATION, TRASH, CLOSE, SUCCESS, WARNING_ROUND, ARROW_RIGHT, ARROW_LEFT, CHECK_MARK, CROSS, HOURGLASS, MEDAL, DOWNLOAD, CAMERA, USER_ROUND, SHIELD } from '../../components/Icons';
-import { Bell, LayoutDashboard, ClipboardCheck, Trophy as TrophyOutline, UsersRound, GitBranch, ClipboardList, UserRound, LogOut, Search } from 'lucide-react';
+import {
+  Bell,
+  LayoutDashboard,
+  ClipboardCheck,
+  Trophy as TrophyOutline,
+  UsersRound,
+  GitBranch,
+  ClipboardList,
+  UserRound,
+  LogOut,
+  Search,
+  BarChart3,
+  BadgeCheck
+} from 'lucide-react';
 import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
 import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
+import AdminPerformanceSearch from '../../components/performance/AdminPerformanceSearch';
+import PlayerPassManagement from '../../components/PlayerPassManagement';
 import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
 import SportIcon from '../../components/SportIcon';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
@@ -69,9 +84,11 @@ const AUDIT_MODULE_LABELS = {
 const VALID_ADMIN_TABS = new Set([
   'dashboard',
   'player-approvals',
+  'player-passes',
   'tournament-setup',
   'university-team',
   'brackets',
+  'player-performance',
   'audit-log',
   'profile',
   'confirmed-summary',
@@ -1143,9 +1160,11 @@ export default function Dashboard() {
           {[
             { id: 'dashboard', label: 'DASHBOARD VIEW', icon: LayoutDashboard },
             { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: ClipboardCheck },
+            { id: 'player-passes', label: 'PLAYER PASSES', icon: BadgeCheck },
             { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TrophyOutline },
             { id: 'university-team', label: 'UNIVERSITY TEAM', icon: UsersRound },
             { id: 'brackets', label: 'BRACKETS & DRAWS', icon: GitBranch },
+            { id: 'player-performance', label: 'PLAYER PERFORMANCE', icon: BarChart3 },
             { id: 'audit-log', label: 'AUDIT LOG', icon: ClipboardList },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -2123,6 +2142,8 @@ export default function Dashboard() {
             </div>
           )}
 
+          {activeTab === 'player-passes' && <PlayerPassManagement color={meta.color} />}
+
           {activeTab === 'tournament-setup' && (
             <div style={ds.section}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 40 }}>
@@ -2690,6 +2711,10 @@ export default function Dashboard() {
 
           {activeTab === 'brackets' && (
             <BracketsView admin={admin} color={meta.color} initialTournamentId={new URLSearchParams(location.search).get('tournamentId')} />
+          )}
+
+          {activeTab === 'player-performance' && (
+            <AdminPerformanceSearch />
           )}
         </main>
       </div>

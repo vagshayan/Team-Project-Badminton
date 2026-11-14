@@ -12,6 +12,9 @@ import CarromPage from './pages/student/CarromPage';
 import BracketsPage from './pages/student/BracketsPage';
 import UniversityTeamPublicPage from './pages/student/UniversityTeamPublicPage';
 import TournamentTeamPage from './pages/student/TournamentTeamPage';
+import PlayerPerformancePage from './pages/student/PlayerPerformancePage';
+import DigitalPassPage from './pages/student/DigitalPassPage';
+import MyPassLookupPage from './pages/student/MyPassLookupPage';
 
 import LandingPage from './pages/student/LandingPage';
 import GlobalBackground from './components/GlobalBackground';
@@ -46,6 +49,9 @@ function App() {
             <Route path="/results/:sport/team" element={<TournamentTeamPage />} />
             <Route path="/results/university-team" element={<UniversityTeamPublicPage />} />
             <Route path="/university-team" element={<UniversityTeamPublicPage />} />
+            <Route path="/admin/player-performance" element={<ProtectedRoute><PlayerPerformancePage /></ProtectedRoute>} />
+            <Route path="/admin/digital-pass/:token" element={<ProtectedRoute><DigitalPassPage /></ProtectedRoute>} />
+            <Route path="/pass/:token" element={<ProtectedRoute><DigitalPassPage /></ProtectedRoute>} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
