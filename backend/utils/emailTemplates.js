@@ -299,6 +299,7 @@ const renderRegistrationConfirmationEmail = ({
   tournamentTime,
   venue,
   portalUrl,
+  passUrl,
 }) => {
   const sportName = formatSport(sport);
   const catName = formatCategory(category);
@@ -367,6 +368,20 @@ const renderRegistrationConfirmationEmail = ({
       </table>
     </div>
 
+    ${passUrl ? `
+    <div style="background-color: #F0FDF4; border: 2px solid #86EFAC; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+      <div style="font-size: 28px; margin-bottom: 6px;">🎫</div>
+      <div style="font-size: 14px; font-weight: 800; color: #065F46; margin-bottom: 8px;">Your Digital Player Pass is Ready!</div>
+      <p style="font-size: 13px; color: #047857; margin: 0 0 16px 0;">
+        Your official digital player pass with QR code has been generated. Use the link below to access it.
+        This link is exclusive to your registered email — please do not share it publicly.
+      </p>
+      <a href="${passUrl}" class="btn btn-primary" style="font-size: 15px; padding: 14px 32px; background-color: #059669; color: #FFFFFF !important; text-decoration: none; display: inline-block; border-radius: 8px; font-weight: 700; border: 1px solid #047857;">
+        🎫 Open My Digital Player Pass
+      </a>
+    </div>
+    ` : ''}
+
     <div class="notice-box">
       <strong>Important Guidelines:</strong> Please report to the venue at least 30 minutes before your scheduled match with your official University Student Identity Card. Proper athletic attire and non-marking indoor sports shoes are required.
     </div>
@@ -400,7 +415,7 @@ EVENT SCHEDULE:
 - Venue: ${venue || 'University Gymnasium'}
 
 Please bring your University Student ID card to the venue.
-
+${passUrl ? `\nYOUR DIGITAL PLAYER PASS:\nAccess your official digital player pass with QR code here:\n${passUrl}\n` : ''}
 Regards,
 Department of Physical Education
 University of Jaffna

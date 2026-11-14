@@ -68,24 +68,6 @@ export default function LandingPage() {
               <HomeButton />
               <ThemeToggleButton />
             </div>
-            <button
-              style={{
-                background: 'rgba(59, 130, 246, 0.15)',
-                color: '#3b82f6',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-              onClick={() => navigate('/my-performance')}
-            >
-              My Performance
-            </button>
             <button className="admin-login-btn" onClick={() => navigate('/admin/login')}>
               Admin login
             </button>
@@ -107,26 +89,6 @@ export default function LandingPage() {
             {menuOpen && (
               <div className="menu-popover" role="menu">
                 <HomeButton variant="menu" onNavigate={() => setMenuOpen(false)} />
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigate('/my-pass');
-                  }}
-                  role="menuitem"
-                >
-                  My Digital Pass 🎫
-                </button>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigate('/my-performance');
-                  }}
-                  role="menuitem"
-                >
-                  My Performance
-                </button>
                 <button
                   className="menu-item"
                   onClick={() => {
@@ -156,28 +118,6 @@ export default function LandingPage() {
               <div className="hero-actions" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <button className="button-primary" onClick={() => navigate('/brackets')}>
                   View live brackets {ARROW_RIGHT}
-                </button>
-                <button
-                  className="button-primary"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.15)',
-                    color: '#3b82f6',
-                    border: '1px solid rgba(59, 130, 246, 0.35)',
-                  }}
-                  onClick={() => navigate('/my-pass')}
-                >
-                  My Digital Pass 🎫
-                </button>
-                <button
-                  className="button-primary"
-                  style={{
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#10b981',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                  }}
-                  onClick={() => navigate('/my-performance')}
-                >
-                  My Performance Analytics 📊
                 </button>
               </div>
             </div>

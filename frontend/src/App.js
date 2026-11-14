@@ -49,11 +49,9 @@ function App() {
             <Route path="/results/:sport/team" element={<TournamentTeamPage />} />
             <Route path="/results/university-team" element={<UniversityTeamPublicPage />} />
             <Route path="/university-team" element={<UniversityTeamPublicPage />} />
-            <Route path="/my-performance" element={<PlayerPerformancePage />} />
-            <Route path="/player/performance" element={<PlayerPerformancePage />} />
-            <Route path="/pass/:token" element={<DigitalPassPage />} />
-            <Route path="/my-pass" element={<MyPassLookupPage />} />
-            <Route path="/player/pass" element={<MyPassLookupPage />} />
+            <Route path="/admin/player-performance" element={<ProtectedRoute><PlayerPerformancePage /></ProtectedRoute>} />
+            <Route path="/admin/digital-pass/:token" element={<ProtectedRoute><DigitalPassPage /></ProtectedRoute>} />
+            <Route path="/pass/:token" element={<ProtectedRoute><DigitalPassPage /></ProtectedRoute>} />
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

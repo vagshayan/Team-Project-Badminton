@@ -204,6 +204,7 @@ const sendRegistrationConfirmationEmail = async ({
   tournamentDate,
   tournamentTime,
   venue,
+  passUrl,
 }) => {
   if (!email) return { success: false, error: 'No recipient email provided' };
 
@@ -222,6 +223,7 @@ const sendRegistrationConfirmationEmail = async ({
     tournamentTime,
     venue,
     portalUrl,
+    passUrl,
   });
 
   return await sendSafeMail({

@@ -123,7 +123,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [playerPassUrl, setPlayerPassUrl] = useState('');
+  // Pass link is now only sent via email, not shown in UI
   const [loading, setLoading] = useState(false);
   const [partnerLookup, setPartnerLookup] = useState(null);
   const [partnerLookupError, setPartnerLookupError] = useState('');
@@ -315,7 +315,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
           tournament: tournament._id,
           ...requestPayload,
         });
-        setPlayerPassUrl(response.data.passUrl || '');
+        // Pass URL is sent via email only, not displayed in UI
       }
       setSuccess(true);
     } catch (err) {
@@ -350,25 +350,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   A confirmation email has been sent to your registered email address.
 </div>
 
-{playerPassUrl && (
-  <>
-    <br />
-    <a
-      href={playerPassUrl}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        display: 'inline-block',
-        marginTop: 16,
-        color: sportColor,
-        fontWeight: 800,
-        textDecoration: 'underline'
-      }}
-    >
-      OPEN MY DIGITAL PLAYER PASS
-    </a>
-  </>
-)}
+
                </>
              )}
           </p>
