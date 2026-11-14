@@ -182,7 +182,7 @@ export default function DigitalPassPage() {
           <XCircle size={52} color="#ef4444" />
           <h2>Pass Unavailable</h2>
           <p>{error}</p>
-          <button onClick={() => navigate('/')}>Return to Home</button>
+          <button onClick={() => navigate('/admin/dashboard?tab=player-passes')}>Back to Player Passes</button>
         </div>
         <style>{`
           .dp-error-screen {
@@ -240,8 +240,8 @@ export default function DigitalPassPage() {
 
       {/* Top Navbar */}
       <nav className="dp-top-nav">
-        <button onClick={() => navigate('/')} className="dp-nav-home-btn">
-          <ArrowLeft size={16} /> Home
+        <button onClick={() => navigate('/admin/dashboard?tab=player-passes')} className="dp-nav-home-btn">
+          <ArrowLeft size={16} /> Back
         </button>
         <div className="dp-nav-title">
           <span className="dp-nav-badge">OFFICIAL VERIFIED BADGE</span>
