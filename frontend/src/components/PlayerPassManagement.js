@@ -299,18 +299,6 @@ export default function PlayerPassManagement({ color }) {
           />
         </div>
 
-        <div className="ppm-filter-tabs">
-          {SPORT_CONFIGS[adminSport] && (
-            <button
-              type="button"
-              className="ppm-tab active"
-              aria-current="true"
-              disabled
-            >
-              {SPORT_CONFIGS[adminSport].name}
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Passes Grid / List */}
