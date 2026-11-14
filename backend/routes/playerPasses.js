@@ -77,17 +77,22 @@ async function renderPassPdf(res, details, token, origin) {
 router.get('/admin', protect, async (req, res) => {
   try {
     const { sport: filterSport } = req.query;
-    const adminSport = req.admin.sport;
+    const adminSport = String(req.admin.sport || '').trim().toLowerCase();
     const isSuperAdmin = req.admin.role === 'super_admin';
+    const availableSports = ['badminton', 'table-tennis', 'carrom'];
+
+    if (!isSuperAdmin && !availableSports.includes(adminSport)) {
+      return res.status(403).json({ message: 'Your admin account must be assigned a sport to manage player passes.' });
+    }
 
     // Sports to query
     let sportsToQuery = [];
     if (isSuperAdmin) {
-      sportsToQuery = filterSport && ['badminton', 'table-tennis', 'carrom'].includes(filterSport)
+      sportsToQuery = filterSport && availableSports.includes(filterSport)
         ? [filterSport]
-        : ['badminton', 'table-tennis', 'carrom'];
+        : availableSports;
     } else {
-      sportsToQuery = adminSport ? [adminSport] : ['badminton', 'table-tennis', 'carrom'];
+      sportsToQuery = [adminSport];
     }
 
     const allRows = [];
