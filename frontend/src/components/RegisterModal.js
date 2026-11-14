@@ -346,7 +346,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
     gap: 6
   }}
 >
-  <span>✉️</span>
+
   A confirmation email has been sent to your registered email address.
 </div>
 
