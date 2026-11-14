@@ -7,6 +7,7 @@ const { publicRegistrationLimiter, publicPartnerLookupLimiter } = require('../mi
 const { logAdminAction } = require('../utils/auditLogger');
 const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
 const crypto = require('crypto');
+
 const {
   sendRegistrationConfirmationEmail,
   sendRegistrationApprovedEmail,
@@ -16,6 +17,8 @@ const {
   sendPartnershipRejectedEmail,
   sendRegistrationCancellationEmail,
 } = require('../utils/emailService');
+
+const { ensurePlayerPass } = require('../utils/playerPass');
 
 // Admin - view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
@@ -815,6 +818,7 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       }
     }
 
+
     // ── Email Notifications (sent only after successful database save) ──
     sendRegistrationConfirmationEmail({
       email: reg.email,
@@ -879,6 +883,25 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
     }
 
     res.status(201).json(reg);
+// Generate a player pass after successful registration
+const { token } = await ensurePlayerPass(targetSport, reg._id);
+
+const frontendUrl = (
+  process.env.FRONTEND_URL ||
+  process.env.CLIENT_ORIGIN ||
+  req.get('origin') ||
+  ''
+).replace(/\/$/, '');
+
+const passUrl = token
+  ? `${frontendUrl}/pass/${encodeURIComponent(token)}`
+  : null;
+
+// Return registration details and player pass URL
+res.status(201).json({
+  ...reg.toObject(),
+  passUrl,
+});
   } catch (err) {
     if (err.code === 11000) {
       const dupKey = Object.keys(err.keyValue || {})[0];

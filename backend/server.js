@@ -4,6 +4,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const dns = require('dns');
+
+// Load environment variables from backend/.env, root .env, or current directory
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 require('dotenv').config();
 
 try {
@@ -78,11 +82,15 @@ const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
 const universityTeamRoutes = require('./routes/universityTeam');
+const performanceRoutes = require('./routes/performance');
+const playerPassRoutes = require('./routes/playerPasses');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/university-team', universityTeamRoutes);
+app.use('/api/performance', performanceRoutes);
+app.use('/api/player-passes', playerPassRoutes);
 
 // Lightweight auth/me fallback: respond safely without touching DB
 // This prevents front-end 500 responses while the DB or models may be initializing.

@@ -123,6 +123,7 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [playerPassUrl, setPlayerPassUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [partnerLookup, setPartnerLookup] = useState(null);
   const [partnerLookupError, setPartnerLookupError] = useState('');
@@ -310,10 +311,11 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
       if (initialData) {
         await axios.put(`/api/registrations/${initialData._id}`, requestPayload);
       } else {
-        await axios.post('/api/registrations', {
+        const response = await axios.post('/api/registrations', {
           tournament: tournament._id,
           ...requestPayload,
         });
+        setPlayerPassUrl(response.data.passUrl || '');
       }
       setSuccess(true);
     } catch (err) {
@@ -333,9 +335,40 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                <>
                  You have successfully registered for:<br/>
                  <strong style={{ color: 'var(--text)' }}>{CAT_LABELS[tournament.category]}</strong>
-                 <div style={{ marginTop: 12, fontSize: 13, color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                   <span>✉️</span> A confirmation email has been sent to your registered email address.
-                 </div>
+<div
+  style={{
+    marginTop: 12,
+    fontSize: 13,
+    color: '#10B981',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6
+  }}
+>
+  <span>✉️</span>
+  A confirmation email has been sent to your registered email address.
+</div>
+
+{playerPassUrl && (
+  <>
+    <br />
+    <a
+      href={playerPassUrl}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: 'inline-block',
+        marginTop: 16,
+        color: sportColor,
+        fontWeight: 800,
+        textDecoration: 'underline'
+      }}
+    >
+      OPEN MY DIGITAL PLAYER PASS
+    </a>
+  </>
+)}
                </>
              )}
           </p>
