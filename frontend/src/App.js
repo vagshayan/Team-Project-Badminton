@@ -14,7 +14,6 @@ import UniversityTeamPublicPage from './pages/student/UniversityTeamPublicPage';
 import TournamentTeamPage from './pages/student/TournamentTeamPage';
 
 import LandingPage from './pages/student/LandingPage';
-
 import GlobalBackground from './components/GlobalBackground';
 
 function ProtectedRoute({ children }) {

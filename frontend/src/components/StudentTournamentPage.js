@@ -8,8 +8,8 @@ import { SPORT_META, getSportMeta } from '../constants/sports';
 import { HomeButton, ThemeToggleButton } from './HeaderControls';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles - Men', 'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men', 'doubles-women': 'Doubles - Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
 const SINGLES = ['singles-men', 'singles-women'];
@@ -35,7 +35,7 @@ function isMatchWinner(match, player) {
 }
 
 // ── Length-based font ladder + horizontal compression for very long names ──
-// Geometry (CARD_HEIGHT/COLUMN_WIDTH/etc) is untouched — this only affects
+// Geometry (CARD_HEIGHT/COLUMN_WIDTH/etc) is untouched - this only affects
 // how the name text itself is sized/rendered inside the existing box.
 function getNameStyle(name) {
   const len = name ? name.length : 0;
@@ -68,7 +68,7 @@ function getNameStyle(name) {
 }
 
 // ── Renders a player's name cell: truncated + shrunk to fit, with
-// hover title, aria-label, and tap/click/keyboard-to-reveal — but only
+// hover title, aria-label, and tap/click/keyboard-to-reveal - but only
 // for names long enough to actually risk truncation.
 function renderPlayerName(m, player, slot, getDisplayName, expandedName, setExpandedName) {
   if (!player) return <i style={{ color: '#555' }}>TBD</i>;
@@ -208,7 +208,7 @@ export default function StudentTournamentPage({ sport }) {
       setMatches(res.data);
     } catch (err) {
       if (err.response?.status === 404) {
-        // Silently ignore 404 during polling — bracket may have been unpublished
+        // Silently ignore 404 during polling - bracket may have been unpublished
       } else {
         console.error(err);
       }
@@ -231,7 +231,7 @@ export default function StudentTournamentPage({ sport }) {
     } finally { setBracketLoading(false); }
   };
 
-  // FR-5.3 — Auto-refresh bracket every 10 seconds while the modal is open
+  // FR-5.3 - Auto-refresh bracket every 10 seconds while the modal is open
   useEffect(() => {
     if (!viewBracketsFor) {
       if (pollingRef.current) {
@@ -267,7 +267,7 @@ export default function StudentTournamentPage({ sport }) {
   });
 
   // ── VERIFIED TIGHT-STACKING POSITION ALGORITHM ─────────
-  // Same fix proven on the admin BracketsView — every round (hidden +
+  // Same fix proven on the admin BracketsView - every round (hidden +
   // visible matches) gets an evenly-spaced position, so later rounds
   // always average from valid, non-compressed feeder positions.
   useLayoutEffect(() => {
@@ -426,7 +426,7 @@ export default function StudentTournamentPage({ sport }) {
             <span className="admin-full-text">ADMIN</span>
             <span className="admin-short-text">ADMIN</span>
           </button>
-          {/* Mobile hamburger button — last item, far right */}
+          {/* Mobile hamburger button - last item, far right */}
           <button
             className="hamburger-btn"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -900,6 +900,7 @@ export default function StudentTournamentPage({ sport }) {
 
 const bh = {
   overlay: { position: 'fixed', inset: 0, background: 'var(--bg)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 40 },
   card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 40, width: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: { position: 'relative', padding: '30px 50px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   close: { position: 'absolute', top: 15, right: 10, zIndex: 30, width: 44, height: 44, borderRadius: 999, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },

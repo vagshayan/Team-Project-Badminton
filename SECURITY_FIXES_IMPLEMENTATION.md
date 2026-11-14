@@ -121,7 +121,7 @@ router.post('/reset-forgot-password', resetPasswordLimiter, async (req, res) => 
   - `name` (display name)
   - `sport` (assigned sport)
   - `avatarUrl` (profile picture)
-  - `role` (admin|super_admin)
+  - `role` (admin)
 
 ### Code Change
 ```javascript

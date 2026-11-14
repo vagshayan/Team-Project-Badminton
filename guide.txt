@@ -51,7 +51,7 @@ app. Current Registered Domain Managers:
 5. 🔍 TROUBLESHOOTING
 ----------------------------------------------------------
 ❌ "500 Internal Server Error":
-   Check `backend/.env`—the database password must be correct.
+   Check `backend/.env`-the database password must be correct.
    
 ❌ "Bad Auth/Authentication Failed":
    Reset your database user password in MongoDB Atlas ->

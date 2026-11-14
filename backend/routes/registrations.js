@@ -17,7 +17,7 @@ const {
   sendRegistrationCancellationEmail,
 } = require('../utils/emailService');
 
-// Admin — view all registrations for the admin's sport
+// Admin - view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -251,7 +251,7 @@ router.patch('/:id/status', protect, async (req, res) => {
 });
 
 
-// Admin — update registration details
+// Admin - update registration details
 router.put('/:id', protect, async (req, res) => {
   const {
     playerName, nicNo, address, email, phone,
@@ -405,7 +405,7 @@ try {
 });
 
 
-// Admin — approve a pair (sets pairStatus: 'approved' on both players)
+// Admin - approve a pair (sets pairStatus: 'approved' on both players)
 router.patch('/:id/approve-pair', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
@@ -448,7 +448,7 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — reset an approved pair back to 'complete' so it can be re-approved
+// Admin - reset an approved pair back to 'complete' so it can be re-approved
 router.patch('/:id/reset-pair', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
@@ -483,7 +483,7 @@ router.patch('/:id/reset-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — remove a paired registration link completely
+// Admin - remove a paired registration link completely
 router.patch('/:id/remove-pair', protect, async (req, res) => {
   try {
     const { Registration, Pair } = getModelsForSport(req.admin.sport);
@@ -542,7 +542,7 @@ router.patch('/:id/remove-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — manually link two solo registrations as partners (bidirectional)
+// Admin - manually link two solo registrations as partners (bidirectional)
 router.patch('/:id/link-partner', protect, async (req, res) => {
   try {
     const { partnerId } = req.body;
@@ -622,7 +622,7 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
 });
 
 
-// Admin — view registrations for a tournament
+// Admin - view registrations for a tournament
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -641,7 +641,7 @@ router.get('/tournament/:tournamentId', protect, async (req, res) => {
   }
 });
 
-// Public — lookup registration by number within a tournament
+// Public - lookup registration by number within a tournament
 router.get('/lookup/:regNo?', publicPartnerLookupLimiter, async (req, res) => {
   const tournament = req.query.tournament;
   const regNo = req.params.regNo || req.query.regNo;
@@ -668,7 +668,7 @@ router.get('/lookup/:regNo?', publicPartnerLookupLimiter, async (req, res) => {
   }
 });
 
-// Public — student registers
+// Public - student registers
 router.post('/', publicRegistrationLimiter, async (req, res) => {
   const {
     tournament, playerName, nicNo, address, email, phone,

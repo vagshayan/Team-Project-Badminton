@@ -99,7 +99,7 @@ function getModelsForSport(sport) {
     Player = mongoose.model(pModelName, sPlayerSchema, `${prefix}players`);
   }
   
-    // 4. Pair Model — groups two registrations as a completed pair
+    // 4. Pair Model - groups two registrations as a completed pair
     let Pair;
     if (mongoose.models[pairModelName]) {
       Pair = mongoose.models[pairModelName];
