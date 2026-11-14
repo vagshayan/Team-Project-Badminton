@@ -333,6 +333,9 @@ export default function RegisterModal({ tournament, onClose, initialData = null 
                <>
                  You have successfully registered for:<br/>
                  <strong style={{ color: 'var(--text)' }}>{CAT_LABELS[tournament.category]}</strong>
+                 <div style={{ marginTop: 12, fontSize: 13, color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                   <span>✉️</span> A confirmation email has been sent to your registered email address.
+                 </div>
                </>
              )}
           </p>
