@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { useAuth } from '../context/AuthContext';
 import {
   CalendarClock,
   Download,
@@ -47,9 +48,10 @@ const SPORT_CONFIGS = {
 };
 
 export default function PlayerPassManagement({ color }) {
+  const { admin } = useAuth();
+  const adminSport = String(admin?.sport || '').trim().toLowerCase();
   const [passes, setPasses] = useState([]);
   const [query, setQuery] = useState('');
-  const [selectedSport, setSelectedSport] = useState('all');
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [scanResult, setScanResult] = useState(null);
@@ -124,10 +126,10 @@ export default function PlayerPassManagement({ color }) {
       const matchQuery = `${pass.player?.name || ''} ${pass.playerId || ''} ${pass.player?.email || ''}`
         .toLowerCase()
         .includes(query.trim().toLowerCase());
-      const matchSport = selectedSport === 'all' || pass.sport === selectedSport;
+      const matchSport = pass.sport === adminSport;
       return matchQuery && matchSport;
     });
-  }, [passes, query, selectedSport]);
+  }, [adminSport, passes, query]);
 
   const regenerate = async (pass) => {
     try {
@@ -298,15 +300,16 @@ export default function PlayerPassManagement({ color }) {
         </div>
 
         <div className="ppm-filter-tabs">
-          {['all', 'badminton', 'table-tennis', 'carrom'].map((s) => (
+          {SPORT_CONFIGS[adminSport] && (
             <button
-              key={s}
-              className={`ppm-tab ${selectedSport === s ? 'active' : ''}`}
-              onClick={() => setSelectedSport(s)}
+              type="button"
+              className="ppm-tab active"
+              aria-current="true"
+              disabled
             >
-              {s === 'all' ? 'All Sports' : SPORT_CONFIGS[s]?.name || s}
+              {SPORT_CONFIGS[adminSport].name}
             </button>
-          ))}
+          )}
         </div>
       </div>
 
