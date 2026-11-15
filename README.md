@@ -29,6 +29,13 @@ All team members must configure the backend with the same `MONGODB_URI` and data
 
 For Gmail, enable 2-Step Verification and create an App Password. Put the Gmail address in `SMTP_USER` and the 16-character App Password in `SMTP_PASS`. Do not use the normal Gmail account password.
 
+### Migrate existing admin roles
+Before deploying the single-admin-role version, normalize any previously promoted accounts to the regular admin role:
+```bash
+npm --prefix backend run migrate-admin-roles
+```
+The command connects to the database configured in `backend/.env` and changes legacy `super_admin` role values to `admin`. Back up the database before running it.
+
 ### 3. Setup Frontend
 ```bash
 cd frontend

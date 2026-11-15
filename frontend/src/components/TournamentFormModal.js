@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { CALENDAR, CLOSE, WARNING, CLOCK, HOURGLASS, LOCATION, KEY, MEDAL, SCHEDULE, EYE, EYE_OFF } from './Icons';
 
 const CATEGORIES = [
-  { value: 'singles-men',   label: 'Singles — Men' },
-  { value: 'singles-women', label: 'Singles — Women' },
-  { value: 'doubles-men',   label: 'Doubles — Men' },
-  { value: 'doubles-women', label: 'Doubles — Women' },
+  { value: 'singles-men',   label: 'Singles - Men' },
+  { value: 'singles-women', label: 'Singles - Women' },
+  { value: 'doubles-men',   label: 'Doubles - Men' },
+  { value: 'doubles-women', label: 'Doubles - Women' },
   { value: 'mixed-doubles', label: 'Mixed Doubles' },
 ];
 

@@ -2,8 +2,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles - Men', 'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men', 'doubles-women': 'Doubles - Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
 const DOUBLES_CATEGORIES = new Set(['doubles-men', 'doubles-women', 'mixed-doubles']);
@@ -137,12 +137,12 @@ export const exportFullPlayerReportPDF = (tournament, registrations) => {
 //   1. Group + sort matches by round.
 //   2. Assign stage-aware labels ("QF1", "SF2", "FINAL" instead of a
 //      flat "Match 4.1") globally, before any pagination, so a reader
-//      can tell what stage a card belongs to from the label alone —
+//      can tell what stage a card belongs to from the label alone -
 //      not just from which page it happens to land on.
 //   3. For each match, build wrapped text lines per side against a
 //      real measured width at a fixed, non-shrinking font size.
 //   4. Compute each match's card height directly from its own line
-//      count — no fixed constant, no shrinking.
+//      count - no fixed constant, no shrinking.
 //   5. Position every match (including hidden byes, for correct feeder
 //      centering) using the same tree algorithm as the admin bracket
 //      view, generalized to variable per-match heights.
@@ -152,8 +152,8 @@ export const exportFullPlayerReportPDF = (tournament, registrations) => {
 //      BEFORE drawing anything.
 //   8. Render cards. Where a match's next match falls on a *different*
 //      page than the match itself, draw a small in-card reference tag
-//      instead of a line that can't physically continue — "► p.3" on
-//      the feeding match, "◄ p.2" on the match it feeds into — so the
+//      instead of a line that can't physically continue - "► p.3" on
+//      the feeding match, "◄ p.2" on the match it feeds into - so the
 //      draw always reads as one continuous bracket even split across a
 //      printed booklet, the same way your reference photo's red arrow
 //      pointed from Match 3.2 to Match 4.1.
@@ -175,7 +175,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
 
   const isDoubles = DOUBLES_CATEGORIES.has(tournament.category);
 
-  // Fixed, non-shrinking layout constants — bracket size is handled via
+  // Fixed, non-shrinking layout constants - bracket size is handled via
   // pagination, never by making this text smaller.
   const FONT_SIZE = 8;
   const LINE_H = 3.6;
@@ -193,7 +193,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
   // inset by this amount instead of plain SIDE_PAD_X.
   const ACCENT_BAR_W = 1.3;
   const CONTENT_INSET = SIDE_PAD_X + ACCENT_BAR_W + 0.3;
-  // "Ghost" continuity stub — a compact, dashed, ~half-width preview of
+  // "Ghost" continuity stub - a compact, dashed, ~half-width preview of
   // a match that actually lives on a later page. Placed in whatever
   // trailing page space is left after the last real column, so a page
   // boundary never just dead-ends into blank space.
@@ -233,7 +233,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
       .sort((a, b) => a.matchNumber - b.matchNumber);
   });
 
-  // ── Text measurement + wrapping — real pixel width, not char counts ──
+  // ── Text measurement + wrapping - real pixel width, not char counts ──
   function textWidth(t) { return doc.getTextWidth(t); }
 
   function normalizeName(name) {
@@ -242,7 +242,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
 
   // Greedy word-wrap against a real measured width. Falls back to a
   // character-level split only for a single word that alone exceeds the
-  // available width (very rare) — every character is preserved, nothing
+  // available width (very rare) - every character is preserved, nothing
   // is ever silently dropped.
   function wrapWords(text, maxWidth) {
     const words = text.split(' ').filter(Boolean);
@@ -317,7 +317,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
   }
 
   // ── Stage-aware labels + colors ──
-  // "Remaining rounds until the final" drives both — the same rule
+  // "Remaining rounds until the final" drives both - the same rule
   // getRoundLabel already used for ROUND 1 / QUARTER FINALS / etc.
   // QF/SF/FINAL get short, unambiguous codes instead of a running
   // match number, and every stage gets a fixed accent color that's
@@ -334,10 +334,10 @@ export const exportTournamentResultPDF = (tournament, matches) => {
 
   function getRoundColor(roundIdx, total) {
     const remaining = total - roundIdx;
-    if (remaining === 1) return [181, 136, 18];   // gold — Final
-    if (remaining === 2) return [147, 51, 234];   // purple — Semi Final
-    if (remaining === 3) return [8, 145, 178];    // teal — Quarter Final
-    return [100, 116, 139];                        // slate — earlier rounds
+    if (remaining === 1) return [181, 136, 18];   // gold - Final
+    if (remaining === 2) return [147, 51, 234];   // purple - Semi Final
+    if (remaining === 3) return [8, 145, 178];    // teal - Quarter Final
+    return [100, 116, 139];                        // slate - earlier rounds
   }
 
   function getRoundLabel(roundIdx, total) {
@@ -348,7 +348,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     return `ROUND ${roundIdx + 1}`;
   }
 
-  // ── Match label + round index — position within its own round,
+  // ── Match label + round index - position within its own round,
   // computed once globally so numbering stays stable no matter how
   // pages split later. roundIdxOf covers every match (including hidden
   // byes) since later lookups (heightMap, markers) need it broadly. ──
@@ -358,7 +358,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     const abbrev = getRoundAbbrev(ri, roundNums.length);
     const list = visibleByRound[r] || [];
     list.forEach((m, i) => {
-      // Dot-separated so "R1.12" can never be misread as "match 112" —
+      // Dot-separated so "R1.12" can never be misread as "match 112" -
       // same convention applied to QF/SF ("QF.1", "SF.2") for consistency.
       matchLabelMap[m._id] = abbrev === 'FINAL'
         ? (list.length > 1 ? `FINAL.${i + 1}` : 'FINAL')
@@ -380,7 +380,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     roundGroups.push(roundNums.slice(i, i + maxColsPerPage));
   }
 
-  // ── Position algorithm — computed FRESH, per round-group. ──
+  // ── Position algorithm - computed FRESH, per round-group. ──
   // Every round-group starts its own independent, compact coordinate
   // system so a small later group (e.g. "Semi Finals + Final") always
   // gets its own tight layout regardless of how tall an earlier group
@@ -471,7 +471,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
 
   // ── Pre-pass: figure out exactly which page (and where on it) every
   // match will land, WITHOUT drawing anything yet. Everything downstream
-  // — cross-page reference tags, same-page connector lines — reads from
+  // - cross-page reference tags, same-page connector lines - reads from
   // this map instead of recomputing band/group logic a second time. ──
   const matchRenderInfo = {};
   pagesToRender.forEach((page, pageIdx) => {
@@ -513,7 +513,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
   });
 
   // Which page each page's last round is, and what targets it should
-  // preview — computed lazily per page inside the render loop below,
+  // preview - computed lazily per page inside the render loop below,
   // but the target-id set for the CURRENT page being drawn is tracked
   // here so drawCard (called earlier in the same page's render pass)
   // knows to skip its own fallback text tag for anything a stub will
@@ -593,7 +593,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.text(
-      `${(tournament.sport || '').toUpperCase()} ${tournament.year} — ${CAT_LABELS[tournament.category] || tournament.category} — DRAW SHEET`,
+      `${(tournament.sport || '').toUpperCase()} ${tournament.year} - ${CAT_LABELS[tournament.category] || tournament.category} - DRAW SHEET`,
       MARGIN, 10
     );
     doc.setFontSize(7);
@@ -607,11 +607,11 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     doc.setTextColor(150);
     doc.setFont('helvetica', 'normal');
     doc.text(
-      'Official Tournament Draw Sheet — University of Jaffna Sports Portal',
+      'Official Tournament Draw Sheet - University of Jaffna Sports Portal',
       MARGIN, PAGE_H - 2.5
     );
 
-    // Stage color legend — reuses the exact colors shown on round
+    // Stage color legend - reuses the exact colors shown on round
     // headers and card accent bars, so a reader can match a card's
     // color straight back to "which stage is this."
     const legend = [];
@@ -646,7 +646,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     doc.setFillColor(m.isCompleted ? 242 : 250, 250, 255);
     doc.roundedRect(x, y, COL_W, h, 0.8, 0.8, 'FD');
 
-    // Stage-color accent bar on the left edge — an immediate visual cue
+    // Stage-color accent bar on the left edge - an immediate visual cue
     // for which round this is, independent of reading any text at all.
     doc.setFillColor(rc[0], rc[1], rc[2]);
     doc.rect(x, y + 0.6, ACCENT_BAR_W, h - 1.2, 'F');
@@ -657,8 +657,8 @@ export const exportTournamentResultPDF = (tournament, matches) => {
     const labelText = matchLabelMap[m._id] || '';
     doc.text(labelText, x + CONTENT_INSET, y + 2.4);
 
-    // Incoming reference — this match receives a winner from a page
-    // other than its own. Plain ASCII '<' — Unicode arrow glyphs (◄/►)
+    // Incoming reference - this match receives a winner from a page
+    // other than its own. Plain ASCII '<' - Unicode arrow glyphs (◄/►)
     // aren't in Helvetica's WinAnsi encoding and render as garbage.
     const inc = incomingMarker[m._id];
     if (inc) {
@@ -670,7 +670,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
       doc.text(`< p.${pages}`, x + CONTENT_INSET + labelW + 2, y + 2.4);
     }
 
-    // Outgoing reference — only drawn as a text fallback when this
+    // Outgoing reference - only drawn as a text fallback when this
     // page had no room for a ghost stub column (see buildOutgoingStubs).
     // When a stub exists, it already shows this visually, so skip the
     // redundant text tag.
@@ -732,7 +732,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
   }
 
   // ── Render every page: header, colored round labels, cards. No
-  // connector lines yet — those need every page to already exist. ──
+  // connector lines yet - those need every page to already exist. ──
   pagesToRender.forEach((page, pageIdx) => {
     if (pageIdx > 0) doc.addPage();
     drawPageHeader(pageIdx, totalPages);
@@ -775,7 +775,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
 
     // Draw the ghost stub column + its connector lines. Source and stub
     // are on the same page by construction, so this is a normal same-
-    // pass draw — no page-jumping needed here.
+    // pass draw - no page-jumping needed here.
     if (stubs.length > 0) {
       const stubW = Math.min(availableForStub, COL_W * 0.55);
       const stubX = lastColRightEdge + STUB_GAP_X;
@@ -814,7 +814,7 @@ export const exportTournamentResultPDF = (tournament, matches) => {
   // ── Second pass: same-page connector lines. Runs after every page
   // already exists, using doc.setPage() to jump back and draw on the
   // correct page regardless of render order. Only pairs where BOTH the
-  // feeding match and the match it feeds into share a page get a line —
+  // feeding match and the match it feeds into share a page get a line -
   // cross-page pairs already have their "► p.N" / "◄ p.N" tags from the
   // render pass above. ──
   const samePageGroups = {};

@@ -4,7 +4,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "migrate-admin-roles": "node ../scripts/migrate_admin_roles.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -15,7 +16,9 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.3.1",
     "multer": "^2.2.0",
-    "nodemailer": "^10.0.10"
+    "nodemailer": "^10.0.10",
+    "pdfkit": "^0.20.2",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

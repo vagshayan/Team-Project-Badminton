@@ -7,6 +7,10 @@ const { getModelsForSport } = require('../models/SportModels');
 const Match = require('../models/Match');
 const { protect } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLogger');
+const {
+  sendScheduleUpdateBatchEmail,
+  sendDrawPublishedEmail,
+} = require('../utils/emailService');
 
 const SINGLES = ['singles-men', 'singles-women'];
 const CATEGORY_LABELS = {
@@ -209,7 +213,7 @@ function buildSeededOrder(players, championId, runnerUpId, bracketSize) {
       result[slot + 1] = null;
 
     } else {
-      // Middle slots — fighters first, then byeRest
+      // Middle slots - fighters first, then byeRest
       if (middleFighterPairsPlaced < middleFighterPairs) {
         result[slot] = fighters[fighterIdx++];
         result[slot + 1] = fighters[fighterIdx++];
@@ -334,14 +338,14 @@ router.get('/dashboard-summary', protect, async (req, res) => {
   }
 });
 
-// ─── PUBLIC — students view tournaments for REGISTRATION ──
+// ─── PUBLIC - students view tournaments for REGISTRATION ──
 router.get('/public/:sport', async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.params.sport);
     const tournaments = await Tournament.find({
       sport: req.params.sport,
       isActive: true,
-      // No isPublished filter — ALL active tournaments visible for registration
+      // No isPublished filter - ALL active tournaments visible for registration
     })
       .populate('createdBy', 'name')
       .sort({ date: 1 });
@@ -353,7 +357,7 @@ router.get('/public/:sport', async (req, res) => {
   }
 });
 
-// ─── PUBLIC — students view matches (no login needed) ────
+// ─── PUBLIC - students view matches (no login needed) ────
 router.get('/public/:tournamentId/matches', async (req, res) => {
   try {
     const { sport } = req.query;
@@ -383,7 +387,7 @@ router.get('/public/:tournamentId/matches', async (req, res) => {
   }
 });
 
-// ─── ADMIN — own sport tournaments ───────────────────────
+// ─── ADMIN - own sport tournaments ───────────────────────
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
@@ -396,7 +400,7 @@ router.get('/admin', protect, async (req, res) => {
   }
 });
 
-// ─── ADMIN — audit logs for current admin ─────────────────────
+// ─── ADMIN - audit logs for current admin ─────────────────────
 router.get('/audit-logs', protect, async (req, res) => {
   try {
     const { search, from, to, action } = req.query;
@@ -478,7 +482,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// ─── UPDATE — password required ──────────────────────────
+// ─── UPDATE - password required ──────────────────────────
 router.put('/:id', protect, async (req, res) => {
   const { password, year, date, time, venue, category, registrationDeadline } = req.body;
   try {
@@ -533,6 +537,71 @@ router.put('/:id', protect, async (req, res) => {
       },
       req
     });
+
+    // Detect what changed to notify affected registered participants
+    const changes = [];
+    const beforeDate = beforeValues.date ? new Date(beforeValues.date).toISOString().split('T')[0] : '';
+    const newDate = tournament.date ? new Date(tournament.date).toISOString().split('T')[0] : '';
+    if (beforeDate && newDate && beforeDate !== newDate) {
+      changes.push({
+        field: 'Event Date',
+        previous: new Date(beforeValues.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+        updated: new Date(tournament.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+      });
+    }
+
+    if (beforeValues.time && tournament.time && beforeValues.time.trim() !== tournament.time.trim()) {
+      changes.push({
+        field: 'Start Time',
+        previous: beforeValues.time,
+        updated: tournament.time,
+      });
+    }
+
+    if (beforeValues.venue && tournament.venue && beforeValues.venue.trim() !== tournament.venue.trim()) {
+      changes.push({
+        field: 'Venue',
+        previous: beforeValues.venue,
+        updated: tournament.venue,
+      });
+    }
+
+    const beforeDeadline = beforeValues.registrationDeadline ? new Date(beforeValues.registrationDeadline).toISOString().split('T')[0] : '';
+    const newDeadline = tournament.registrationDeadline ? new Date(tournament.registrationDeadline).toISOString().split('T')[0] : '';
+    if (beforeDeadline && newDeadline && beforeDeadline !== newDeadline) {
+      changes.push({
+        field: 'Registration Deadline',
+        previous: new Date(beforeValues.registrationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        updated: new Date(tournament.registrationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      });
+    }
+
+    if (changes.length > 0) {
+      // Find all registered participants for this specific tournament
+      const { Registration } = getModelsForSport(req.admin.sport);
+      const registeredParticipants = await Registration.find({
+        tournament: tournament._id,
+        status: { $in: ['pending', 'confirmed'] },
+      }).select('email playerName');
+
+      if (registeredParticipants.length > 0) {
+        sendScheduleUpdateBatchEmail({
+          participants: registeredParticipants,
+          sport: req.admin.sport,
+          category: tournament.category,
+          changes,
+          currentSchedule: {
+            date: tournament.date,
+            time: tournament.time,
+            venue: tournament.venue,
+            registrationDeadline: tournament.registrationDeadline,
+          },
+        }).catch((emailErr) => {
+          console.error('[Notification] Schedule update batch email error:', emailErr.message);
+        });
+      }
+    }
+
     res.json(tournament);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -567,7 +636,7 @@ router.delete('/:id/reset-draw', protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// ─── FORCE UNLOCK (testing only — bypasses publish safety) ─
+// ─── FORCE UNLOCK (testing only - bypasses publish safety) ─
 router.delete('/:id/force-unlock', protect, async (req, res) => {
   try {
     const { Tournament } = getModelsForSport(req.admin.sport);
@@ -595,7 +664,7 @@ router.delete('/:id/force-unlock', protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// ─── DELETE TOURNAMENT — password required ────────────────
+// ─── DELETE TOURNAMENT - password required ────────────────
 router.delete('/:id', protect, async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: 'Password is required to delete' });
@@ -666,7 +735,7 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
-// ─── GET MATCHES — admin ──────────────────────────────────
+// ─── GET MATCHES - admin ──────────────────────────────────
 router.get('/:id/matches', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -930,6 +999,29 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
       details: { category: tournament.category, year: tournament.year },
       req
     });
+
+    // Notify all confirmed participants that the official draw and bracket are published
+    const { Registration } = getModelsForSport(req.admin.sport);
+    const confirmedPlayers = await Registration.find({
+      tournament: tournament._id,
+      status: 'confirmed',
+    }).select('email playerName');
+
+    for (const player of confirmedPlayers) {
+      if (player.email) {
+        sendDrawPublishedEmail({
+          email: player.email,
+          playerName: player.playerName,
+          sport: req.admin.sport,
+          category: tournament.category,
+          tournamentDate: tournament.date,
+          venue: tournament.venue,
+        }).catch((err) => {
+          console.error(`[Notification] Draw publish email error for ${player.email}:`, err.message);
+        });
+      }
+    }
+
     res.json({ message: 'Draw published! Students can now see the bracket.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -940,7 +1032,7 @@ router.post('/:id/publish-draw', protect, async (req, res) => {
 router.put('/matches/:matchId/score', protect, async (req, res) => {
   try {
     const { score1, score2 } = req.body;
-    if (score1 === score2) return res.status(400).json({ message: 'Scores cannot be equal — there must be a winner' });
+    if (score1 === score2) return res.status(400).json({ message: 'Scores cannot be equal - there must be a winner' });
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ message: 'Match not found' });
     if (match.isCompleted) return res.status(400).json({ message: 'Match already completed' });
@@ -960,7 +1052,7 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });*/
-// ─── UPDATE MATCH RESULT (W/L only — no score numbers) ────
+// ─── UPDATE MATCH RESULT (W/L only - no score numbers) ────
 router.put('/matches/:matchId/score', protect, async (req, res) => {
   try {
     const { winnerId } = req.body;
@@ -984,6 +1076,17 @@ router.put('/matches/:matchId/score', protect, async (req, res) => {
 
     if (winnerStr !== p1Str && winnerStr !== p2Str) {
       return res.status(400).json({ message: 'winnerId must be one of the two players in this match' });
+    }
+
+    if (req.body.score1 !== undefined) match.score1 = Number(req.body.score1) || 0;
+    if (req.body.score2 !== undefined) match.score2 = Number(req.body.score2) || 0;
+    if (req.body.player1Stats) {
+      match.player1Stats = req.body.player1Stats;
+      match.statsEnteredByAdmin = true;
+    }
+    if (req.body.player2Stats) {
+      match.player2Stats = req.body.player2Stats;
+      match.statsEnteredByAdmin = true;
     }
 
     match.winner = winnerId;

@@ -6,8 +6,21 @@ const { protect } = require('../middleware/auth');
 const { publicRegistrationLimiter, publicPartnerLookupLimiter } = require('../middleware/rateLimiter');
 const { logAdminAction } = require('../utils/auditLogger');
 const { isPartnerCompatible, getPartnerCompatibilityError } = require('../utils/partnerCompatibility');
+const crypto = require('crypto');
 
-// Admin — view all registrations for the admin's sport
+const {
+  sendRegistrationConfirmationEmail,
+  sendRegistrationApprovedEmail,
+  sendRegistrationRejectedEmail,
+  sendPartnerSelectionEmail,
+  sendPartnershipConfirmedEmail,
+  sendPartnershipRejectedEmail,
+  sendRegistrationCancellationEmail,
+} = require('../utils/emailService');
+
+const { ensurePlayerPass } = require('../utils/playerPass');
+
+// Admin - view all registrations for the admin's sport
 router.get('/admin', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -88,6 +101,19 @@ router.patch('/:id/status', protect, async (req, res) => {
         req
       });
 
+      // 🔔 Send rejection email to participant
+      if (reg.email) {
+        sendRegistrationRejectedEmail({
+          email: reg.email,
+          playerName: reg.playerName,
+          rollNumber: reg.rollNumber,
+          sport: req.admin.sport,
+          category: reg.tournament?.category || '',
+          partnerName: reg.partnerName || '',
+          partnerRollNumber: reg.partnerRollNumber || '',
+        }).catch((err) => console.error('[Notification] Rejection email error:', err.message));
+      }
+
       return res.json({ message: 'Registration marked as rejected.' });
     }
 
@@ -147,6 +173,22 @@ router.patch('/:id/status', protect, async (req, res) => {
           { upsert: true, new: true }
         );
       }
+
+      // 🔔 Send approval email to participant
+      if (reg.email) {
+        sendRegistrationApprovedEmail({
+          email: reg.email,
+          playerName: reg.playerName,
+          rollNumber: reg.rollNumber,
+          sport: req.admin.sport,
+          category: reg.tournament?.category || '',
+          partnerName: reg.partnerName || '',
+          partnerRollNumber: reg.partnerRollNumber || '',
+          tournamentDate: reg.tournament?.date,
+          tournamentTime: reg.tournament?.time,
+          venue: reg.tournament?.venue,
+        }).catch((err) => console.error('[Notification] Approval email error:', err.message));
+      }
     } else if (status === 'pending') {
        // If changing from confirmed to pending, remove from Player table
        await Player.findOneAndUpdate(
@@ -193,6 +235,16 @@ router.patch('/:id/status', protect, async (req, res) => {
           const pt = await Player.findOne({ rollNumber: reg.partnerRollNumber });
           if (pt && pt.tournamentHistory.length === 0) await Player.deleteOne({ rollNumber: reg.partnerRollNumber });
        }
+
+       if (reg.email) {
+         sendRegistrationCancellationEmail({
+           email: reg.email,
+           playerName: reg.playerName,
+           rollNumber: reg.rollNumber,
+           sport: req.admin.sport,
+           category: reg.tournament?.category || '',
+         }).catch((err) => console.error('[Notification] Cancellation email error:', err.message));
+       }
     }
 
     res.json(reg);
@@ -202,7 +254,7 @@ router.patch('/:id/status', protect, async (req, res) => {
 });
 
 
-// Admin — update registration details
+// Admin - update registration details
 router.put('/:id', protect, async (req, res) => {
   const {
     playerName, nicNo, address, email, phone,
@@ -356,7 +408,7 @@ try {
 });
 
 
-// Admin — approve a pair (sets pairStatus: 'approved' on both players)
+// Admin - approve a pair (sets pairStatus: 'approved' on both players)
 router.patch('/:id/approve-pair', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
@@ -399,7 +451,7 @@ router.patch('/:id/approve-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — reset an approved pair back to 'complete' so it can be re-approved
+// Admin - reset an approved pair back to 'complete' so it can be re-approved
 router.patch('/:id/reset-pair', protect, async (req, res) => {
   try {
     const { Registration } = getModelsForSport(req.admin.sport);
@@ -434,7 +486,7 @@ router.patch('/:id/reset-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — remove a paired registration link completely
+// Admin - remove a paired registration link completely
 router.patch('/:id/remove-pair', protect, async (req, res) => {
   try {
     const { Registration, Pair } = getModelsForSport(req.admin.sport);
@@ -493,7 +545,7 @@ router.patch('/:id/remove-pair', protect, async (req, res) => {
   }
 });
 
-// Admin — manually link two solo registrations as partners (bidirectional)
+// Admin - manually link two solo registrations as partners (bidirectional)
 router.patch('/:id/link-partner', protect, async (req, res) => {
   try {
     const { partnerId } = req.body;
@@ -554,6 +606,17 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
       req
     });
 
+    sendPartnershipConfirmedEmail({
+      requesterEmail: reg.email,
+      requesterName: reg.playerName,
+      targetEmail: partner.email,
+      targetName: partner.playerName,
+      sport: req.admin.sport,
+      category: reg.tournament?.category || '',
+    }).catch((emailErr) => {
+      console.error('[Notification] Admin link-partner confirmation email error:', emailErr.message);
+    });
+
     res.json({ message: 'Players linked as partners successfully.' });
 
   } catch (err) {
@@ -562,7 +625,7 @@ router.patch('/:id/link-partner', protect, async (req, res) => {
 });
 
 
-// Admin — view registrations for a tournament
+// Admin - view registrations for a tournament
 router.get('/tournament/:tournamentId', protect, async (req, res) => {
   try {
     const { Tournament, Registration } = getModelsForSport(req.admin.sport);
@@ -581,7 +644,7 @@ router.get('/tournament/:tournamentId', protect, async (req, res) => {
   }
 });
 
-// Public — lookup registration by number within a tournament
+// Public - lookup registration by number within a tournament
 router.get('/lookup/:regNo?', publicPartnerLookupLimiter, async (req, res) => {
   const tournament = req.query.tournament;
   const regNo = req.params.regNo || req.query.regNo;
@@ -608,7 +671,7 @@ router.get('/lookup/:regNo?', publicPartnerLookupLimiter, async (req, res) => {
   }
 });
 
-// Public — student registers
+// Public - student registers
 router.post('/', publicRegistrationLimiter, async (req, res) => {
   const {
     tournament, playerName, nicNo, address, email, phone,
@@ -755,7 +818,90 @@ router.post('/', publicRegistrationLimiter, async (req, res) => {
       }
     }
 
-    res.status(201).json(reg);
+
+    // ── Email Notifications (sent only after successful database save) ──
+    // Generate a player pass first so we can include the link in the email
+    let passUrl = null;
+    try {
+      const { token } = await ensurePlayerPass(targetSport, reg._id);
+      const frontendUrl = (
+        process.env.FRONTEND_URL ||
+        process.env.CLIENT_ORIGIN ||
+        req.get('origin') ||
+        ''
+      ).replace(/\/$/, '');
+      if (token) {
+        passUrl = `${frontendUrl}/pass/${encodeURIComponent(token)}`;
+      }
+    } catch (passErr) {
+      console.error('[PlayerPass] Pass creation warning:', passErr.message);
+    }
+
+    sendRegistrationConfirmationEmail({
+      email: reg.email,
+      playerName: reg.playerName,
+      rollNumber: reg.rollNumber,
+      nicNo: reg.nicNo,
+      department: reg.department,
+      sport: targetSport,
+      category: tournamentDoc.category,
+      partnerName: reg.partnerName,
+      partnerRollNumber: reg.partnerRollNumber,
+      status: reg.status,
+      tournamentDate: tournamentDoc.date,
+      tournamentTime: tournamentDoc.time,
+      venue: tournamentDoc.venue,
+      passUrl,
+    }).catch((emailErr) => {
+      console.error('[Notification] Registration confirmation email error:', emailErr.message);
+    });
+
+    if (cleanedPartnerRoll && partnerRecord && partnerRecord.email) {
+      try {
+        const { PartnerRequest } = getModelsForSport(targetSport);
+        const confirmationToken = crypto.randomBytes(32).toString('hex');
+        
+        let partnerReqDoc = await PartnerRequest.findOne({
+          tournament: tournamentDoc._id,
+          requesterRegistration: reg._id,
+          targetRegistration: partnerRecord._id,
+        });
+
+        if (!partnerReqDoc) {
+          partnerReqDoc = await PartnerRequest.create({
+            tournament: tournamentDoc._id,
+            requesterRegistration: reg._id,
+            requesterRollNumber: reg.rollNumber,
+            targetRegistration: partnerRecord._id,
+            targetRollNumber: partnerRecord.rollNumber,
+            confirmationToken,
+            status: 'pending',
+            notificationSent: true,
+          });
+        }
+
+        sendPartnerSelectionEmail({
+          partnerEmail: partnerRecord.email,
+          partnerName: partnerRecord.playerName,
+          partnerRollNumber: partnerRecord.rollNumber,
+          requesterName: reg.playerName,
+          requesterRollNumber: reg.rollNumber,
+          sport: targetSport,
+          category: tournamentDoc.category,
+          tournamentDate: tournamentDoc.date,
+          venue: tournamentDoc.venue,
+          requestId: partnerReqDoc._id,
+          confirmationToken: partnerReqDoc.confirmationToken || confirmationToken,
+        }).catch((emailErr) => {
+          console.error('[Notification] Partner selection notification email error:', emailErr.message);
+        });
+      } catch (partnerNotifErr) {
+        console.error('[Notification] Failed to create partner request / notify partner:', partnerNotifErr.message);
+      }
+    }
+
+    // Return registration details (pass link is sent via email only)
+    return res.status(201).json(reg.toObject());
   } catch (err) {
     if (err.code === 11000) {
       const dupKey = Object.keys(err.keyValue || {})[0];
@@ -799,7 +945,36 @@ router.post('/find-partner', publicRegistrationLimiter, async (req, res) => {
     const existing = await PartnerRequest.findOne({ tournament, requesterRegistration: a._id, status: 'pending' });
     if (existing) return res.status(400).json({ message: 'You already have an active pending request.' });
 
-    const reqDoc = await PartnerRequest.create({ tournament, requesterRegistration: a._id, requesterRollNumber: yourRollNumber, targetRegistration: b._id, targetRollNumber: partnerRollNumber });
+    const confirmationToken = crypto.randomBytes(32).toString('hex');
+    const reqDoc = await PartnerRequest.create({
+      tournament,
+      requesterRegistration: a._id,
+      requesterRollNumber: yourRollNumber,
+      targetRegistration: b._id,
+      targetRollNumber: partnerRollNumber,
+      confirmationToken,
+      notificationSent: true,
+      status: 'pending',
+    });
+
+    if (b.email) {
+      sendPartnerSelectionEmail({
+        partnerEmail: b.email,
+        partnerName: b.playerName,
+        partnerRollNumber: b.rollNumber,
+        requesterName: a.playerName,
+        requesterRollNumber: a.rollNumber,
+        sport: targetSport,
+        category: tournamentDoc.category,
+        tournamentDate: tournamentDoc.date,
+        venue: tournamentDoc.venue,
+        requestId: reqDoc._id,
+        confirmationToken,
+      }).catch((emailErr) => {
+        console.error('[Notification] Find-partner email dispatch error:', emailErr.message);
+      });
+    }
+
     return res.json({ message: 'Partner request sent.', request: reqDoc });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -937,6 +1112,17 @@ router.post('/partner-requests/:id/accept', async (req, res) => {
     found.status = 'accepted'; await found.save();
     await PartnerRequest.updateMany({ tournament: found.tournament, $or: [ { requesterRegistration: requester._id }, { targetRegistration: requester._id }, { requesterRegistration: target._id }, { targetRegistration: target._id } ], status: 'pending' }, { status: 'rejected' });
 
+    sendPartnershipConfirmedEmail({
+      requesterEmail: requester.email,
+      requesterName: requester.playerName,
+      targetEmail: target.email,
+      targetName: target.playerName,
+      sport: tournamentSport,
+      category: tournamentDoc.category,
+    }).catch((emailErr) => {
+      console.error('[Notification] Partner accept confirmation email error:', emailErr.message);
+    });
+
     return res.json({ message: 'Partner request accepted and pair created.', pair });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -957,9 +1143,281 @@ router.post('/partner-requests/:id/reject', async (req, res) => {
     if (!found) return res.status(404).json({ message: 'Partner request not found.' });
     if (found.status !== 'pending') return res.status(400).json({ message: 'Request is not pending.' });
     found.status = 'rejected'; await found.save();
+
+    let requesterReg = null;
+    let tournamentSport = null;
+    let tournamentDoc = null;
+    for (const s of sports) {
+      const { Registration, Tournament } = getModelsForSport(s);
+      const reg = await Registration.findById(found.requesterRegistration);
+      if (reg) {
+        requesterReg = reg;
+        tournamentSport = s;
+        tournamentDoc = await Tournament.findById(found.tournament);
+        break;
+      }
+    }
+
+    if (requesterReg && requesterReg.email) {
+      sendPartnershipRejectedEmail({
+        requesterEmail: requesterReg.email,
+        requesterName: requesterReg.playerName,
+        targetName: found.targetRollNumber,
+        sport: tournamentSport || '',
+        category: tournamentDoc?.category || '',
+      }).catch((emailErr) => {
+        console.error('[Notification] Partner reject email error:', emailErr.message);
+      });
+    }
+
     return res.json({ message: 'Partner request rejected.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// Direct link response for email action buttons (Accept / Reject)
+router.get('/partner-requests/:id/respond', async (req, res) => {
+  const { id } = req.params;
+  const { action, token } = req.query;
+
+  const getPortalUrl = (sport = '') => {
+    const base = process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+    return sport ? `${base}/${sport.toLowerCase()}` : base;
+  };
+
+  const renderResponsePage = ({ title, heading, message, isSuccess, sport }) => `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title} - University of Jaffna Sports</title>
+      <style>
+        body {
+          margin: 0; padding: 0;
+          background: #0B192C; color: #F8FAFC;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        }
+        .card {
+          background: #1E293B; border: 1px solid #334155; border-radius: 20px;
+          padding: 40px; max-width: 520px; width: 90%; text-align: center;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .icon { font-size: 54px; margin-bottom: 16px; }
+        h1 { font-size: 24px; font-weight: 800; margin: 0 0 12px 0; color: ${isSuccess ? '#10B981' : '#F59E0B'}; }
+        p { font-size: 15px; color: #94A3B8; line-height: 1.6; margin: 0 0 24px 0; }
+        .btn {
+          display: inline-block; background: #3B82F6; color: #FFF;
+          padding: 12px 28px; border-radius: 10px; text-decoration: none;
+          font-weight: 700; font-size: 14px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="icon">${isSuccess ? '🏆' : 'ℹ️'}</div>
+        <h1>${heading}</h1>
+        <p>${message}</p>
+        <a href="${getPortalUrl(sport)}" class="btn">Open Tournament Portal</a>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const mongoose = require('mongoose');
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).send(renderResponsePage({
+      title: 'Not Found',
+      heading: 'Request Not Found',
+      message: 'This partner request could not be located or may have been deleted.',
+      isSuccess: false,
+    }));
+  }
+
+  try {
+    const sports = ['badminton', 'table-tennis', 'carrom'];
+    let found = null;
+    let models = null;
+    let targetSport = null;
+
+    for (const s of sports) {
+      const currentModels = getModelsForSport(s);
+      const r = await currentModels.PartnerRequest.findById(id);
+      if (r) {
+        found = r;
+        models = currentModels;
+        targetSport = s;
+        break;
+      }
+    }
+
+    if (!found) {
+      return res.status(404).send(renderResponsePage({
+        title: 'Not Found',
+        heading: 'Request Not Found',
+        message: 'This partner request could not be located or may have been deleted.',
+        isSuccess: false,
+      }));
+    }
+
+    if (found.confirmationToken && token && found.confirmationToken !== token) {
+      return res.status(403).send(renderResponsePage({
+        title: 'Invalid Link',
+        heading: 'Invalid Confirmation Link',
+        message: 'The security verification token for this action link is invalid.',
+        isSuccess: false,
+      }));
+    }
+
+    if (found.status !== 'pending') {
+      return res.send(renderResponsePage({
+        title: 'Already Processed',
+        heading: `Request Already ${found.status.toUpperCase()}`,
+        message: `This partnership request has already been ${found.status}. No further action is required.`,
+        isSuccess: found.status === 'accepted',
+        sport: targetSport,
+      }));
+    }
+
+    if (action === 'reject') {
+      found.status = 'rejected';
+      await found.save();
+
+      const requester = await models.Registration.findById(found.requesterRegistration);
+      const tournamentDoc = await models.Tournament.findById(found.tournament);
+
+      if (requester && requester.email) {
+        sendPartnershipRejectedEmail({
+          requesterEmail: requester.email,
+          requesterName: requester.playerName,
+          targetName: found.targetRollNumber,
+          sport: targetSport,
+          category: tournamentDoc?.category || '',
+        }).catch((err) => console.error('[Notification] Error sending reject email:', err.message));
+      }
+
+      return res.send(renderResponsePage({
+        title: 'Request Declined',
+        heading: 'Partner Request Declined',
+        message: 'You have declined this partnership invitation. Your player status has been returned to the available pool.',
+        isSuccess: false,
+        sport: targetSport,
+      }));
+    }
+
+    if (action === 'accept') {
+      const requester = await models.Registration.findById(found.requesterRegistration);
+      const target = await models.Registration.findById(found.targetRegistration);
+
+      if (!requester || !target) {
+        return res.status(404).send(renderResponsePage({
+          title: 'Error',
+          heading: 'Registration Missing',
+          message: 'One of the participant registrations could not be found.',
+          isSuccess: false,
+        }));
+      }
+
+      if (requester.pairStatus === 'complete' || target.pairStatus === 'complete') {
+        return res.status(400).send(renderResponsePage({
+          title: 'Already Paired',
+          heading: 'Player Already Paired',
+          message: 'One of the players has already finalized another partnership.',
+          isSuccess: false,
+          sport: targetSport,
+        }));
+      }
+
+      const tournamentDoc = await models.Tournament.findById(found.tournament);
+      const category = (tournamentDoc?.category || '').toLowerCase();
+      const compatibilityError = getPartnerCompatibilityError(category, requester.gender, target.gender);
+      if (compatibilityError) {
+        return res.status(400).send(renderResponsePage({
+          title: 'Compatibility Conflict',
+          heading: 'Category Incompatible',
+          message: compatibilityError,
+          isSuccess: false,
+          sport: targetSport,
+        }));
+      }
+
+      // Create pair & update statuses
+      const pair = await models.Pair.create({
+        tournament: found.tournament,
+        players: [requester._id, target._id],
+      });
+
+      const pairInitiatedAt = found.createdAt || new Date();
+      requester.partnerName = target.playerName;
+      requester.partnerRollNumber = target.rollNumber;
+      requester.pairInitiatedByRollNumber = requester.rollNumber;
+      requester.pairInitiatedAt = pairInitiatedAt;
+      requester.partnerStatus = 'paired';
+      requester.pairStatus = 'complete';
+      requester.pairId = pair._id;
+
+      target.partnerName = requester.playerName;
+      target.partnerRollNumber = requester.rollNumber;
+      target.pairInitiatedByRollNumber = requester.rollNumber;
+      target.pairInitiatedAt = pairInitiatedAt;
+      target.partnerStatus = 'paired';
+      target.pairStatus = 'complete';
+      target.pairId = pair._id;
+
+      await requester.save();
+      await target.save();
+
+      found.status = 'accepted';
+      await found.save();
+
+      await models.PartnerRequest.updateMany(
+        {
+          tournament: found.tournament,
+          $or: [
+            { requesterRegistration: requester._id },
+            { targetRegistration: requester._id },
+            { requesterRegistration: target._id },
+            { targetRegistration: target._id },
+          ],
+          status: 'pending',
+        },
+        { status: 'rejected' }
+      );
+
+      sendPartnershipConfirmedEmail({
+        requesterEmail: requester.email,
+        requesterName: requester.playerName,
+        targetEmail: target.email,
+        targetName: target.playerName,
+        sport: targetSport,
+        category: tournamentDoc?.category || '',
+      }).catch((emailErr) => console.error('[Notification] Email respond confirmation error:', emailErr.message));
+
+      return res.send(renderResponsePage({
+        title: 'Partnership Confirmed',
+        heading: '🎉 Partnership Confirmed!',
+        message: `You and ${requester.playerName} (${requester.rollNumber}) are now officially paired for ${tournamentDoc?.category ? tournamentDoc.category.replace(/-/g, ' ') : 'doubles'}. Good luck in the tournament!`,
+        isSuccess: true,
+        sport: targetSport,
+      }));
+    }
+
+    return res.status(400).send(renderResponsePage({
+      title: 'Invalid Action',
+      heading: 'Invalid Request Action',
+      message: 'The requested partnership action could not be identified.',
+      isSuccess: false,
+    }));
+  } catch (err) {
+    console.error('Direct link respond error:', err);
+    res.status(500).send(renderResponsePage({
+      title: 'Server Error',
+      heading: 'Server Error',
+      message: 'An unexpected error occurred while processing your request.',
+      isSuccess: false,
+    }));
   }
 });
 

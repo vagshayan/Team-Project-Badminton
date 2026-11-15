@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import homeBgDark from '../assets/home-bg-dark.jpg';
-import homeBgLight from '../assets/home-bg-light.jpg';
+import homeBgLight from '../assets/home-bg-light1.jpg';
 
 export default function GlobalBackground() {
   const { isDarkMode } = useTheme();

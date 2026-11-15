@@ -2,7 +2,7 @@ from pathlib import Path
 path = Path('backend/routes/registrations.js')
 text = path.read_text(encoding='utf-8')
 start = text.find('//   try {')
-end = text.find('// Admin — approve a pair', start)
+end = text.find('// Admin - approve a pair', start)
 if start == -1 or end == -1:
     raise SystemExit(f'Could not find replacement boundaries: start={start} end={end}')
 new_block = '''  try {

@@ -44,6 +44,7 @@ body.light-mode .landing-hero-page {
   background-color: transparent;
 }
 
+
 .landing-inner {
   position: relative;
   z-index: 2;
@@ -92,6 +93,28 @@ body.light-mode .landing-header {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.team-header-brand {
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.team-header-brand .brand-mark {
+  width: 48px;
+  height: 48px;
+}
+
+.team-header-brand .brand-divider {
+  height: 32px;
+}
+
+.team-header-brand .brand-university {
+  font-size: 16px;
+}
+
+.team-header-brand .brand-line {
+  font-size: 10px;
 }
 
 .brand-mark {
@@ -196,7 +219,7 @@ body.light-mode .brand-line {
   position: absolute;
   top: 54px;
   right: 0;
-  background: var(--landing-card-bg);
+  background: var(--landing-bg-soft);
   border: 1px solid var(--landing-border);
   padding: 8px;
   border-radius: 12px;
@@ -275,6 +298,10 @@ body.light-mode .brand-line {
   letter-spacing: 1.8px;
   text-transform: uppercase;
   margin-bottom: 20px;
+}
+
+body.light-mode .hero-badge {
+  color: #161301;
 }
 
 .hero-badge::before {
@@ -447,7 +474,10 @@ body.light-mode .visual-circle-small {
 .tournament-card {
   position: relative;
   overflow: hidden;
-
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--landing-border));
+  background: var(--landing-card-bg);
+  padding: 28px;
   border-radius: 24px;
   border: 1px solid var(--landing-border);
   background: rgba(16, 22, 34, 0.72);
@@ -455,9 +485,12 @@ body.light-mode .visual-circle-small {
   -webkit-backdrop-filter: blur(16px);
   padding: 32px;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 220px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 22px;
+  min-height: 176px;
+  min-width: 0;
   box-sizing: border-box;
   text-align: left;
   transition: transform 0.25s ease,
@@ -509,18 +542,27 @@ body.light-mode .tournament-card:hover {
 }
 
 .tournament-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  background: var(--landing-surface);
-  border: 1px solid var(--landing-border);
+  width: 80px;
+  height: 80px;
+  flex: 0 0 80px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: #101722;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
   display: grid;
   place-items: center;
-  font-size: 26px;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 20%, transparent), inset 0 0 18px rgba(255,255,255,0.025);
+}
+
+.tournament-icon svg {
+  display: block;
+  width: 64px;
+  height: 64px;
 }
 
 body.light-mode .tournament-icon {
-  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.1);
+  background: color-mix(in srgb, var(--accent) 16%, #ffffff);
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.1), 0 0 20px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .tournament-meta {
@@ -541,13 +583,15 @@ body.light-mode .tournament-icon {
 }
 
 .tournament-card-body {
-  margin-bottom: 24px;
+  flex: 1;
+  min-width: 0;
 }
 
 .tournament-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--landing-text);
+  overflow-wrap: anywhere;
 }
 
 .tournament-count {
@@ -558,11 +602,14 @@ body.light-mode .tournament-icon {
 }
 
 .tournament-link {
-  font-size: 19px;
+  margin-top: 16px;
+  font-size: 16px;
   font-weight: 700;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  gap: 6px;
+  overflow-wrap: anywhere;
 }
 
 /* Footer spanning full width */
@@ -609,9 +656,78 @@ body.light-mode .tournament-icon {
   .tournaments-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .tournament-card {
+    gap: 16px;
+    padding: 22px;
+  }
+
+  .tournament-icon {
+    width: 72px;
+    height: 72px;
+    flex-basis: 72px;
+    border-radius: 18px;
+  }
+
+  .tournament-icon svg {
+    width: 58px;
+    height: 58px;
+  }
 }
 
 @media (max-width: 768px) {
+
+  .team-header-nav {
+    padding: 10px 12px !important;
+    gap: 8px;
+  }
+
+  .team-header-brand {
+    flex: 1 1 auto;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .team-header-brand .brand-name {
+    min-width: 0;
+  }
+
+  .team-header-brand .brand-university,
+  .team-header-brand .brand-line {
+    white-space: nowrap;
+  }
+
+  .team-header-controls {
+    flex-shrink: 0;
+    gap: 0 !important;
+  }
+
+  .team-header-controls > .app-header-control-group,
+  .team-header-controls > button:not(.hamburger-btn) {
+    display: none !important;
+  }
+
+  .team-header-brand {
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .team-header-brand .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .team-header-brand .brand-divider {
+    display: none;
+  }
+
+  .team-header-brand .brand-university {
+    font-size: 14px;
+  }
+
+  .team-header-brand .brand-line {
+    font-size: 9px;
+  }
 
   .landing-inner {
     padding: 0 16px;
@@ -629,15 +745,14 @@ body.light-mode .tournament-icon {
     justify-content: space-between;
 
     padding: 20px 16px;
-
     background: rgba(10, 14, 23, 0.75);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-
+    background: var(--landing-bg);
+    border-bottom: none;
     z-index: 1000;
   }
-
   body.light-mode .landing-header {
     background: rgba(244, 246, 251, 0.85);
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -688,6 +803,40 @@ body.light-mode .tournament-icon {
     gap: 18px;
   }
 
+  .tournament-card {
+    gap: 14px;
+    min-height: 144px;
+    padding: 18px;
+  }
+
+  .tournament-icon {
+    width: 68px;
+    height: 68px;
+    flex-basis: 68px;
+    border-radius: 16px;
+  }
+
+  .tournament-icon svg {
+    width: 54px;
+    height: 54px;
+  }
+
+  .tournament-title {
+    font-size: 19px;
+    line-height: 1.2;
+  }
+
+  .tournament-count {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .tournament-link {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
   .open-tournaments {
     margin-bottom: 40px;
   }
@@ -727,6 +876,53 @@ body.light-mode .tournament-icon {
 
   .hero-visual {
     display: none;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .team-header-nav {
+    padding: 10px 16px !important;
+    gap: 8px;
+  }
+
+  .team-header-brand {
+    gap: 6px;
+  }
+
+  .team-header-brand .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .team-header-brand .brand-divider {
+    display: none;
+  }
+
+  .team-header-brand .brand-university {
+    font-size: 14px;
+  }
+
+  .team-header-brand .brand-line {
+    font-size: 9px;
+  }
+
+  .team-header-nav .desktop-sport-switcher {
+    gap: 2px !important;
+  }
+
+  .team-header-nav .desktop-sport-switcher button {
+    padding: 6px 7px !important;
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+
+  .team-header-controls {
+    gap: 6px !important;
+  }
+
+  .team-header-controls > button:not(.hamburger-btn) {
+    padding: 7px 10px !important;
+    font-size: 11px !important;
   }
 }
 

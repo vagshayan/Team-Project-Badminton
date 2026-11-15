@@ -4,6 +4,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const dns = require('dns');
+
+// Load environment variables from backend/.env, root .env, or current directory
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 require('dotenv').config();
 
 try {
@@ -11,6 +15,9 @@ try {
 } catch (e) {
   // Ignore if custom DNS server cannot be configured
 }
+
+
+
 process.on('uncaughtException', (err) => {
   console.error('🔥 Uncaught Exception:', err);
   process.exit(1);
@@ -73,11 +80,15 @@ const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
 const universityTeamRoutes = require('./routes/universityTeam');
+const performanceRoutes = require('./routes/performance');
+const playerPassRoutes = require('./routes/playerPasses');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/university-team', universityTeamRoutes);
+app.use('/api/performance', performanceRoutes);
+app.use('/api/player-passes', playerPassRoutes);
 
 // Lightweight auth/me fallback: respond safely without touching DB
 // This prevents front-end 500 responses while the DB or models may be initializing.
@@ -136,7 +147,7 @@ const startServer = async () => {
         const docs = await Tournament.find({ registrationDeadline: { $exists: false } });
         for (const doc of docs) {
           doc.registrationDeadline = doc.date;
-          await doc.save();
+          await doc.save({ validateBeforeSave: false });
         }
         if (docs.length > 0) {
           console.log(`📡 Migrated ${docs.length} ${sport} tournaments`);
@@ -147,7 +158,7 @@ const startServer = async () => {
       const standaloneDocs = await StandaloneTournament.find({ registrationDeadline: { $exists: false } });
       for (const doc of standaloneDocs) {
         doc.registrationDeadline = doc.date;
-        await doc.save();
+        await doc.save({ validateBeforeSave: false });
       }
       if (standaloneDocs.length > 0) {
         console.log(`📡 Migrated ${standaloneDocs.length} standalone tournaments`);

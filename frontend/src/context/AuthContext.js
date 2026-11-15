@@ -185,11 +185,9 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     const res = await axios.post('/api/auth/login', { username, password });
     const { token, admin: adminData } = res.data;
-    const normalizedAdmin = normalizeAdminData(adminData);
+    let normalizedAdmin = normalizeAdminData(adminData);
     const timestamp = new Date().toISOString();
     localStorage.setItem('token', token);
-    localStorage.setItem(adminDataKeyForToken(token), JSON.stringify(normalizedAdmin));
-    localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(normalizedAdmin));
     localStorage.setItem('loginTimestamp', timestamp);
     localStorage.setItem('lastActivity', Date.now().toString());
     setLoginHistory((prev) => {
@@ -198,6 +196,20 @@ export function AuthProvider({ children }) {
       return next;
     });
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    if (!normalizedAdmin.email) {
+      try {
+        const profileResponse = await axios.get('/api/auth/me', { timeout: 3000 });
+        if (profileResponse.data) {
+          normalizedAdmin = normalizeAdminData({ ...normalizedAdmin, ...profileResponse.data });
+        }
+      } catch (error) {
+        console.error('Unable to load the admin profile after login:', error);
+      }
+    }
+
+    localStorage.setItem(adminDataKeyForToken(token), JSON.stringify(normalizedAdmin));
+    localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(normalizedAdmin));
     setAdmin(normalizedAdmin);
     setLoginTimestamp(timestamp);
     return normalizedAdmin;

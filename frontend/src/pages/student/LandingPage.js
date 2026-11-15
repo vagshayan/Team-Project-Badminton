@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ARROW_RIGHT, MENU_OPEN, MENU_CLOSE } from '../../components/Icons';
 import { SPORTS, getSportMeta } from '../../constants/sports';
 import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
+import SportIcon from '../../components/SportIcon';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -111,10 +112,10 @@ export default function LandingPage() {
               <div className="hero-badge">University Tournaments</div>
               <h1 className="hero-title">Manage every<br />match day.</h1>
               <p className="hero-desc">
-                Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> — all in one clean tournament hub.
+                Registration, brackets, player lists, and exports for <strong>Badminton</strong>, <strong>Table Tennis</strong>, and <strong>Carrom</strong> - all in one clean tournament hub.
               </p>
 
-              <div className="hero-actions">
+              <div className="hero-actions" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <button className="button-primary" onClick={() => navigate('/brackets')}>
                   View live brackets {ARROW_RIGHT}
                 </button>
@@ -134,6 +135,7 @@ export default function LandingPage() {
             <div className="tournaments-grid">
               {SPORTS.map((sport) => {
                 const sportMeta = getSportMeta(sport.id, isDarkMode);
+                const iconColor = isDarkMode ? sportMeta.accent : sportMeta.color;
                 return (
                   <button
                     key={sport.id}
@@ -141,13 +143,15 @@ export default function LandingPage() {
                     style={{ "--accent": sportMeta.accent }}
                     onClick={() => navigate(sport.path)}
                   >
-                    <div className="tournament-icon">{sportMeta.icon}</div>
+                    <div className="tournament-icon" style={{ "--accent": sportMeta.accent }}>
+                      <SportIcon sportId={sport.id} accent={iconColor} size={64} strokeWidth={1.8} />
+                    </div>
                     <div className="tournament-card-body">
                       <div className="tournament-title">{sportMeta.label}</div>
                       <div className="tournament-count">
                         {openTournamentCounts[sport.id] || 0} Open Tournament{openTournamentCounts[sport.id] === 1 ? '' : 's'}
                       </div>
-                      <div className="tournament-link" style={{ color: sportMeta.color }}>
+                      <div className="tournament-link" style={{ color: sportMeta.accent }}>
                         View Tournaments {ARROW_RIGHT}
                       </div>
                     </div>

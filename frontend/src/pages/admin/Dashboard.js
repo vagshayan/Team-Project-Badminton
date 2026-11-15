@@ -5,20 +5,36 @@ import Cropper from 'react-easy-crop';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { SUN, MOON, EYE, EYE_OFF, LOCK, SEARCH, MENU_OPEN, MENU_CLOSE, CARET_UP, CARET_DOWN, TROPHY, TREE, PEOPLE, PHONE, EMAIL, ID_CARD, CALENDAR, LOCATION, TRASH, CLOSE, SUCCESS, WARNING_ROUND, ARROW_RIGHT, ARROW_LEFT, CHECK_MARK, CROSS, HOURGLASS, MEDAL, DOWNLOAD, CAMERA, USER_ROUND, SHIELD } from '../../components/Icons';
-import { Bell, LayoutDashboard, ClipboardCheck, Trophy as TrophyOutline, UsersRound, GitBranch, ClipboardList, UserRound, LogOut } from 'lucide-react';
+import {
+  Bell,
+  LayoutDashboard,
+  ClipboardCheck,
+  Trophy as TrophyOutline,
+  UsersRound,
+  GitBranch,
+  ClipboardList,
+  UserRound,
+  LogOut,
+  Search,
+  BarChart3,
+  BadgeCheck
+} from 'lucide-react';
 import TournamentFormModal from '../../components/TournamentFormModal';
 import PasswordConfirmModal from '../../components/PasswordConfirmModal';
 import RegistrationsModal from '../../components/RegistrationsModal';
 import BracketsView from '../../components/BracketsView';
 import UniversityTeamAdminView from '../../components/UniversityTeamAdminView';
 import RegisterModal from '../../components/RegisterModal';
+import AdminPerformanceSearch from '../../components/performance/AdminPerformanceSearch';
+import PlayerPassManagement from '../../components/PlayerPassManagement';
 import { HomeButton, ThemeToggleButton } from '../../components/HeaderControls';
+import SportIcon from '../../components/SportIcon';
 import { exportPlayerListCSV, exportFullPlayerReportPDF, exportSinglePlayerPDF, exportFilteredPlayersPDF, exportFilteredPlayersCSV } from '../../utils/exporters';
 import { SPORT_META, getSportMeta } from '../../constants/sports';
 
 const CAT_LABELS = {
-  'singles-men': 'Singles — Men', 'singles-women': 'Singles — Women',
-  'doubles-men': 'Doubles — Men', 'doubles-women': 'Doubles — Women', 'mixed-doubles': 'Mixed Doubles',
+  'singles-men': 'Singles - Men', 'singles-women': 'Singles - Women',
+  'doubles-men': 'Doubles - Men', 'doubles-women': 'Doubles - Women', 'mixed-doubles': 'Mixed Doubles',
 };
 
 const STATUS_STYLE = {
@@ -68,9 +84,11 @@ const AUDIT_MODULE_LABELS = {
 const VALID_ADMIN_TABS = new Set([
   'dashboard',
   'player-approvals',
+  'player-passes',
   'tournament-setup',
   'university-team',
   'brackets',
+  'player-performance',
   'audit-log',
   'profile',
   'confirmed-summary',
@@ -110,16 +128,16 @@ const formatTeamMemberDetails = (details, actionLabel) => {
   ].filter(Boolean);
   const registrationNumber = formatAuditValue(details.registrationNumber);
   if (registrationNumber) fields.push(`Registration No: ${registrationNumber}`);
-  return `${actionLabel} team member${fields.length ? ` — ${fields.join(', ')}` : ''}`;
+  return `${actionLabel} team member${fields.length ? ` - ${fields.join(', ')}` : ''}`;
 };
 
 const formatGenericAuditDetails = (details) => Object.entries(details)
   .filter(([, value]) => value !== null && value !== undefined && value !== '')
   .map(([key, value]) => `${formatAuditFieldName(key)}: ${typeof value === 'object' ? formatGenericAuditDetails(value) : value}`)
-  .join(', ') || '—';
+  .join(', ') || '-';
 
 const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
-  if (!log?.details) return '—';
+  if (!log?.details) return '-';
   const details = log.details;
   if (typeof details === 'string') return details;
 
@@ -143,7 +161,7 @@ const formatAuditDetails = (log, dateFormat = 'DD/MM/YYYY') => {
           if (key === 'registrationDeadline') return `Registration deadline to ${formatDatePreference(value, dateFormat)}`;
           return `${key} to ${value}`;
         }).join(', ');
-        return `Updated tournament — ${updated}`;
+        return `Updated tournament - ${updated}`;
       }
       return 'Updated tournament details';
     }
@@ -617,6 +635,9 @@ export default function Dashboard() {
   const normalizedSport = admin?.sport ? String(admin.sport).trim().toLowerCase() : '';
   const meta = getSportMeta(normalizedSport, isDarkMode) || { label: admin?.sport ? String(admin.sport).trim().toUpperCase() : 'ADMIN', icon: TROPHY, color: '#2563EB' };
   const safeMetaLabel = meta.label || 'ADMIN';
+  const sidebarLogoIcon = SPORT_META[normalizedSport]
+    ? <SportIcon sportId={normalizedSport} accent="#080D15" size={32} strokeWidth={2.4} />
+    : meta.icon;
 
   const loginTimeFormatted = `${formatDatePreference(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now(), dateFormat)} ${formatTimePreference(admin?.loginTimestamp || localStorage.getItem('loginTimestamp') || Date.now(), timeFormat)}`;
 
@@ -1067,7 +1088,7 @@ export default function Dashboard() {
                 aria-label="Open sidebar"
                 style={{ ...ds.logoBox, position: 'relative', background: meta.color, border: 'none', color: 'inherit', cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}
               >
-                <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: sidebarToggleHovered ? 0 : 1, transition: 'opacity 0.2s ease' }}>{meta.icon}</span>
+                <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: sidebarToggleHovered ? 0 : 1, transition: 'opacity 0.2s ease' }}>{sidebarLogoIcon}</span>
                 <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: sidebarToggleHovered ? 1 : 0, transition: 'opacity 0.2s ease' }}>{MENU_OPEN}</span>
               </button>
               <span
@@ -1096,7 +1117,7 @@ export default function Dashboard() {
               </span>
             </div>
           ) : (
-            <div style={{ ...ds.logoBox, background: meta.color, flexShrink: 0 }}>{meta.icon}</div>
+            <div style={{ ...ds.logoBox, background: meta.color, flexShrink: 0 }}>{sidebarLogoIcon}</div>
           )}
           {!((!isMobile) && sidebarCollapsed) && <div style={{ fontWeight: 950, fontSize: 16, letterSpacing: -0.5, whiteSpace: 'nowrap' }}>ADMIN PANEL</div>}
           <button
@@ -1139,9 +1160,11 @@ export default function Dashboard() {
           {[
             { id: 'dashboard', label: 'DASHBOARD VIEW', icon: LayoutDashboard },
             { id: 'player-approvals', label: 'PLAYER APPROVALS', icon: ClipboardCheck },
+            { id: 'player-passes', label: 'PLAYER PASSES', icon: BadgeCheck },
             { id: 'tournament-setup', label: 'TOURNAMENT SETUP', icon: TrophyOutline },
             { id: 'university-team', label: 'UNIVERSITY TEAM', icon: UsersRound },
             { id: 'brackets', label: 'BRACKETS & DRAWS', icon: GitBranch },
+            { id: 'player-performance', label: 'PLAYER PERFORMANCE', icon: BarChart3 },
             { id: 'audit-log', label: 'AUDIT LOG', icon: ClipboardList },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -1272,10 +1295,6 @@ export default function Dashboard() {
               style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, cursor: 'pointer', padding: 4, lineHeight: 1 }}
               aria-label="Open menu"
             >{MENU_OPEN}</button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ ...ds.logoBox, background: meta.color, width: 32, height: 32, fontSize: 18 }}>{meta.icon}</div>
-              <span style={{ fontWeight: 950, fontSize: 14, letterSpacing: 0.5 }}>ADMIN PANEL</span>
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div ref={notificationsRef} style={{ position: 'relative' }}>
                 <button
@@ -1633,23 +1652,23 @@ export default function Dashboard() {
 
           {activeTab === 'player-approvals' && (
             <div style={ds.section}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32 }}>
-                <div>
-                  <h2 style={ds.sectionTitle}>PLAYER VERIFICATION BOARD</h2>
-                </div>
-                <div style={{ display: 'flex', gap: 15, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-input)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 14, transition: 'all 0.3s' }}>
+              <div style={{ marginBottom: isMobile ? 20 : 32 }}>
+                <h2 style={{ ...ds.sectionTitle, fontSize: isMobile ? 24 : ds.sectionTitle.fontSize, marginBottom: 0 }}>PLAYER VERIFICATION BOARD</h2>
+              </div>
+              <section aria-label="Registration controls" style={{ padding: isMobile ? 14 : 20, marginBottom: 24, border: '1px solid var(--border)', borderRadius: 16, background: 'var(--bg-card)', boxShadow: 'var(--shadow)', minWidth: 0, boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: 'var(--text)' }}>Registrations</h3>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 44, padding: '0 10px', cursor: 'pointer', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-input)', flexShrink: 0 }}>
                     <input type="checkbox" checked={isEditMode} onChange={() => setIsEditMode(!isEditMode)} style={{ display: 'none' }} />
-                    <div style={{ width: 50, height: 28, background: isEditMode ? '#10B981' : '#D1D5DB', borderRadius: 14, position: 'relative', transition: 'background 0.3s', display: 'flex', alignItems: 'center', padding: '2px' }}>
-                      <div style={{ width: 24, height: 24, background: '#FFF', borderRadius: '50%', transition: 'transform 0.3s', transform: isEditMode ? 'translateX(22px)' : 'translateX(0)' }} />
+                    <div style={{ width: 42, height: 24, background: isEditMode ? 'var(--primary)' : '#64748B', borderRadius: 14, position: 'relative', transition: 'background 0.2s', padding: 2, boxSizing: 'border-box' }}>
+                      <div style={{ width: 20, height: 20, background: '#FFF', borderRadius: '50%', transition: 'transform 0.2s', transform: isEditMode ? 'translateX(18px)' : 'translateX(0)' }} />
                     </div>
-                    <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', userSelect: 'none' }}>Edit Mode</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)', userSelect: 'none' }}>Edit mode</span>
                   </label>
                 </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 15, alignItems: isMobile ? 'stretch' : 'center', flex: 1, justifyContent: isMobile ? 'flex-start' : 'flex-end', width: '100%' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gridTemplateAreas: '"search search" "filter csv"', gap: 12, minWidth: 0 }}>
                 {/* Custom Nested Filter Dropdown (Windows Context Menu Style) */}
-                  <div ref={filterRef} style={{ position: 'relative', width: isMobile ? '100%' : 350, zIndex: 50 }}>
+                  <div ref={filterRef} style={{ position: 'relative', gridArea: 'filter', width: '100%', minWidth: 0, zIndex: 50 }}>
                     <div
                       onClick={() => {
                         setFilterOpen(!filterOpen);
@@ -1658,12 +1677,14 @@ export default function Dashboard() {
                       style={{
                         ...ds.filterSelect,
                         width: '100%',
-                        height: 50,
-                        borderRadius: 20,
+                        height: 48,
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        borderRadius: 12,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '0 20px',
+                        padding: '0 14px',
                         background: 'var(--bg-input)',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
@@ -1691,7 +1712,7 @@ export default function Dashboard() {
                           boxShadow: 'var(--shadow)',
                           zIndex: 1000,
                           padding: '6px 0',
-                          width: isMobile ? '100%' : 240,
+                          width: '100%',
                           maxWidth: '100%'
                         }}
                       >
@@ -1774,23 +1795,27 @@ export default function Dashboard() {
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       const unique = Array.from(new Map(filteredRegistrations.map(item => [item.rollNumber, item])).values());
                       exportFilteredPlayersCSV(unique, `${admin.sport.toUpperCase()} PARTICIPANTS - ${statusFilter.toUpperCase()}`);
                     }}
-                    style={{ ...ds.actionBtn, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0 25px', height: 50, borderRadius: 20, whiteSpace: 'nowrap' }}
-                  >{DOWNLOAD} DOWNLOAD CSV</button>
-                  <div style={{ position: 'relative', width: isMobile ? '100%' : 350 }}>
-                    <span style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', fontSize: 18 }}>{SEARCH}</span>
+                    aria-label="Download CSV"
+                    title="Download CSV"
+                    style={{ ...ds.actionBtn, gridArea: 'csv', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 76, minHeight: 48, padding: '0 12px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid var(--primary)', color: 'var(--primary)', borderRadius: 12, whiteSpace: 'nowrap', fontSize: 12 }}
+                  >{DOWNLOAD} CSV</button>
+                  <div style={{ position: 'relative', gridArea: 'search', width: '100%', minWidth: 0 }}>
+                    <Search size={18} strokeWidth={1.8} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input
                       type="text"
-                      placeholder="Search Name or Reg No..."
+                      placeholder="Search name or registration no."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      style={{ ...ds.input, paddingLeft: 50, borderRadius: 20, width: '100%', height: 50 }}
+                      style={{ ...ds.input, boxSizing: 'border-box', paddingLeft: 42, paddingRight: 12, borderRadius: 12, width: '100%', minWidth: 0, height: 48, fontSize: 14 }}
                     />
                   </div>
                 </div>
+              </section>
               <div className="responsive-table-wrap" style={{ ...ds.tableBox, overflowX: 'auto' }}>
                 <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={ds.thead}>
@@ -2117,6 +2142,8 @@ export default function Dashboard() {
             </div>
           )}
 
+          {activeTab === 'player-passes' && <PlayerPassManagement color={meta.color} />}
+
           {activeTab === 'tournament-setup' && (
             <div style={ds.section}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 16 : 0, marginBottom: 40 }}>
@@ -2159,7 +2186,7 @@ export default function Dashboard() {
                 <div style={{ gridArea: 'profile', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 24, padding: 28, boxShadow: 'var(--shadow)' }}>
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ color: 'var(--primary)', fontSize: 12, fontWeight: 950, letterSpacing: 1.4 }}>PROFILE INFORMATION</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 6 }}>Manage the details shown on your administrator account.</div>
+                    {/* <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 6 }}>Manage the details shown on your administrator account.</div> */}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 28 }}>
                     <div style={{ position: 'relative', width: 88, height: 88 }}>
@@ -2289,7 +2316,7 @@ export default function Dashboard() {
                     </div>
                     <div style={{ position: 'relative' }}>
                       <label style={ds.fieldLabel}>Role</label>
-                      <input type="text" value={admin?.role === 'super_admin' ? 'Super Administrator' : 'Administrator'} readOnly style={{ ...ds.input, opacity: 0.75 }} />
+                      <input type="text" value="Administrator" readOnly style={{ ...ds.input, opacity: 0.75 }} />
                     </div>
                     {profileMessage && <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', fontWeight: 700 }}>{profileMessage}</div>}
                     <button
@@ -2627,9 +2654,9 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-end', gap: 16, marginBottom: 32 }}>
                 <div>
                   <h2 style={ds.sectionTitle}>AUDIT LOG</h2>
-                  <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Track important admin actions performed in the system.</p>
+                  {/* <p style={{ margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>Track important admin actions performed in the system.</p> */}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, width: isMobile ? '100%' : 'auto', minWidth: 0, alignItems: 'center' }}>
                   <input
                     type="date"
                     value={auditDate}
@@ -2637,11 +2664,11 @@ export default function Dashboard() {
                       setAuditDate(e.target.value);
                       fetchAuditLogs(e.target.value);
                     }}
-                    style={{ ...ds.input, width: isMobile ? '100%' : 220 }}
+                    style={{ ...ds.input, flex: isMobile ? '1 1 0' : '0 0 220px', minWidth: 0, width: isMobile ? 0 : 220, height: 44, boxSizing: 'border-box', padding: '0 10px', borderRadius: 12, fontSize: 13 }}
                   />
                   <button
                     onClick={handleClearAllAuditLogs}
-                    style={{ ...ds.actionBtn, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '0 20px', height: 44, borderRadius: 16, whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700 }}
+                    style={{ ...ds.actionBtn, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', borderRadius: 12, whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700 }}
                   >
                     {TRASH} CLEAR ALL
                   </button>
@@ -2684,6 +2711,10 @@ export default function Dashboard() {
 
           {activeTab === 'brackets' && (
             <BracketsView admin={admin} color={meta.color} initialTournamentId={new URLSearchParams(location.search).get('tournamentId')} />
+          )}
+
+          {activeTab === 'player-performance' && (
+            <AdminPerformanceSearch />
           )}
         </main>
       </div>

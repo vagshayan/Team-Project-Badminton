@@ -99,7 +99,7 @@ function getModelsForSport(sport) {
     Player = mongoose.model(pModelName, sPlayerSchema, `${prefix}players`);
   }
   
-    // 4. Pair Model — groups two registrations as a completed pair
+    // 4. Pair Model - groups two registrations as a completed pair
     let Pair;
     if (mongoose.models[pairModelName]) {
       Pair = mongoose.models[pairModelName];
@@ -123,6 +123,8 @@ function getModelsForSport(sport) {
         targetRegistration: { type: mongoose.Schema.Types.ObjectId, ref: rModelName, required: true },
         targetRollNumber: { type: String, required: true },
         status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+        confirmationToken: { type: String, default: null },
+        notificationSent: { type: Boolean, default: false },
       }, { timestamps: true });
       PartnerRequest = mongoose.model(partnerRequestModelName, prSchema, `${prefix}partner_requests`);
     }
